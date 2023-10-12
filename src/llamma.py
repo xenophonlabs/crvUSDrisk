@@ -59,8 +59,20 @@ class LLAMMA:
 
     def deposit(self, user, amount, n1, n2):
         n0 = self.active_band
-        assert n1 < n0
-        pass
+        N = n2 - n1 + 1
+        assert N <= self.MAX_TICKS, "Too many ticks"
+        assert self.user_shares[user] == defaultdict(float), "User already has shares"
+        yn = amount / N
+        for ni in range(n1, n2):
+            assert self.bands_x[n1] == 0
+            ds = self.total_shares[ni]*yn/self.bands_y[ni]
+            assert ds > 0
+            self.user_shares[user][ni] += ds
+            self.total_shares[ni] += ds
+            self.bands_y[ni] += yn
+        
+        self.min_band = min(self.min_band, n1)
+        self.max_band = max(self.max_band, n2)
 
     def withdraw(self):
         pass
