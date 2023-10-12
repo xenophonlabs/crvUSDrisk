@@ -2,9 +2,31 @@ import llamma as lm
 import controller as cntrlr
 import oracle as orcl
 import liquidator as lqdtr
+import plotly.express as px
+import numpy as np
+
+def gen_gbm(S0,mu,sigma, dt, T):
+    W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
+    S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma ** 2) * dt + sigma * W))
+    return(S)
+
+# Graphing
+def graph(df,y1: str,y2: int =False):
+    if y2!=False:
+        fig = px.line(df,x=df.index,y=y1,labels={'X':'Timestep',"Y":y1})
+        fig.add_trace(go.Scatter(x=df.index, y=df[y2], mode='lines',name=y2,yaxis="y2"))
+        fig.update_layout(yaxis2=dict(overlaying='y',side='right'))
+        fig.show()
+    else:
+        fig = px.line(df,x=df.index,y=y1,labels={'X':'Timestep',"Y":y1})
+        fig.show()
 
 def sim(
-        T, # number of timesteps
+        T, # number of time periods
+        dt, # resolution of time steps
+        collat_base_price,
+        collat_mu,
+        collat_sigma
     ):
     # NOTE: For now assume Gas is 0? But DO create the Gas variable, and set it to 0.
     # NOTE: Eventually optimize as just DataFrame operations.
@@ -16,7 +38,9 @@ def sim(
     controller = cntrlr.Controller()
     controller.create() # NOTE: Might want to just query subgraph?
 
-    prices = [] # Gen from GBM. The price is collateral/USD price
+    # Gen from GBM. The price is collateral/USD price
+    spot_collateral_prices = gen_gbm(S0=collat_base_price,mu=collat_mu, sigma=collat_sigma, dt=dt,T=T) 
+    
     # TODO: Eventually, this price will be a function of Collateral/USDC and Collateral/USDT -> crvUSD/USD (from PKs) -> turn into Collateral/USD
     # ETH/USDC and crvUSD/USDC (Tricrypto) -> ETH/crvUSD (PK pool)
     # ETH/USDT and crvUSD/USDT (Tricrypto) -> ETH/crvUSD (PK pool)
@@ -28,13 +52,16 @@ def sim(
 
     liquidity = [] # Create external slippage Curve for ETH and crvUSD?
 
-    for t in range(T):
+    for t in range(int(T/dt)):
         # This loops through timesteps
 
         # Get price
+        p_spot = spot_collateral_prices[t]
 
         # First: update Peg Keepers. For now: pass <- this involves arbitrage and the update() function
         # This mints/burns crvUSD
+        # TODO: implement peg keeper
+        
 
         # Update oracle price <- This updates position healths
 
@@ -47,11 +74,10 @@ def sim(
         # Try to have distribution be fixed (e.g. Normally around current price)
 
         # Update metrics in dfs <- e.g., calculate loss/bad debt
-        print(t)
 
 
 def main():
-    sim(365)
+    sim(T=1,dt=1/365,collat_base_price=1500,collat_mu=0.05,collat_sigma=0.2)
 
 if __name__ == "__main__":
     main()
