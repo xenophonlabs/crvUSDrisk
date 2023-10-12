@@ -1,7 +1,7 @@
-import llamma 
-import controller
-import oracle
-import liquidator
+import llamma as lm
+import controller as cntrlr
+import oracle as orcl
+import liquidator as lqdtr
 
 def sim(
         T, # number of timesteps
@@ -12,8 +12,8 @@ def sim(
     dfs = [] # Store data from run
 
     # Generate collateral distribution <- This means Borrowers will create loans
-    llamma = llamma.LLAMMA()
-    controller = controller.Controller()
+    llamma = lm.LLAMMA(A=100,base_price=1800,oracle=orcl.Oracle(),fee=0.01,admin_fee=0.01)
+    controller = cntrlr.Controller()
     controller.create() # NOTE: Might want to just query subgraph?
 
     prices = [] # Gen from GBM. The price is collateral/USD price
@@ -47,4 +47,11 @@ def sim(
         # Try to have distribution be fixed (e.g. Normally around current price)
 
         # Update metrics in dfs <- e.g., calculate loss/bad debt
-        print(T)
+        print(t)
+
+
+def main():
+    sim(365)
+
+if __name__ == "__main__":
+    main()
