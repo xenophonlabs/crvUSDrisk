@@ -11,13 +11,13 @@ class LLAMMA:
         'MAX_TICKS', # Define as an input param (instead of hard-coded at 50), to potentially test
 
         # === State variables === #
-        'bands_x', # bands_x[n] = stablecoins in band n
-        'bands_y', # bands_y[n] = collateral in band n
-        'user_shares', # user_shares[user, n] = user's share of band n
-        'total_shares', # total_shares[n] = total shares in band n
-        'active_band', # band for current price
-        'min_band', # bands below this are empty
-        'max_band', # bands above this are empty
+        'bands_x',  # bands_x[n] = stablecoins in band n
+        'bands_y',  # bands_y[n] = collateral in band n
+        'user_shares',  # user_shares[user, n] = user's share of band n
+        'total_shares',  # total_shares[n] = total shares in band n
+        'active_band',  # band for current price
+        'min_band',  # bands below this are empty
+        'max_band',  # bands above this are empty
 
         # === Dependencies/Inputs === #
         'oracle', # Oracle object

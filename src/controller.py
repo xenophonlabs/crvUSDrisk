@@ -3,6 +3,9 @@ class Controller:
     def __init__(self):
         pass
 
+    def create(self):
+        pass
+
     def health(self, user):
         pass
 
