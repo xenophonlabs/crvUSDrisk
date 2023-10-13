@@ -247,7 +247,7 @@ class LLAMMA:
         assert N <= self.MAX_TICKS, "Too many ticks"
         assert self.user_shares[user] == defaultdict(float), "User already has shares"
         yn = amount / N
-        for ni in range(n1, n2):
+        for ni in range(n1, n2+1):
             assert self.bands_x[n1] == 0
             ds = (self.total_shares[ni] + DEAD_SHARES)*yn/(self.bands_y[ni] + EPSILON)
             assert ds > 0
@@ -325,10 +325,49 @@ class LLAMMA:
 
         return (total_x, total_y)
 
+    def get_x_down(self, user: str) -> float:
+        """
+        @notice calculate the amount of stablecoins obtainable
+        from a user's position if prices decrease adiabatically.
+        @param user user address
+        @return x_down amount of stablecoins obtainable
+        """
+        user_bands = self.user_shares[user].keys()
+        n1, n2 = min(user_bands), max(user_bands)
+        x_down = 0
 
-    def get_x_down():
-        pass
+        for n in range(n1, n2+1):
 
+            share = self.user_shares[user][n] / self.total_shares[n]
+
+            I = self.inv(n)
+            f = self.f(n)
+            g = self.g(n)
+
+            if self.p_o > self.p_o_up(n):
+
+                y_o = I/f - g
+                assert y_o > 0
+                x_down += y_o * self.p_o_up(n) * ((self.A - 1)/self.A) ** 0.5 * share
+
+                print(self.bands_y[n], y_o * self.p_o_up(n) * ((self.A - 1)/self.A) ** 0.5 * share)
+            
+            elif self.p_o < self.p_o_down(n):
+
+                x_o = I/g - f
+                assert x_o > 0
+                x_down += x_o * share
+            
+            else:
+
+                y_o = self.A * self.y0(n) * (self.p_o - self.p_o_down(n)) / self.p_o
+                x_o = I/(g + y_o) - f
+                assert y_o > 0
+                assert x_o > 0
+                x_down += x_o + y_o * (self.p_o_down(n) * self.p_o) ** 0.5 * share
+        
+        return x_down
+            
     # === Helper Functions === #
 
     def _p(
@@ -409,7 +448,7 @@ class LLAMMA:
         @notice Plot reserves in each band
         NOTE: for now, assume collateral price is = oracle price, and crvUSD price = $1
         """
-        band_range = range(self.min_band, self.max_band)
+        band_range = range(self.min_band, self.max_band+1)
         bands_x = [self.bands_x[i] for i in band_range]
         bands_y = [self.bands_y[i] * self.p_o for i in band_range]
         band_edges = [self.p_o_down(i) for i in band_range]
