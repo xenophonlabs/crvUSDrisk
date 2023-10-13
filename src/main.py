@@ -40,13 +40,13 @@ def calc_p_impact(x,y,original_swap_x,fee):
     return((trade_price-original_price)/original_price)
 
 def sim(
-        T, # number of time periods
-        dt, # resolution of time steps
-        collat_base_price,
-        collat_mu,
-        collat_sigma,
-        spot_stable_mu,
-        external_stable_liquidity,
+        T, # number of time periods, eg 1 year
+        dt, # resolution of time steps, eg 1/365 for daily
+        collat_base_price, # for the gbm
+        collat_mu, # expected drift for the collat
+        collat_sigma, # expected volatility for collat
+        spot_stable_sigma, # expected volatility for the stable
+        external_stable_liquidity, # 
         external_swap_fee
     ):
     # NOTE: For now assume Gas is 0? But DO create the Gas variable, and set it to 0.
@@ -87,6 +87,7 @@ def sim(
         pegkeeper.update()
 
         # Update oracle price <- This updates position healths
+        # TODO: implement oracle
         oracle = orcl.Oracle()
         p_oracle = oracle.price()
 
@@ -107,6 +108,7 @@ def sim(
         # TODO: How will borrowers update positions?
         # Try to have distribution be fixed (e.g. Normally around current price)
         # VC: I think instead of simlating indidivudal loans here it might make more sense to simulate the whole distribution of loans at once, but we can discuss        
+        
         
         # Compute gains and losses from liquidations and swaps
         liquidation_pnl = np.zeros(int(T/dt))
