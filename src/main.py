@@ -2,6 +2,7 @@ import llamma as lm
 import controller as cntrlr
 import oracle as orcl
 import liquidator as lqdtr
+import pegkeeper as pk
 import plotly.express as px
 import numpy as np
 
@@ -20,6 +21,22 @@ def graph(df,y1: str,y2: int =False):
     else:
         fig = px.line(df,x=df.index,y=y1,labels={'X':'Timestep',"Y":y1})
         fig.show()
+
+def calc_p_impact(x,y,original_swap_x,fee):
+    # x = 2e6 
+    # y = 1e3
+    k = x*y
+    original_price = x/y
+    # original_swap_x = 10e3
+    # fee=0.00
+    swap_x = original_swap_x*(1-fee)
+    new_x = x + swap_x
+    new_y = k/new_x
+    swap_y = y-new_y
+    trade_price = swap_x/swap_y
+    new_price = new_x/new_y
+
+    return((trade_price-original_price)/original_price)
 
 def sim(
         T, # number of time periods
@@ -50,24 +67,29 @@ def sim(
     # for now, just generate ETH/USD from GBM?
     # Ultimately, will need to generate 6 price paths (+ crvUSD price path?)
 
-    liquidity = [] # Create external slippage Curve for ETH and crvUSD?
+    # Create external slippage Curve for ETH and crvUSD?
+    liquidity = calc_p_impact(x=2e6,y=1e3,original_swap_x=10e3,fee=0.005) 
 
-    for t in range(int(T/dt)):
-        # This loops through timesteps
+    # This loops through timesteps
+    for t in range(int(T/dt)):    
 
         # Get price
         p_spot = spot_collateral_prices[t]
 
         # First: update Peg Keepers. For now: pass <- this involves arbitrage and the update() function
         # This mints/burns crvUSD
-        # TODO: implement peg keeper
-        
+        # TODO: implement peg keeper        
+        pegkeeper = pk.PegKeeper()
+        pegkeeper.update()
 
         # Update oracle price <- This updates position healths
+        oracle = orcl.Oracle()
+        p_oracle = oracle.price()
 
         # Liquidators liquidate positions or arbitrage LLAMMA <- This updates LLAMMA/Controller
         # NOTE: Liquidators do whatever is most profitable < check hard liquidations first, then arbs (soft liquidations)
         # NOTE: This is where slippage/liquidity is important
+        
 
         # Borrowers update positions or create new loans <- This updates LLAMMA/Controller
         # TODO: How will borrowers update positions?
