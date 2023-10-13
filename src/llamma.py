@@ -1,5 +1,6 @@
 from collections import defaultdict
 import matplotlib.pyplot as plt
+from .oracle import Oracle
 
 EPSILON = 1e-18 # to avoid division by 0
 DEAD_SHARES = 1e-15 # to init shares in a band
@@ -61,13 +62,13 @@ class LLAMMA:
 
     def __init__(
             self, 
-            A, 
-            base_price, 
-            oracle,
-            fee,
-            admin_fee = 1,
-            MAX_TICKS = 50,
-        ):
+            A: int, 
+            base_price: float, 
+            oracle: Oracle,
+            fee: float,
+            admin_fee: float = 1,
+            MAX_TICKS: int = 50,
+        ) -> None:
         # Set parameters
         self.A = A
         self.base_price = base_price # TODO: eventually updated by interest rate
@@ -88,10 +89,16 @@ class LLAMMA:
 
         # Set dependencies
         self.oracle = oracle
+
+    # === Main Functions === #
     
-    def _swap(self, amt_in, y_in) -> Swap:
+    def _swap(
+            self, 
+            amt_in: float, 
+            y_in: bool
+        ) -> Swap:
         """
-        @notice Sell at most amt_in to the AMM.
+        @notice Sell at most amt_in to the AMM. This is a VIEW function.
         @param amt_in amount of tokens to swap in
         @param y_in whether collateral is being sold to the AMM (True) or bought from the AMM (False)
         @return Swap object
@@ -191,7 +198,11 @@ class LLAMMA:
 
         return s
 
-    def swap(self, amt_in, y_in):
+    def swap(
+            self, 
+            amt_in: float, 
+            y_in: bool
+        ) -> tuple:
         """
         @notice Swap tokens in pool. This is a soft liquidation.
         @param amt amount of tokens to swap in
@@ -218,9 +229,15 @@ class LLAMMA:
 
         self.active_band = s.n2
 
-        return s.in_amount, s.out_amount
+        return (s.in_amount, s.out_amount)
 
-    def deposit(self, user, amount, n1, n2):
+    def deposit(
+            self, 
+            user: str, 
+            amount: float, 
+            n1: int, 
+            n2: int
+        ) -> None:
         N = n2 - n1 + 1
         assert N <= self.MAX_TICKS, "Too many ticks"
         assert self.user_shares[user] == defaultdict(float), "User already has shares"
@@ -236,7 +253,11 @@ class LLAMMA:
         self.min_band = min(self.min_band, n1)
         self.max_band = max(self.max_band, n2)
 
-    def withdraw(self, user, frac):
+    def withdraw(
+            self, 
+            user: str, 
+            frac: float
+        ) -> tuple:
         """
         @notice Evenly withdraw frac of the user's shares from each band.
         @param user user address
@@ -297,16 +318,21 @@ class LLAMMA:
         # self.rate_mul = self._rate_mul()
         # self.rate_time = block.timestamp
 
-        return [total_x, total_y]
+        return (total_x, total_y)
 
     @property
-    def p_o(self):
+    def p_o(self) -> float:
         # TODO: limit oracle changes and dynamic fee
         return self.oracle.price()
 
     # === Helper Functions === #
 
-    def _p(self, n, x, y):
+    def _p(
+            self, 
+            n: int, 
+            x: float, 
+            y: float
+        ) -> float:
         if x==0 and y==0:
             # return mid-price between p_c_up and p_c_down
             return self.p_c_down(n) * (self.A/(self.A-1))
@@ -318,47 +344,47 @@ class LLAMMA:
             return self.p_c_up(n)
         return (x + self.f(n)) / (y + self.g(n))
     
-    def p(self):
+    def p(self) -> float:
         """
         @notice wrapper to get price at current band
         """
         n = self.active_band
         return self._p(n, self.bands_x[n], self.bands_y[n])
     
-    def p_o_up(self, n):
+    def p_o_up(self, n: int) -> float:
         return self.base_price * ((self.A-1)/self.A)**n
     
-    def p_o_down(self, n):
+    def p_o_down(self, n: int) -> float:
         return self.p_o_up(n+1)
     
-    def p_c_up(self, n):
+    def p_c_up(self, n: int) -> float:
         return self.p_c_down(n+1)
     
-    def p_c_down(self, n):
+    def p_c_down(self, n: int) -> float:
         return self.p_o ** 3 / self.p_o_up(n) ** 2
 
-    def f(self, n):
+    def f(self, n: int) -> float:
         return self.A * self.y0(n) * self.p_o**2 / self.p_o_up(n)
 
-    def g(self, n):
+    def g(self, n: int) -> float:
         return (self.A - 1) * self.y0(n) * self.p_o_up(n) / self.p_o
     
-    def inv(self, n):
+    def inv(self, n: int) -> float:
         return (self.bands_x[n] + self.f(n)) * (self.bands_y[n] + self.g(n))
 
-    def inv_up(self, n):
+    def inv_up(self, n: int) -> float:
         return self.p_o * self.A**2 * self.y0(n)**2
     
-    def band_width(self, n):
+    def band_width(self, n: int) -> float:
         return self.p_o_up(n) / self.A
     
     def _y0(
             self,
-            x, 
-            y, 
-            p_o, 
-            p_o_up
-        ):
+            x: float, 
+            y: float, 
+            p_o: float, 
+            p_o_up: float
+        ) -> float:
         # solve quadratic:
         # p_o * A * y0**2 - y0 * (p_oracle_up/p_o * (A-1) * x + p_o**2/p_oracle_up * A * y) - xy = 0
         a = p_o * self.A
@@ -366,11 +392,13 @@ class LLAMMA:
         c = x * y
         return (b + (b**2 - 4*a*c)**0.5) / (2*a)
     
-    def y0(self, n):
+    def y0(self, n: int):
         """
         @notice wrapper to get _y0 for input band
         """
         return self._y0(self.bands_x[n], self.bands_y[n], self.p_o, self.p_o_up(n))
+    
+    # === Plotting Functions === #
 
     def plot_reserves(self):
         """
