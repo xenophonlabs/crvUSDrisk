@@ -1,4 +1,13 @@
 from collections import defaultdict
+import matplotlib.pyplot as plt
+
+EPSILON = 1e-18 # to avoid division by 0
+DEAD_SHARES = 1e-15 # to init shares in a band
+
+plt.rcParams["font.family"] = "serif"
+plt.rcParams.update({'font.size': 10})
+plt.rcParams["axes.spines.top"] = False
+plt.rcParams["axes.spines.right"] = False
 
 class LLAMMA:
 
@@ -58,14 +67,13 @@ class LLAMMA:
         return
 
     def deposit(self, user, amount, n1, n2):
-        n0 = self.active_band
         N = n2 - n1 + 1
         assert N <= self.MAX_TICKS, "Too many ticks"
         assert self.user_shares[user] == defaultdict(float), "User already has shares"
         yn = amount / N
         for ni in range(n1, n2):
             assert self.bands_x[n1] == 0
-            ds = self.total_shares[ni]*yn/self.bands_y[ni]
+            ds = (self.total_shares[ni] + DEAD_SHARES)*yn/(self.bands_y[ni] + EPSILON)
             assert ds > 0
             self.user_shares[user][ni] += ds
             self.total_shares[ni] += ds
@@ -127,6 +135,9 @@ class LLAMMA:
     def inv_up(self, n):
         return self.p_o * self.A**2 * self.y0(n)**2
     
+    def band_width(self, n):
+        return self.p_o_up(n) / self.A
+    
     def _y0(
             self,
             x, 
@@ -146,3 +157,22 @@ class LLAMMA:
         @notice wrapper to get _y0 for input band
         """
         return self._y0(self.bands_x[n], self.bands_y[n], self.p_o, self.p_o_up(n))
+
+    def plot_reserves(self):
+        """
+        @notice Plot reserves in each band
+        NOTE: for now, assume collateral price is = AMM price, and crvUSD price = $1
+        """
+        band_range = range(self.min_band, self.max_band)
+        bands_x = [self.bands_x[i] for i in band_range]
+        bands_y = [self.bands_y[i] * self.p() for i in band_range]
+        band_edges = [self.p_o_down(i) for i in band_range]
+        band_widths = [self.band_width(i)*0.9 for i in band_range]
+
+        plt.bar(band_edges, bands_y, color='darkblue', width=band_widths, label='Collateral')
+        plt.bar(band_edges, bands_x, bottom=bands_y, color='darkred', width=band_widths, label='crvUSD')
+        plt.xlabel('p_o_down[n] (USD)')
+        plt.ylabel('Reserves (USD)')
+        plt.title('LLAMMA Collateral Distribution')
+        plt.xticks([round(i) for i in band_edges], rotation=45)
+        plt.show()
