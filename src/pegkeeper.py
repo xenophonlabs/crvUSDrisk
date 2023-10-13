@@ -1,4 +1,4 @@
-class PegKepper:
+class PegKeeper:
 
     def __init__(self):
         pass
