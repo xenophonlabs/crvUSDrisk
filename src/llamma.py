@@ -1,14 +1,9 @@
 from collections import defaultdict
-import matplotlib.pyplot as plt
 from .oracle import Oracle
+from .utils import _plot_reserves
 
 EPSILON = 1e-18 # to avoid division by 0
 DEAD_SHARES = 1e-15 # to init shares in a band
-
-plt.rcParams["font.family"] = "serif"
-plt.rcParams.update({'font.size': 10})
-plt.rcParams["axes.spines.top"] = False
-plt.rcParams["axes.spines.right"] = False
 
 class Swap:
 
@@ -448,16 +443,4 @@ class LLAMMA:
         @notice Plot reserves in each band
         NOTE: for now, assume collateral price is = oracle price, and crvUSD price = $1
         """
-        band_range = range(self.min_band, self.max_band+1)
-        bands_x = [self.bands_x[i] for i in band_range]
-        bands_y = [self.bands_y[i] * self.p_o for i in band_range]
-        band_edges = [self.p_o_down(i) for i in band_range]
-        band_widths = [self.band_width(i)*0.9 for i in band_range]
-
-        plt.bar(band_edges, bands_y, color='darkblue', width=band_widths, label='Collateral')
-        plt.bar(band_edges, bands_x, bottom=bands_y, color='darkred', width=band_widths, label='crvUSD')
-        plt.xlabel('p_o_down[n] (USD)')
-        plt.ylabel('Reserves (USD)')
-        plt.title('LLAMMA Collateral Distribution')
-        plt.xticks([round(i) for i in band_edges], rotation=45)
-        plt.show()
+        _plot_reserves(self)
