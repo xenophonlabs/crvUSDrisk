@@ -24,6 +24,13 @@ def graph(df,y1: str,y2: int =False):
         fig.show()
 
 def calc_p_impact(x,y,original_swap_x,fee):
+    """
+    @notice calculate slippage when selling x or y to the open market.
+    Assuming that we trade against Uniswap is a conservative assumption
+    """
+    # TODO: Also need to incorporate original_swap_y in case we are selling collateral
+    # TODO: Need to incorporate concentrated liquidity (e.g., no more liquidity beyond ]a, b[)
+    # TODO: Need to incorproate the StableSwap invariant for crvUSD pool liquidity
     # x = 2e6 
     # y = 1e3
     k = x*y

@@ -90,6 +90,11 @@ class LLAMMA:
         # Set dependencies
         self.oracle = oracle
 
+    @property
+    def p_o(self) -> float:
+        # TODO: limit oracle changes and dynamic fee
+        return self.oracle.price()
+
     # === Main Functions === #
     
     def _swap(
@@ -320,10 +325,9 @@ class LLAMMA:
 
         return (total_x, total_y)
 
-    @property
-    def p_o(self) -> float:
-        # TODO: limit oracle changes and dynamic fee
-        return self.oracle.price()
+
+    def get_x_down():
+        pass
 
     # === Helper Functions === #
 
