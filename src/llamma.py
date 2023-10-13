@@ -82,8 +82,68 @@ class LLAMMA:
         self.min_band = min(self.min_band, n1)
         self.max_band = max(self.max_band, n2)
 
-    def withdraw(self):
-        pass
+    def withdraw(self, user, frac):
+        """
+        @notice Evenly withdraw frac of the user's shares from each band.
+        @param user user address
+        @param frac fraction of shares to withdraw
+        @return [x, y] [amount of stablecoins withdrawn, amount of collateral withdrawn]
+        """
+        assert frac <= 1
+        user_bands = self.user_shares[user].keys()
+        assert len(self.user_shares[user]) >= 0
+        n1 = min(user_bands)
+        n2 = max(user_bands)
+
+        total_x = 0
+        total_y = 0
+        min_band = self.min_band
+        max_band = n1 - 1
+
+        for n in range(n1, n2+1):
+
+            x = self.bands_x[n]
+            y = self.bands_y[n]
+
+            ds = frac * self.user_shares[user][n]  
+            self.user_shares[user][n] -= ds
+            s = self.total_shares[n]
+            new_shares = s - ds
+            self.total_shares[n] = new_shares
+            s += DEAD_SHARES
+            dx = (x + EPSILON) * ds / s
+            dy = (y + EPSILON) * ds / s
+
+            x -= dx
+            y -= dy
+            
+            if new_shares == 0:
+                assert x == 0 & y == 0 
+
+            if n == min_band:
+                if x == 0 and y==0:
+                    min_band += 1
+            if x > 0 or y > 0:
+                max_band = n
+
+            self.bands_x[n] = x
+            self.bands_y[n] = y
+            total_x += dx
+            total_y += dy
+
+        # Empty the ticks
+        if frac == 1:
+            del self.user_shares[user]
+
+        self.min_band = min_band
+        if self.max_band <= n2:
+            self.max_band = max_band
+
+        # TODO: update rate
+        # self.rate_mul = self._rate_mul()
+        # self.rate_time = block.timestamp
+
+        return [total_x, total_y]
 
     @property
     def p_o(self):
