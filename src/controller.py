@@ -1,6 +1,7 @@
 from collections import defaultdict
 import math
 from typing import List
+import numpy as np
 from .llamma import LLAMMA
 from .mpolicy import MonetaryPolicy
 
@@ -26,10 +27,12 @@ class Controller:
     """
     @notice A simplified python implementation of the crvUSD Controller with
     enough functionality to model risk in the system.
+    TODO implement interest rates
+    TODO each loan should have its own liq disc if it changes in the future
+    TODO withdraw
+    TODO repay
+    TODO limit amt of controller debt
     """
-
-    # TODO: implement interest rates
-    # TODO: each loan should have its own liq disc if it changes in the future
 
     __slots__ = (
         # === Parameters === #
@@ -65,18 +68,52 @@ class Controller:
         self.liquidation_discount = liquidation_discount
         self.MIN_TICKS = MIN_TICKS
         self.MAX_TICKS = MAX_TICKS
-
+        
+        self.total_debt = 0
         self.loans = defaultdict(int)
 
-    def create(self):
+    def gen_borrowers(
+        self,
+        n: int,
+        coins: float, # target collateral
+        mean_N: int = 10,
+        std_N: int = 3,
+        v: bool = False,
+        ):
         """
-        @notice create positions to approximate a target distribution 
-        of collateral/health.
-        TODO: a function to open a loan taking as input the target debt (or collateral)
-        and a target health. Then we can create loans as a func of a health/collateral
-        distribution.
+        @notice generate n borrowers. borrowers are
+        a tuple (collateral, debt, N). 
+        @param n number of borrowers to generate
+        @param mean_N mean of normal distribution for N
+        @param std_N std of normal distribution for N
+        @return borrowers list of tuples (collateral, debt, N)
+
+        NOTE For now, we create them as:
+        1. Generate uniform (dirichlet) collateral distribution from target COINS
+        2. Generate normal distribution for N
+        For each borrower:
+        3. a. calculate max_borrowable given collateral, N
+        3. b. generate random riskiness from [0.5, 1] <- TODO this was arbitrary to get us to ~40M debt
+        3. c. set debt = max_borrowable * riskiness
+        TODO include whales (not just uniform dist of collateral)
+        TODO improve riskiness generation
+        TODO compare to empirical data
+        TODO could replace riskiness with a target health
         """
-        pass
+        borrowers = []
+        collateral = np.random.dirichlet(np.ones(n), 1)[0] * coins
+        Ns = np.clip(np.random.normal(mean_N, std_N, n), 4, 50).astype(int)
+        for i in range(n):
+            max_borrowable = self.max_borrowable(collateral[i], Ns[i])
+            riskiness = np.random.uniform(low=0.5)
+            debt = riskiness * max_borrowable
+            borrowers.append((collateral[i], debt, Ns[i]))
+        borrowers = np.array(borrowers)
+        assert abs(borrowers[:,0].sum() - coins) <= 1e-3
+        if v:
+            print(f"Total collateral: {round(borrowers[:,0].sum() * self.amm.base_price / 1e6)} Mns USD")
+            print(f"Total debt: {round(borrowers[:,1].sum() / 1e6)} Mns USD")
+        return borrowers
 
     def health(self, user):
         """
@@ -133,8 +170,8 @@ class Controller:
         assert self.MIN_TICKS <= N <= self.MAX_TICKS, "Invalid number of bands"
         assert self.loans[user] == 0, "User already has a loan"
 
-        n1 = self.calculate_debt_n1(collateral, N)
-        n2 = n1 + (N - 1)
+        n1 = self.calculate_debt_n1(collateral, debt, N)
+        n2 = int(n1 + (N - 1))
 
         self.loans[user] = debt
         self.total_debt += debt
@@ -155,6 +192,18 @@ class Controller:
                 x, y = self.amm.get_sum_xy(user)
                 to_liquidate.append(Position(user, x, y, debt, self.health(user)))
         return to_liquidate
+    
+    def max_borrowable(
+            self,
+            collateral: float,
+            N: int,
+        ) -> float:
+        """
+        @notice compute max debt for a given collateral amount
+        TODO using amm.p_o_down(amm.active_band) is not the same 
+        as max_p_base() from controller contract.
+        """
+        return self.get_y_effective(collateral, N) * self.amm.p_o_down(self.amm.active_band)
 
     def get_y_effective(self, collateral, N) -> float:
         """
@@ -167,12 +216,12 @@ class Controller:
         discount = min(self.loan_discount + DEAD_SHARES / max(collateral / N, DEAD_SHARES), 1)
         d_y_effective = collateral / N * (1 - discount) * ((self.A-1)/self.A) ** 0.5
         y_effective = d_y_effective
-        for i in range(1, N):
+        for _ in range(1, N):
             d_y_effective = d_y_effective * (self.A - 1) / self.A
             y_effective += d_y_effective
         return y_effective
     
-    def _calculate_debt_n1(self, collateral, debt, N) -> int:
+    def calculate_debt_n1(self, collateral, debt, N) -> int:
         """
         @notice Calculate the upper band number for the deposit to sit in to support
                 the given debt. Reverts if requested debt is too high.
@@ -181,21 +230,21 @@ class Controller:
         @param N Number of bands to deposit into
         @return Upper band n1 (n1 <= n2) to deposit into. Signed integer
         """
+        if isinstance(N, float):
+            N = int(N)
         assert debt > 0, "No loan"
-        n0 = self.amm.active_band()
-        p_base = self.amm.p_oracle_up(n0)
-
-        y_effective = self.get_y_effective(collateral, N, self.loan_discount)
-
+        n0 = self.amm.active_band
+        p_base = self.amm.p_o_up(n0)
+        y_effective = self.get_y_effective(collateral, N)
         ratio = y_effective * p_base / (debt + EPSILON)
 
-        assert y_effective > 0, "Amount too low"
-        n_delta = math.log(y_effective, base=(self.A/(self.A - 1))) 
+        n_delta = math.ceil(math.log(ratio, self.A/(self.A - 1))) 
+        # n_delta = math.ceil(math.log(ratio) / math.log(self.A / (self.A - 1)))
 
         n1 = n0 + n_delta
         # if n1 <= n0:
         #     assert self.amm.can_skip_bands(n1 - 1), "Debt too high"
 
-        assert self.amm.p_o_up(n1) < self.amm.p_o(), "Debt too high"
+        assert self.amm.p_o_up(n1) < self.amm.p_o, "Debt too high"
 
-        return n1
+        return int(n1)
