@@ -1,8 +1,10 @@
 from collections import defaultdict
+import math
 from .llamma import LLAMMA
 from .mpolicy import MonetaryPolicy
 
 DEAD_SHARES = 1e-15 # to init shares in a band
+EPSILON = 1e-18 # to avoid division by 0
 
 class Position:
 
@@ -65,6 +67,9 @@ class Controller:
         """
         @notice create positions to approximate a target distribution 
         of collateral/health.
+        TODO: a function to open a loan taking as input the target debt (or collateral)
+        and a target health. Then we can create loans as a func of a health/collateral
+        distribution.
         """
         pass
 
@@ -89,3 +94,49 @@ class Controller:
 
     def repay(self, user, amount):
         pass
+
+    # === Helper Functions === #
+
+    def get_y_effective(self, collateral, N) -> float:
+        """
+        @notice Compute the value of the collateral 
+        @param collateral Amount of collateral to get the value for
+        @param N Number of bands the deposit is made into
+        @param discount Loan discount at 1e18 base (e.g. 1e18 == 100%)
+        @return y_effective
+        """
+        discount = min(self.loan_discount + DEAD_SHARES / max(collateral / N, DEAD_SHARES), 1)
+        d_y_effective = collateral / N * (1 - discount) * ((self.A-1)/self.A) ** 0.5
+        y_effective = d_y_effective
+        for i in range(1, N):
+            d_y_effective = d_y_effective * (self.A - 1) / self.A
+            y_effective += d_y_effective
+        return y_effective
+    
+    def _calculate_debt_n1(self, collateral, debt, N) -> int:
+        """
+        @notice Calculate the upper band number for the deposit to sit in to support
+                the given debt. Reverts if requested debt is too high.
+        @param collateral Amount of collateral (at its native precision)
+        @param debt Amount of requested debt
+        @param N Number of bands to deposit into
+        @return Upper band n1 (n1 <= n2) to deposit into. Signed integer
+        """
+        assert debt > 0, "No loan"
+        n0 = self.amm.active_band()
+        p_base = self.amm.p_oracle_up(n0)
+
+        y_effective = self.get_y_effective(collateral, N, self.loan_discount)
+
+        ratio = y_effective * p_base / (debt + EPSILON)
+
+        assert y_effective > 0, "Amount too low"
+        n_delta = math.log(y_effective, base=(self.A/(self.A - 1))) 
+
+        n1 = n0 + n_delta
+        # if n1 <= n0:
+        #     assert self.amm.can_skip_bands(n1 - 1), "Debt too high"
+
+        assert self.amm.p_o_up(n1) < self.amm.p_o(), "Debt too high"
+
+        return n1
