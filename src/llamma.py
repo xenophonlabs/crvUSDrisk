@@ -293,7 +293,7 @@ class LLAMMA:
             y -= dy
             
             if new_shares == 0:
-                assert x == 0 & y == 0 
+                assert abs(x) <= 1e-6 & abs(y) <= 1e-6
 
             if n == min_band:
                 if x == 0 and y==0:
@@ -344,8 +344,6 @@ class LLAMMA:
                 y_o = I/f - g
                 assert y_o > 0
                 x_down += y_o * self.p_o_up(n) * ((self.A - 1)/self.A) ** 0.5 * share
-
-                print(self.bands_y[n], y_o * self.p_o_up(n) * ((self.A - 1)/self.A) ** 0.5 * share)
             
             elif self.p_o < self.p_o_down(n):
 

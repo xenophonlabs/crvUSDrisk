@@ -18,10 +18,10 @@ class Position:
         self.health = health
 
     def __repr__(self) -> str:
-        return f'Position\nuser={self.user}\nx={self.x}\ny={self.y}\ndebt={self.debt}\nhealth={self.health}'
+        return f'Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})'
     
     def __str__(self) -> str:
-        return f'Position\nuser={self.user}\nx={self.x}\ny={self.y}\ndebt={self.debt}\nhealth={self.health}'
+        return f'Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})'
 
 class Controller:
     """
@@ -32,6 +32,9 @@ class Controller:
     TODO withdraw
     TODO repay
     TODO limit amt of controller debt
+    TODO currently to generate the distribution we just create loans but this
+    means that we aren't accounting for loans that are in soft liquidation. We
+    need a way to generate a distribution which already has loans in soft liquidation?
     """
 
     __slots__ = (
@@ -143,13 +146,12 @@ class Controller:
         debt_final = debt_initial - debt_liquidated
         
         x_liquidated, y_liquidated = self.amm.withdraw(user, frac)
-        x_pnl, y_pnl = 0, 0
 
         # delta is the amount of crvUSD leftover from position
         # or is the remaining crvUSD needed to close position
-        delta = debt_liquidated - x_liquidated
-        x_pnl += delta # liquidator either pockets a positive delta or pays a negative delta
-        y_pnl += y_liquidated # liquidator pockets collateral
+        delta = x_liquidated - debt_liquidated
+        x_pnl = delta # liquidator either pockets a positive delta or pays a negative delta
+        y_pnl = y_liquidated # liquidator pockets collateral
 
         if debt_final == 0:
             del self.loans[user]
@@ -157,6 +159,22 @@ class Controller:
             self.loans[user] = debt_final
 
         self.total_debt -= debt_liquidated
+
+        return x_pnl, y_pnl
+    
+    def check_liquidate(self, user, frac):
+        assert self.health(user) < 0, "Not enough rekt"
+
+        debt_initial = self.loans[user]
+        debt_liquidated = debt_initial * frac
+        
+        x_liquidated, y_liquidated = self.amm.get_sum_xy(user) * frac
+
+        # delta is the amount of crvUSD leftover from position
+        # or is the remaining crvUSD needed to close position
+        delta = x_liquidated - debt_liquidated
+        x_pnl = delta # liquidator either pockets a positive delta or pays a negative delta
+        y_pnl = y_liquidated # liquidator pockets collateral
 
         return x_pnl, y_pnl
 

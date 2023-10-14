@@ -14,13 +14,16 @@ class Oracle:
         # 'TVL_MA_TIME', # EMA window for tvl
         'last_price', # temp price for last update to do bootleg EMA
         'PRICE_MA_TIME', # temp EMA window for price
+        'v', # verbose
     )
 
     def __init__(
             self,
             PRICE_MA_TIME: int,
+            v: bool = False
         ):
             self.PRICE_MA_TIME = PRICE_MA_TIME
+            self.v = v
 
     def price(self):
         return self.last_price

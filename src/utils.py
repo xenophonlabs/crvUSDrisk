@@ -1,6 +1,41 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def gen_gbm(S0,mu,sigma, dt, T):
+    W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
+    S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma ** 2) * dt + sigma * W))
+    return(S)
+
+def external_swap(
+        x,
+        y,
+        swap,
+        fee,
+        y_in
+    ):
+    """
+    @notice account for slippage when trading against open market
+    Assuming that we trade against Uniswap is a conservative assumption
+    since not accounting for CEX. 
+    However, we are not accounting for crvUSD liquidity in Curve pools yet.
+    """
+    # TODO: Need to incorporate concentrated liquidity (e.g., no more liquidity beyond ]a, b[)
+    # TODO: Need to incorproate the StableSwap invariant for crvUSD pool liquidity
+    k = x*y
+
+    if y_in:
+        new_y = y + swap
+        new_x = k/new_y
+        out = (x - new_x) * (1-fee)
+    else:
+        new_x = x + swap
+        new_y = k/new_x
+        out = (y - new_y) * (1-fee)
+
+    return out
+
+# === PLOTTING === #
+
 plt.rcParams["font.family"] = "serif"
 plt.rcParams.update({'font.size': 10})
 plt.rcParams["axes.spines.top"] = False
@@ -28,13 +63,14 @@ def _plot_reserves(llamma):
 def _plot_borrowers(borrowers, price):
     f, ax = plt.subplots(3, figsize=(10, 10))
     n_bins = len(borrowers) // 2
-    ax[0].hist(borrowers[:,0] * price / 1e6, bins=n_bins)
+    ax[0].hist(borrowers[:,0] * price / 1e6, bins=n_bins, color='darkblue')
     ax[0].set_title("Collateral Distribution")
     ax[0].set_xlabel("Collateral (Mn USD)")
-    ax[1].hist(borrowers[:,1] / 1e6, bins=n_bins)
+    ax[1].hist(borrowers[:,1] / 1e6, bins=n_bins, color='darkblue')
     ax[1].set_title("Debt Distribution")
     ax[1].set_xlabel("Debt (Mn USD)")
-    ax[2].hist(borrowers[:,2], bins=np.unique(borrowers[:,2]))
+    ax[2].hist(borrowers[:,2], bins=np.unique(borrowers[:,2]), color='darkblue')
     ax[2].set_title("N Distribution")
     ax[2].set_xlabel("N")
     f.tight_layout()
+
