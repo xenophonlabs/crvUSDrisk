@@ -1,5 +1,6 @@
 from collections import defaultdict
 import math
+from typing import List
 from .llamma import LLAMMA
 from .mpolicy import MonetaryPolicy
 
@@ -22,6 +23,10 @@ class Position:
         return f'Position\nuser={self.user}\nx={self.x}\ny={self.y}\ndebt={self.debt}\nhealth={self.health}'
 
 class Controller:
+    """
+    @notice A simplified python implementation of the crvUSD Controller with
+    enough functionality to model risk in the system.
+    """
 
     # TODO: implement interest rates
     # TODO: each loan should have its own liq disc if it changes in the future
@@ -83,11 +88,57 @@ class Controller:
         health = (self.amm.get_x_down(user) * (1 - self.liquidation_discount)/self.loans[user]) - 1
         return health
 
-    def liquidate(self, user):
-        pass
+    def liquidate(
+            self, 
+            user: str,
+            frac: float,
+        ) -> None:
+        """
+        @notice liquidate a fraction of a user's debt. This is a hard liquidation.
+        @param user user address
+        @param frac fraction of debt to liquidate
+        @return [x_pnl, y_pnl] pnl in crvUSD and collateral of liquidator
+        """
+        assert self.health(user) < 0, "Not enough rekt"
 
-    def deposit(self, user, amount, N):
-        pass
+        debt_initial = self.loans[user]
+        debt_liquidated = debt_initial * frac
+        debt_final = debt_initial - debt_liquidated
+        
+        x_liquidated, y_liquidated = self.amm.withdraw(user, frac)
+        x_pnl, y_pnl = 0, 0
+
+        # delta is the amount of crvUSD leftover from position
+        # or is the remaining crvUSD needed to close position
+        delta = debt_liquidated - x_liquidated
+        x_pnl += delta # liquidator either pockets a positive delta or pays a negative delta
+        y_pnl += y_liquidated # liquidator pockets collateral
+
+        if debt_final == 0:
+            del self.loans[user]
+        else:
+            self.loans[user] = debt_final
+
+        self.total_debt -= debt_liquidated
+
+        return x_pnl, y_pnl
+
+    def create_loan(
+            self, 
+            user: str, 
+            collateral: float, 
+            debt: float, 
+            N: int
+        ) -> None:
+        assert self.MIN_TICKS <= N <= self.MAX_TICKS, "Invalid number of bands"
+        assert self.loans[user] == 0, "User already has a loan"
+
+        n1 = self.calculate_debt_n1(collateral, N)
+        n2 = n1 + (N - 1)
+
+        self.loans[user] = debt
+        self.total_debt += debt
+        self.amm.deposit(user, collateral, n1, n2)
 
     def withdraw(self, user, frac):
         pass
@@ -96,6 +147,14 @@ class Controller:
         pass
 
     # === Helper Functions === #
+
+    def users_to_liquidate(self) -> List[Position]:
+        to_liquidate = []
+        for user, debt in self.loans.items():
+            if self.health(user) < 0:
+                x, y = self.amm.get_sum_xy(user)
+                to_liquidate.append(Position(user, x, y, debt, self.health(user)))
+        return to_liquidate
 
     def get_y_effective(self, collateral, N) -> float:
         """

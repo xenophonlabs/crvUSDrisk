@@ -362,6 +362,18 @@ class LLAMMA:
                 x_down += x_o + y_o * (self.p_o_down(n) * self.p_o) ** 0.5 * share
         
         return x_down
+    
+    def get_sum_xy(self, user):
+        """
+        @notice return sum of crvUSD, collateral owned by the user
+        """
+        user_bands = self.user_shares[user]
+        x, y = 0, 0
+        for n, shares in user_bands.items():
+            share = shares / self.total_shares[n]
+            x += self.bands_x[n] * share
+            y += self.bands_y[n] * share
+        return x, y
             
     # === Helper Functions === #
 
