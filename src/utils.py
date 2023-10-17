@@ -41,6 +41,11 @@ plt.rcParams.update({'font.size': 10})
 plt.rcParams["axes.spines.top"] = False
 plt.rcParams["axes.spines.right"] = False
 
+plt.rcParams['axes.facecolor'] = '#f5f5f5'
+plt.rcParams['grid.color'] = 'white'
+plt.rcParams['grid.linestyle'] = '-'
+plt.rcParams['grid.linewidth'] = 2
+
 def _plot_reserves(llamma):
     band_range = range(llamma.min_band, llamma.max_band+1)
     bands_x = [llamma.bands_x[i] for i in band_range]
@@ -48,10 +53,10 @@ def _plot_reserves(llamma):
     band_edges = [llamma.p_o_down(i) for i in band_range]
     band_widths = [llamma.band_width(i)*0.9 for i in band_range]
 
-    f, ax = plt.subplots()
+    f, ax = plt.subplots(figsize=(8, 5))
 
-    ax.bar(band_edges, bands_y, color='darkblue', width=band_widths, label='Collateral')
-    ax.bar(band_edges, bands_x, bottom=bands_y, color='darkred', width=band_widths, label='crvUSD')
+    ax.bar(band_edges, bands_y, color='royalblue', width=band_widths, label='Collateral')
+    ax.bar(band_edges, bands_x, bottom=bands_y, color='indianred', width=band_widths, label='crvUSD')
     ax.set_xlabel('p_o_down[n] (USD)')
     ax.set_ylabel('Reserves (USD)')
     ax.set_title('LLAMMA Collateral Distribution')
