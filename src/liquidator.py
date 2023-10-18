@@ -63,11 +63,12 @@ class Liquidator:
         for position in to_liquidate:
             self.pnl += self.maybe_liquidate(controller, position.user, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
 
-    # def arbitrage(self, llamma, spot_price):
-    #     """
-    #     @notice This is the soft liquidation
-    #     """
-    #     if llamma.p == spot_price:
-    #         return 0
-    #     elif llamma.p > spot_price:
-
+    def arbitrage(self, llamma, spot_price):
+        """
+        @notice This is the soft liquidation
+        TODO Need to account for fees
+        """
+        # if llamma.p == spot_price:
+        #     return 0
+        # elif llamma.p > spot_price:
+        pass
