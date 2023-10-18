@@ -60,7 +60,7 @@ def _plot_reserves(llamma):
     ax.set_xlabel('p_o_down[n] (USD)')
     ax.set_ylabel('Reserves (USD)')
     ax.set_title('LLAMMA Collateral Distribution')
-    ax.axvline(llamma.p_o, color='black', linestyle='--', label='p_o')
+    ax.axvline(llamma.p_o, color='black', linestyle='--', label='Oracle price')
     # ax.xticks([round(i) for i in band_edges], rotation=45)
     ax.legend()
     f.tight_layout()

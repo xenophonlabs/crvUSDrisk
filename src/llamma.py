@@ -392,6 +392,7 @@ class LLAMMA:
             return self.p_c_up(n)
         return (x + self.f(n)) / (y + self.g(n))
     
+    @property
     def p(self) -> float:
         """
         @notice wrapper to get price at current band
@@ -433,12 +434,19 @@ class LLAMMA:
             p_o: float, 
             p_o_up: float
         ) -> float:
-        # solve quadratic:
+        # solve:
         # p_o * A * y0**2 - y0 * (p_oracle_up/p_o * (A-1) * x + p_o**2/p_oracle_up * A * y) - xy = 0
-        a = p_o * self.A
-        b = p_o_up * (self.A-1) * x / p_o + p_o**2/p_o_up * self.A * y
-        c = x * y
-        return (b + (b**2 - 4*a*c)**0.5) / (2*a)
+        b = 0
+        # p_o_up * unsafe_sub(A, 1) * x / p_o + A * p_o**2 / p_o_up * y / 10**18
+        if x != 0:
+            b = p_o_up * (self.A - 1) * x / p_o
+        if y != 0:
+            b += self.A * p_o**2 / p_o_up * y
+        if x > 0 and y > 0:
+            D = b**2 + ((4 * self.A) * p_o) * y * x
+            return (b + D**0.5) / (2 * self.A * p_o)
+        else:
+            return (b / (self.A * p_o))
     
     def y0(self, n: int):
         """
