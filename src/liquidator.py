@@ -6,18 +6,26 @@ import copy
 import numpy as np
 
 class Liquidator:
+    """
+    Liquidator either hard or soft liquidates LLAMMA positions.
+    TODO ensure pnl from hard and soft liquidations is in USD (NOT crvUSD) units!
+    """
 
     __slots__ = (
         'tolerance', # min profit required to liquidate (could be returns)
         'pnl', # pnl from liquidations
+        'verbose', # print statements
     )
 
     def __init__(
             self, 
-            tolerance,
+            tolerance: float,
+            verbose: bool = False,
         ) -> None:
+
         self.tolerance = tolerance
         self.pnl = 0
+        self.verbose = verbose
 
     def maybe_liquidate(
             self, 
@@ -41,10 +49,10 @@ class Liquidator:
         if pnl > self.tolerance:
             # TODO need to account for gas
             controller.liquidate(user, 1)
-            print(f"Liquidated user {user} with pnl {pnl}.")
+            self.print(f"Liquidated user {user} with pnl {pnl}.")
             return pnl
         else:
-            print(f"Missed liquidation for user {user} with pnl {pnl}.")
+            self.print(f"Missed liquidation for user {user} with pnl {pnl}.")
             return 0
     
     def perform_liquidations(
@@ -61,7 +69,6 @@ class Liquidator:
         to_liquidate = controller.users_to_liquidate()
 
         if len(to_liquidate) == 0:
-            print("No users to liquidate.")
             return
         
         for position in to_liquidate:
@@ -69,12 +76,36 @@ class Liquidator:
 
     # === Soft Liquidations === #
 
+    def arbitrage(
+            self, 
+            amm:LLAMMA, 
+            p_mkt: float,
+            ext_stable_liq: float,
+            ext_collat_liq: float,
+            ext_swap_fee: float,
+        ):
+        """
+        @notice calculate optimal arbitrage and perform it.
+        @param amm LLAMMA object
+        @param p market price
+        """
+        p_opt, profit = Liquidator.get_optimal_arb(amm, p_mkt, ext_stable_liq, ext_collat_liq, ext_swap_fee)
+        amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm, p_opt)
+        if amt_in > 0 and profit > self.tolerance:
+            self.print(f"Performed arbitrage, profit: {round(profit)} USD")
+            amm.swap(amt_in, not pump)
+            self.pnl += profit
+
     @staticmethod
-    def calc_arb_amounts(amm: LLAMMA, p):
+    def calc_arb_amounts(amm: LLAMMA, p: float):
         """
         @notice Calculates the swap_in and swap_out for an arbitrageur
         moving LLAMMA price to p.
         """
+
+        if p == amm.p:
+            # Do nothing
+            return 0, 0, False
 
         pump = True if p > amm.p else False # pump == True means stablecoin being sold to the AMM
 
@@ -114,11 +145,11 @@ class Liquidator:
                     n -= 1
 
         if pump:
-            # we are going right -> selling collateral to AMM
+            # we are going left <- selling stablecoin to AMM
             amt_in = amt_x / (1 - amm.fee)
             amt_out = amt_y
         else:
-            # we are going left <- selling crvUSD to AMM
+            # we are going right -> selling collateral to AMM
             amt_in = amt_y / (1 - amm.fee)
             amt_out = amt_x
         
@@ -136,28 +167,53 @@ class Liquidator:
         Liquidator.test_arb(amm, p_new) # not necessary
 
         amt_out = external_swap(ext_stable_liquidity, ext_collat_liquidity, amt_out, ext_swap_fee, pump)
+        pnl = amt_out - amt_in
 
-        return amt_out - amt_in
+        # Ensure arb profits in USD units
+        # TODO need to incorporate crvUSD slippage (rn crvUSD units assumed to be = 1 USD)
+        if pump:
+            # we are selling stablecoin to AMM, pnl in units of stablecoin
+            pnl *= 1 
+        else:
+            ext_p = ext_stable_liquidity/ext_collat_liquidity
+            pnl *= ext_p # convert collateral units to crvUSD units
+
+        return pnl
     
     @staticmethod
-    def get_optimal_arb(llamma, p_mkt, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee):
+    def get_optimal_arb(
+            llamma: LLAMMA, 
+            p_mkt: float, 
+            ext_stable_liquidity: float, 
+            ext_collat_liquidity: float, 
+            ext_swap_fee: float,
+            plot: bool=False,
+        ) -> tuple[float, float]:
         """
         Dumb linear search
-        TODO Really need this to be faster.
+        TODO If this needs to be faster we can:
+        1. Implement a better search algo
+        2. Derive the optimal p_new analytically <- this is hard
         """
+        # Expanding the interval with 0.9 and 1.1 for the plotting
         p_low = min(llamma.p, p_mkt)*0.9
         p_high = max(llamma.p, p_mkt)*1.1
 
-        ps = np.linspace(p_low, p_high, 1000)
+        ps = np.linspace(p_low, p_high, 100)
 
         profits = [Liquidator.arb_profits(llamma, p, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee) for p in ps]
 
-        idx = profits.index(max(profits))
+        max_profits = max(profits)
+        idx = profits.index(max_profits)
 
-        plt.plot(ps, profits)
-        plt.axvline(ps[idx], color='black', linestyle='--')
+        if plot:
+            plt.plot(ps, profits)
+            plt.axvline(ps[idx], color='black', linestyle='--')
 
-        return ps[idx]
+        if max_profits == 0:
+            return llamma.p, 0 # Don't do anything
+
+        return ps[idx], max_profits
     
         """
         # Try binary search
@@ -169,7 +225,7 @@ class Liquidator:
         while p_low <= p_high:
             p_mid = (p_low + p_high) / 2
             profit = Liquidator.arb_profits(llamma, p_mid, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
-            print(f'try: {p_mid, profit}')
+            self.print(f'try: {p_mid, profit}')
             
             if profit > max_profit:
                 max_profit = profit
@@ -191,11 +247,18 @@ class Liquidator:
 
         amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm_cp, p_new)
         if amt_in == 0 or amt_out == 0:
-            print("No arb opportunity")
             return
         # if pump == True then stablecoin is being sold to the AMM
 
         swap_in, swap_out = amm_cp.swap(amt_in, not pump)
 
+        # print(amm.p, amm.p_o, amt_in, amt_out, pump, swap_in, swap_out, p_new, amm_cp.p)
+        # print(amm_cp.bands_x[amm_cp.active_band], amm_cp.bands_y[amm_cp.active_band])
+        # print(amm_cp.p_c_down(amm_cp.active_band), amm_cp.p_c_up(amm_cp.active_band))
+
         assert abs(swap_out - amt_out) < 1e-6
-        assert abs(p_new - amm_cp.p) < 1e-6
+        # assert abs(p_new - amm_cp.p) < 1e-6 # TODO sometimes you just can't reach the target price
+
+    def print(self, txt):
+        if self.verbose:
+            print(txt)

@@ -456,9 +456,9 @@ class LLAMMA:
     
     # === Plotting Functions === #
 
-    def plot_reserves(self):
+    def plot_reserves(self, fn=None):
         """
         @notice Plot reserves in each band
         NOTE: for now, assume collateral price is = oracle price, and crvUSD price = $1
         """
-        _plot_reserves(self)
+        _plot_reserves(self, fn=fn)

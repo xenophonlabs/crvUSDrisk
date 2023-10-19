@@ -46,7 +46,7 @@ plt.rcParams['grid.color'] = 'white'
 plt.rcParams['grid.linestyle'] = '-'
 plt.rcParams['grid.linewidth'] = 2
 
-def _plot_reserves(llamma):
+def _plot_reserves(llamma, fn=None):
     band_range = range(llamma.min_band, llamma.max_band+1)
     bands_x = [llamma.bands_x[i] for i in band_range]
     bands_y = [llamma.bands_y[i] * llamma.p_o for i in band_range]
@@ -61,9 +61,16 @@ def _plot_reserves(llamma):
     ax.set_ylabel('Reserves (USD)')
     ax.set_title('LLAMMA Collateral Distribution')
     ax.axvline(llamma.p_o, color='black', linestyle='--', label='Oracle price')
+    ax.axvline(llamma.p, color='green', linestyle='--', label='AMM price')
     # ax.xticks([round(i) for i in band_edges], rotation=45)
     ax.legend()
+
     f.tight_layout()
+
+    if fn:
+        plt.savefig(fn)
+        plt.close() # don't show
+    return f
 
 def _plot_borrowers(borrowers, price):
     f, ax = plt.subplots(3, figsize=(10, 10))
