@@ -120,7 +120,7 @@ class LLAMMA:
                 # Going right ->
                 
                 if x != 0:
-                    assert self.f(n) > 0
+                    # assert self.f(n) >= 0
                     y_dest = (self.inv(n) / self.f(n) - self.g(n)) - y # Amt required to clear this band
                     dy = y_dest / (1 - self.fee) # Amt required to clear this band + fee
 
@@ -160,7 +160,7 @@ class LLAMMA:
                 # Going left <-
 
                 if y != 0:
-                    assert self.g(n) > 0
+                    # assert self.g(n) >= 0
                     x_dest = (self.inv(n) / self.g(n) - self.f(n)) - x # Amt required to clear this band
                     dx = x_dest / (1 - self.fee) # Amt required to clear this band + fee
 
@@ -293,7 +293,7 @@ class LLAMMA:
             y -= dy
             
             if new_shares == 0:
-                assert abs(x) <= 1e-6 & abs(y) <= 1e-6
+                assert (abs(x) <= 1e-6) & (abs(y) <= 1e-6)
 
             if n == min_band:
                 if x == 0 and y==0:

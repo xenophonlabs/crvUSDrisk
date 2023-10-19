@@ -31,6 +31,7 @@ class Liquidator:
             self, 
             controller: Controller, 
             user: str,
+            health: float,
             ext_stable_liquidity: float,
             ext_collat_liquidity: float,
             ext_swap_fee: float,
@@ -52,7 +53,7 @@ class Liquidator:
             self.print(f"Liquidated user {user} with pnl {pnl}.")
             return pnl
         else:
-            self.print(f"Missed liquidation for user {user} with pnl {pnl}.")
+            self.print(f"Missed liquidation for user {user} with health {health}.")
             return 0
     
     def perform_liquidations(
@@ -72,7 +73,7 @@ class Liquidator:
             return
         
         for position in to_liquidate:
-            self.pnl += self.maybe_liquidate(controller, position.user, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
+            self.pnl += self.maybe_liquidate(controller, position.user, position.health, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
 
     # === Soft Liquidations === #
 
