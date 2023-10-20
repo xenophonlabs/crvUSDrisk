@@ -128,8 +128,17 @@ class LLAMMA:
                         # This is the last band
                         y_dest = in_amount_left * (1 - self.fee)
                         x_left = self.inv(n) / (self.g(n) + (y + y_dest)) - self.f(n) + EPSILON
-                        assert 0 < x_left < x 
+
+                        # NOTE some tolerance for floating point errors
+                        assert -1e-6 < x_left 
+                        x_left = max(x_left, 0)
+
+                        if x_left >= x:
+                            print(x_left, x)
+                        assert x_left <= x # sanity check
+
                         admin_fee = (in_amount_left - y_dest) * self.admin_fee
+
                         # Updates
                         s.in_amount = amt_in # Used all amt_in
                         s.out_amount += x - x_left
@@ -168,8 +177,17 @@ class LLAMMA:
                         # This is the last band
                         x_dest = in_amount_left * (1 - self.fee)
                         y_left = self.inv(n) / (self.f(n) + (x + x_dest)) - self.g(n) + EPSILON
-                        assert 0 < y_left < y
+
+                        # NOTE some tolerance for floating point errors
+                        assert -1e-6 < y_left
+                        y_left = max(y_left, 0)
+
+                        if y_left >= y:
+                            print(y_left, y)
+                        assert y_left <= y # sanity check
+
                         admin_fee = (in_amount_left - x_dest) * self.admin_fee
+
                         # Updates
                         s.in_amount = amt_in # Used all amt_in
                         s.out_amount += y - y_left

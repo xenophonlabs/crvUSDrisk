@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import imageio
+from PIL import Image
 
 def gen_gbm(S0,mu,sigma, dt, T):
     W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
@@ -36,6 +38,20 @@ def external_swap(
 
 # === PLOTTING === #
 
+FPS = 3
+
+fn_frames_reserves = "./figs/frames/test_reserves_{}.png"
+fn_gif_reserves = "./figs/gifs/test_reserves.gif"
+
+fn_frames_actions = "./figs/frames/test_actions_{}.png"
+fn_gif_actions = "./figs/gifs/test_actions.gif"
+
+fn_frames_bad_debt = "./figs/frames/test_bad_debt_{}.png"
+fn_gif_bad_debt = "./figs/gifs/test_bad_debt.gif"
+
+fn_frames_system_health = "./figs/frames/test_system_health_{}.png"
+fn_gif_system_health = "./figs/gifs/test_system_health.gif"
+
 plt.rcParams["font.family"] = "serif"
 plt.rcParams.update({'font.size': 10})
 plt.rcParams["axes.spines.top"] = False
@@ -45,6 +61,145 @@ plt.rcParams['axes.facecolor'] = '#f5f5f5'
 plt.rcParams['grid.color'] = 'white'
 plt.rcParams['grid.linestyle'] = '-'
 plt.rcParams['grid.linewidth'] = 2
+
+def plot_combined(df):
+
+    # Read frames from both GIFs
+    reader1 = imageio.get_reader(fn_gif_reserves)
+    reader2 = imageio.get_reader(fn_gif_actions)
+    reader3 = imageio.get_reader(fn_gif_bad_debt)
+    reader4 = imageio.get_reader(fn_gif_system_health)
+
+    # Initialize list to store new frames
+    new_frames = []
+
+    # Combine frames
+    for frame1, frame2, frame3, frame4 in zip(reader1, reader2, reader3, reader4):
+        img1 = Image.fromarray(frame1)
+        img2 = Image.fromarray(frame2)
+        img3 = Image.fromarray(frame3)
+        img4 = Image.fromarray(frame4)
+        
+        # Concatenate images
+        new_img = Image.new('RGB', (img1.width + img2.width, img1.height + img3.height))
+        new_img.paste(img1, (0, 0))
+        new_img.paste(img2, (img1.width, 0))
+        new_img.paste(img3, (0, img1.height))
+        new_img.paste(img4, (img1.width, img1.height))
+        
+        # Convert back to array and append to new frames
+        new_frames.append(np.array(new_img))
+
+    # Create new GIF
+    imageio.mimsave("./figs/gifs/combined.gif", new_frames, fps=FPS)
+
+def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn):
+    
+    f, ax = plt.subplots(figsize=(8, 5))
+
+    ax2 = ax.twinx()
+
+    ndf = df.loc[:i]
+
+    ax.plot(ndf.index, ndf['spot'], label='Spot', color='black', linestyle='--', lw=1)
+    ax.plot(ndf.index, ndf['oracle'], label='Oracle', color='black', lw=1)
+
+    ax.set_title('Simulated Agent Behavior: Liquidator')
+    ax.set_ylabel('Collateral Price (USD)')
+    ax.tick_params(axis='x', rotation=45)
+    ax.set_ylim(min_price, max_price)
+    ax.set_xlim(min_time, max_time)
+
+    ax2.scatter(ndf.index, ndf['liquidation_pnl'], label='Liquidation PnL', color='indianred', s=20)
+    ax2.scatter(ndf.index, ndf['arbitrage_pnl'], label='Arbitrage PnL', color='royalblue', s=20)
+
+    ax2.set_xlim(min_time, max_time)
+    ax2.set_ylim(min_pnl, max_pnl)
+    ax2.set_ylabel('Liquidator PnL (USD)')
+
+    f.legend(loc='upper center', bbox_to_anchor=(0.5, 0), ncol=4)
+    f.tight_layout()
+
+    plt.savefig(fn, bbox_inches='tight', dpi=300)
+    plt.close() # don't show
+
+def plot_bad_debt(df, i, min_time, max_time, min_price, max_price, min_bad_debt, max_bad_debt, fn):
+    
+    f, ax = plt.subplots(figsize=(8, 5))
+
+    ax2 = ax.twinx()
+
+    ndf = df.loc[:i]
+
+    ax.plot(ndf.index, ndf['spot'], label='Spot', color='black', linestyle='--', lw=1)
+    ax.plot(ndf.index, ndf['oracle'], label='Oracle', color='black', lw=1)
+
+    ax.set_title('Simulated Bad Debt')
+    ax.set_ylabel('Collateral Price (USD)')
+    ax.tick_params(axis='x', rotation=45)
+    ax.set_ylim(min_price, max_price)
+    ax.set_xlim(min_time, max_time)
+
+    ax2.plot(ndf.index, ndf['bad_debt'], label='Bad Debt', color='indianred', lw=1)
+
+    ax2.set_xlim(min_time, max_time)
+    ax2.set_ylim(min_bad_debt, max_bad_debt)
+    ax2.set_ylabel('Bad Debt (USD)')
+
+    f.legend(loc='upper center', bbox_to_anchor=(0.5, 0), ncol=3)
+    f.tight_layout()
+
+    plt.savefig(fn, bbox_inches='tight', dpi=300)
+    plt.close() # don't show
+
+def plot_system_health(df, i, min_time, max_time, min_price, max_price, min_system_health, max_system_health, fn):
+    
+    f, ax = plt.subplots(figsize=(8, 5))
+
+    ax2 = ax.twinx()
+
+    ndf = df.loc[:i]
+
+    ax.plot(ndf.index, ndf['spot'], label='Spot', color='black', linestyle='--', lw=1)
+    ax.plot(ndf.index, ndf['oracle'], label='Oracle', color='black', lw=1)
+
+    ax.set_title('Simulated System Health')
+    ax.set_ylabel('Collateral Price (USD)')
+    ax.tick_params(axis='x', rotation=45)
+    ax.set_ylim(min_price, max_price)
+    ax.set_xlim(min_time, max_time)
+
+    ax2.plot(ndf.index, ndf['system_health'], label='System Health', color='indianred', lw=1)
+
+    ax2.set_xlim(min_time, max_time)
+    ax2.set_ylim(min_system_health, max_system_health)
+    ax2.set_ylabel('System Health')
+
+    f.legend(loc='upper center', bbox_to_anchor=(0.5, 0), ncol=3)
+    f.tight_layout()
+
+    plt.savefig(fn, bbox_inches='tight', dpi=300)
+    plt.close() # don't show
+
+def plot_sim(df, scale=0.1) -> None:
+
+    # Define plot bounds
+    min_time, max_time = df.index.min(), df.index.max()
+    min_price, max_price = df['spot'].min() * (1-scale), df['spot'].max() * (1+scale)
+    min_pnl, max_pnl = 0, max(df['liquidation_pnl'].max(), df['arbitrage_pnl'].max()) * (1+scale)
+    min_bad_debt, max_bad_debt = 0, df['bad_debt'].max() * (1+scale)
+    min_system_health, max_system_health = 0, df['system_health'].max() * (1+scale)
+
+    frame = 0
+    for i, _ in df.iterrows():
+        plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn_frames_actions.format(frame))
+        plot_bad_debt(df, i, min_time, max_time, min_price, max_price, min_bad_debt, max_bad_debt, fn_frames_bad_debt.format(frame))
+        plot_system_health(df, i, min_time, max_time, min_price, max_price, min_system_health, max_system_health, fn_frames_system_health.format(frame))
+        frame += 1
+
+    imageio.mimsave(fn_gif_actions, [imageio.v2.imread(fn_frames_actions.format(i)) for i in range(len(df))], fps=FPS)
+    imageio.mimsave(fn_gif_bad_debt, [imageio.v2.imread(fn_frames_bad_debt.format(i)) for i in range(len(df))], fps=FPS)
+    imageio.mimsave(fn_gif_system_health, [imageio.v2.imread(fn_frames_system_health.format(i)) for i in range(len(df))], fps=FPS)
 
 def _plot_reserves(llamma, fn=None):
     band_range = range(llamma.min_band, llamma.max_band+1)
@@ -63,13 +218,14 @@ def _plot_reserves(llamma, fn=None):
     ax.axvline(llamma.p_o, color='black', linestyle='--', label='Oracle price')
     ax.axvline(llamma.p, color='green', linestyle='--', label='AMM price')
     # ax.xticks([round(i) for i in band_edges], rotation=45)
-    ax.legend()
 
+    f.legend(loc='upper center', bbox_to_anchor=(0.5, 0), ncol=4)
     f.tight_layout()
 
     if fn:
-        plt.savefig(fn)
+        plt.savefig(fn, bbox_inches='tight', dpi=300)
         plt.close() # don't show
+
     return f
 
 def _plot_borrowers(borrowers, price):

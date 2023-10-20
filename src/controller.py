@@ -87,6 +87,7 @@ class Controller:
         @notice generate n borrowers. borrowers are
         a tuple (collateral, debt, N). 
         @param n number of borrowers to generate
+        @param coins number of collateral tokens
         @param mean_N mean of normal distribution for N
         @param std_N std of normal distribution for N
         @return borrowers list of tuples (collateral, debt, N)
@@ -118,14 +119,22 @@ class Controller:
             print(f"Total debt: {round(borrowers[:,1].sum() / 1e6)} Mns USD")
         return borrowers
 
-    def health(self, user):
+    def health(self, user, full=True):
         """
         @notice simple health computation for user
         @param user user address
+        @param full whether to account for the price difference above the user's highest band
         @return health of user
         TODO: missing the get_sum_xy component if full=True on the contract
         """
         health = (self.amm.get_x_down(user) * (1 - self.liquidation_discount)/self.loans[user]) - 1
+        if full:
+            n = min(self.amm.user_shares[user].keys()) # top band == most negative band
+            if n > self.amm.active_band:  # We are not in liquidation mode
+                p = self.amm.p_o
+                p_up = self.amm.p_o_up(n)
+                if p > p_up:
+                    health += (p - p_up) * self.amm.get_sum_xy(user)[1] / self.loans[user]
         return health
 
     def liquidate(
@@ -202,6 +211,14 @@ class Controller:
         pass
 
     # === Helper Functions === #
+
+    @property
+    def system_health(self) -> float:
+        """
+        @notice Compute the system health
+        @return system health
+        """
+        return np.array([self.health(user) * debt for user, debt in self.loans.items()]).sum() / self.total_debt
 
     def users_to_liquidate(self) -> List[Position]:
         to_liquidate = []

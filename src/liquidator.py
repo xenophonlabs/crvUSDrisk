@@ -1,4 +1,4 @@
-from .controller import Controller
+from .controller import Controller, Position
 from .llamma import LLAMMA
 from .utils import external_swap
 import matplotlib.pyplot as plt
@@ -13,7 +13,10 @@ class Liquidator:
 
     __slots__ = (
         'tolerance', # min profit required to liquidate (could be returns)
-        'pnl', # pnl from liquidations
+        'liquidation_pnl',
+        'liquidation_count',
+        'arbitrage_pnl',
+        'arbitrage_count',
         'verbose', # print statements
     )
 
@@ -23,25 +26,55 @@ class Liquidator:
             verbose: bool = False,
         ) -> None:
 
+        assert tolerance >= 0
+
         self.tolerance = tolerance
-        self.pnl = 0
+        self.liquidation_pnl = 0
+        self.liquidation_count = 0
+        self.arbitrage_pnl = 0
+        self.arbitrage_count = 0
         self.verbose = verbose
+        
+    # === Hard Liquidations === #
 
     def maybe_liquidate(
             self, 
             controller: Controller, 
-            user: str,
-            health: float,
+            position: Position,
             ext_stable_liquidity: float,
             ext_collat_liquidity: float,
             ext_swap_fee: float,
         ) -> float:
         """
-        @notice This is the hard liquidation
+        @notice This is the hard liquidation. Liquidator will
+        compute the pnl from the liquidation, accounting for external
+        slippage. We assume their quote asset is USDC which they obtain from
+        the ETH/USDC pool on Uniswap.
+
+        NOTE ultimately we want to simulate pnl from the following path (using ETH as example):
+        1. Flashswap ETH -> USDC
+        2. Swap USDC -> crvUSD
+        3. Liquidate (repay crvUSD debt) and receive ETH
+        4. Repay flashswap (i.e. sell ETH)
+        5. Swap remaining ETH for USDC.
+        6. Swap remaining crvUSD for USDC.
+
+        This means their PnL is a function of slippage on both Uni v3 ETH/USDC and Curve's crvUSD/USDC.
+
+        @param controller Controller object
+        @param position Position object to liquidate
+        @param ext_stable_liquidity external stablecoin liquidity (e.g. USDC in ETH/USDC pool)
+        @param ext_collat_liquidity external collateral liquidity (e.g. ETH in ETH/USDC pool)
+        @param ext_swap_fee external swap fee 
+        @return pnl in USDC units
+
         TODO incorporate crvUSD slippage
         NOTE for now assume crvUSD is 1:1 with USD w/ no slippage
         TODO could convert the external_swap functionality into an ExternalMarket class or something
         """
+        user = position.user
+        health = position.health
+
         x_pnl, y_pnl = controller.check_liquidate(user, 1)
 
         # Sell y_pnl collateral for USD
@@ -55,6 +88,11 @@ class Liquidator:
         else:
             self.print(f"Missed liquidation for user {user} with health {health}.")
             return 0
+        
+    # Fit this curve
+    # f(x | sigma) = c * sigma * x <- Gauntlet found this empirically in Compound report
+    # f(x | sigma) = c * sigma * x**0.5 <- TradFi empirical finding
+    # f(x | sigma) = c * sigma * x**2 <- Perhaps more like a simple CFMM
     
     def perform_liquidations(
             self, 
@@ -62,7 +100,7 @@ class Liquidator:
             ext_stable_liquidity: float,
             ext_collat_liquidity: float,
             ext_swap_fee: float,
-        ) -> None:
+        ) -> tuple[float, float]:
         """
         @notice loops through all liquidatable users and 
         liquidate if profitable
@@ -70,10 +108,26 @@ class Liquidator:
         to_liquidate = controller.users_to_liquidate()
 
         if len(to_liquidate) == 0:
-            return
+            return 0, 0
         
+        underwater_debt = 0
+        total_pnl = 0
+
         for position in to_liquidate:
-            self.pnl += self.maybe_liquidate(controller, position.user, position.health, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
+
+            pnl = self.maybe_liquidate(controller, position, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee)
+
+            if pnl > 0:
+                total_pnl += pnl
+                self.liquidation_count += 1
+            
+            else:
+                # Liquidation was missed
+                underwater_debt += position.debt
+
+        self.liquidation_pnl += total_pnl
+
+        return total_pnl, underwater_debt
 
     # === Soft Liquidations === #
 
@@ -90,12 +144,16 @@ class Liquidator:
         @param amm LLAMMA object
         @param p market price
         """
-        p_opt, profit = Liquidator.get_optimal_arb(amm, p_mkt, ext_stable_liq, ext_collat_liq, ext_swap_fee)
+        p_opt, pnl = Liquidator.get_optimal_arb(amm, p_mkt, ext_stable_liq, ext_collat_liq, ext_swap_fee)
         amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm, p_opt)
-        if amt_in > 0 and profit > self.tolerance:
-            self.print(f"Performed arbitrage, profit: {round(profit)} USD")
+
+        if amt_in > 0 and pnl > self.tolerance:
+            self.print(f"Performed arbitrage, profit: {round(pnl)} USD")
             amm.swap(amt_in, not pump)
-            self.pnl += profit
+            self.arbitrage_pnl += pnl
+            self.arbitrage_count += 1
+    
+        return max(pnl, 0)
 
     @staticmethod
     def calc_arb_amounts(amm: LLAMMA, p: float):
