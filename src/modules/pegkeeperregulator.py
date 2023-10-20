@@ -1,7 +1,29 @@
+from .pegkeeperregulator import PegKeeperRegulator
+from .aggregator import AggregateStablePrice
+from curvesim.pool.stableswap import CurvePool
+
+CRVUSD_ADDRESS = '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' 
+
 class PegKeeperRegulator:
 
-    def __init__(self):
-        pass
+    __slots__ = (
+        # === Dependencies === #
+        'aggregator', # aggregator object
+
+        # === State Variables === #
+        'price_deviation', # max price deviation to mint/burn
+    )
+
+    def __init__(
+            self,
+            aggregator: AggregateStablePrice,
+            deviation: float=5*10**(18-4) # 0.0005 = 0.05%,
+        ) -> None:
+
+        self.aggregator = aggregator
+        # TODO what is this?
+        self.price_deviation = deviation
+        self.price_pairs = []
 
     def get_price(self, pair):
         # implements stableswap get_price
