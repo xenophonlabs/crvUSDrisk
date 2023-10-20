@@ -1,8 +1,9 @@
-import llamma as lm
-import controller as cntrlr
-import oracle as orcl
-import agents.liquidator as lqdtr
-import pegkeeper as pk
+from ..modules.llamma import LLAMMA as lm
+from ..modules.controller import Controller as cntrlr
+from ..modules.oracle import Oracle as orcl
+from ..agents.liquidator import Liquidator as lqdtr
+from ..modules.pegkeeperv1 import PegKeeperV1 as pk
+
 import plotly.express as px
 import numpy as np
 import pandas as pd

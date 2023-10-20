@@ -1,5 +1,5 @@
-from ..controller import Controller, Position
-from ..llamma import LLAMMA
+from ..modules.controller import Controller, Position
+from ..modules.llamma import LLAMMA
 from ..utils import external_swap
 import matplotlib.pyplot as plt
 import copy

@@ -15,7 +15,6 @@ class PegKeeperV1:
         'caller_share', # share of profits for caller
         'aggregator', # aggregator object
         'action_delay', # min delay between actions
-        'profit', # net PK profit     
         'stabilization_coef', # smoothing coefficient for stabilizing pool
 
         # === State Variables === #
