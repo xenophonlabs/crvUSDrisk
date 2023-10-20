@@ -27,6 +27,8 @@ class PegKeeper:
 
         # @QUESTION: should we implement a caller_share?
         # self.caller_share = 0  
+
+        pool_balances = [0,0]
     
     # @TODO: need to implement stableswap pool add_liquidity
     def add_liquidity(self,amounts,min_mint_amount=self.min_mint_amount):
@@ -34,6 +36,10 @@ class PegKeeper:
 
     # @TODO: need to implement stableswap pool remove_liquidity_imbalance
     def remove_liquidity_imbalance(self,amounts,max_burn_amount=self.max_burn_amount):
+        pass
+
+    # @TODO: need to implement stableswap pool transfer
+    def pool_transfer(beneficiary, caller_profit):
         pass
 
     # @TODO: update references to actual function names
@@ -61,22 +67,25 @@ class PegKeeper:
         if self.last_change + self.ACTION_DELAY > block_timestamp:
             return 0
         # @TODO: finish converting references to POOL
-        # balance_pegged = POOL.balances(I)
-        # balance_peg = POOL.balances(1 - I) * self.PEG_MUL
-        # initial_profit = self._calc_profit()
-        # if balance_peg > balance_pegged:
-        #      assert self.regulator.provide_allowed(), "Regulator ban"
-        #      self._provide(unsafe_sub(balance_peg, balance_pegged) / 5)  # this dumps stablecoin
-        # else:
-        #     assert self.regulator.withdraw_allowed(), "Regulator ban"
-        #     self._withdraw(unsafe_sub(balance_pegged, balance_peg) / 5)  # this pumps stablecoin
-        # new_profit: uint256 = self._calc_profit()
-        # assert new_profit >= initial_profit, "peg unprofitable"
-        # lp_amount: uint256 = new_profit - initial_profit
-        # caller_profit: uint256 = lp_amount * self.caller_share / SHARE_PRECISION
-        # if caller_profit > 0:
-        #     POOL.transfer(_beneficiary, caller_profit)
-        # return caller_profit
+        # NOTE: we added this (assume I=1)
+        balance_pegged = self.pool_balances[1]
+        # NOTE: we added this, assume I=1, 1-I=0
+        balance_peg = self.pool_balances[0] * self.PEG_MUL
+        initial_profit = self._calc_profit()
+        if balance_peg > balance_pegged:
+             assert self.regulator.provide_allowed(), "Regulator ban"
+             self._provide((balance_peg - balance_pegged) / 5)  # this dumps stablecoin
+        else:
+            assert self.regulator.withdraw_allowed(), "Regulator ban"
+            self._withdraw((balance_pegged - balance_peg) / 5)  # this pumps stablecoin
+        new_profit = self.calc_profit()
+        assert new_profit >= initial_profit, "peg unprofitable"
+        lp_amount = new_profit - initial_profit
+        caller_profit = lp_amount * self.caller_share / self.SHARE_PRECISION
+        if caller_profit > 0:
+            # NOTE: modified to a function
+            self.pool_transfer(beneficiary, caller_profit)
+        return caller_profit
 
         pass
 
@@ -127,6 +136,7 @@ class PegKeeper:
         for pair in self.price_pairs:
             pair_price = self.get_price_oracle(pair)
             pool_match = (self.pool_addresses[pair] == pk)
+            
             if pool_match and not self.price_in_range(price, self.get_price(pair)): 
                 return False
             if pool_match and self.price_in_range(price, self.get_price(pair)): 
@@ -137,17 +147,17 @@ class PegKeeper:
                 pass
         return largest_price >= (price - 3 * 10 ** (18 - 4))
 
-def withdraw_allowed(self,pk):
-    """
-    @notice Allow Peg Keeper to withdraw stablecoin from the pool
-    Checks
-        1) current price in range of oracle in case of spam-attack
-        2) stablecoin price is below 1
-    """
-    if self.aggregator.price() > 1e18: return False
+    def withdraw_allowed(self,pk):
+        """
+        @notice Allow Peg Keeper to withdraw stablecoin from the pool
+        Checks
+            1) current price in range of oracle in case of spam-attack
+            2) stablecoin price is below 1
+        """
+        if self.aggregator.price() > 1e18: return False
 
-    for pair in self.price_pairs:
-        pool_match = (self.pool_addresses[pair] == pk)
-        if pool_match:
-            return self.price_in_range(self.get_price(pair), self.get_price_oracle(pair))
-    return False  # dev: not found
+        for pair in self.price_pairs:
+            pool_match = (self.pool_addresses[pair] == pk)
+            if pool_match:
+                return self.price_in_range(self.get_price(pair), self.get_price_oracle(pair))
+        return False  # dev: not found
