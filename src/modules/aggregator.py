@@ -7,47 +7,45 @@ from curvesim.pool import CurvePool
 
 PRECISION = 1e18
 
-class AggregateStablePrice:
 
+class AggregateStablePrice:
     __slots__ = (
         # === Dependencies === #
-        'price_pairs',
-
+        "price_pairs",
         # === Parameters === #
-        'sigma', # sensitivity parameter for price aggregation
-        'min_liquidity', # minimum liquidity to consider pool for aggregation
-        'tvl_ma_time', # time to calculate moving average of TVL
-
+        "sigma",  # sensitivity parameter for price aggregation
+        "min_liquidity",  # minimum liquidity to consider pool for aggregation
+        "tvl_ma_time",  # time to calculate moving average of TVL
         # === State Variables === #
-        'last_price', 
-        'last_timestamp',
-        'last_tvl'
+        "last_price",
+        "last_timestamp",
+        "last_tvl",
     )
 
     def __init__(
-            self,
-            pools: List[CurvePool],
-            sigma: float,
-            tvl_ma_time: float=50000,
-            min_liquidity: float=100,
-        ):
+        self,
+        pools: List[CurvePool],
+        sigma: float,
+        tvl_ma_time: float = 50000,
+        min_liquidity: float = 100,
+    ):
         self.price_pairs = [PricePair(pool) for pool in pools]
         self.sigma = sigma
         self.tvl_ma_time = tvl_ma_time
         self.min_liquidity = min_liquidity
         # TODO need to incorporate eixsting last_price, timestamp, tvl at initialization
 
-    def ema_tvl(self, ts: int=None) -> List[float]:
+    def ema_tvl(self, ts: int = None) -> List[float]:
         """
-        Calculate the exponential moving average (EMA) of the 
+        Calculate the exponential moving average (EMA) of the
         total value locked (TVL) of each pool.
-        
+
         Parameters
         ----------
         ts : int, optional
-            The timestamp to calculate the EMA at. If not provided, 
+            The timestamp to calculate the EMA at. If not provided,
             the current timestamp will be used.
-        
+
         Returns
         -------
         List[float]
@@ -55,7 +53,7 @@ class AggregateStablePrice:
         """
         ts = ts or int(time.time())
 
-        if not hasattr(self, 'last_timestamp'):
+        if not hasattr(self, "last_timestamp"):
             # No EMA to perform
             self.last_timestamp = ts
             self.last_tvl = [pair.pool.tokens / PRECISION for pair in self.price_pairs]
@@ -63,15 +61,17 @@ class AggregateStablePrice:
 
         alpha = math.exp(-(ts - self.last_timestamp) / self.tvl_ma_time)
         for i, pair in enumerate(self.price_pairs):
-            self.last_tvl[i] = alpha * self.last_tvl[i] + (1 - alpha) * pair.pool.tokens / PRECISION
-        
+            self.last_tvl[i] = (
+                alpha * self.last_tvl[i] + (1 - alpha) * pair.pool.tokens / PRECISION
+            )
+
         return self.last_tvl
 
     def price(self) -> float:
         """
         Return aggregated stablecoin price from Curve pools.
         Methodology:
-            1. Compute liquidity weighted average price 
+            1. Compute liquidity weighted average price
             (using EMA prices from pools).
             2. Compute each pool's deviation from the average price.
             3. Compute weights for each pool based on an exponential
@@ -83,7 +83,7 @@ class AggregateStablePrice:
             The aggregated stablecoin price.
         """
         n = len(self.price_pairs)
-        prices = D = errors = np.zeros(n) 
+        prices = D = errors = np.zeros(n)
 
         # Compute LWA
         Dsum = DPsum = 0
@@ -97,7 +97,9 @@ class AggregateStablePrice:
 
         # Compute error weights
         for i in range(n):
-            errors[i] = ((max(prices[i], p_avg) - min(prices[i], p_avg)) / self.sigma)**2
+            errors[i] = (
+                (max(prices[i], p_avg) - min(prices[i], p_avg)) / self.sigma
+            ) ** 2
         min_error = min(errors)
 
         # Compute error weighted average

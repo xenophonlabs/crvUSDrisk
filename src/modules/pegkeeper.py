@@ -6,8 +6,11 @@ import numpy as np
 
 # TODO move to config
 PRECISION = 1e18
-PROFIT_THRESHOLD = 1 # I'm not sure why this is used, but let's err on the side of keeping it
-CRVUSD_ADDRESS = '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' 
+PROFIT_THRESHOLD = (
+    1  # I'm not sure why this is used, but let's err on the side of keeping it
+)
+CRVUSD_ADDRESS = "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
+
 
 class PegKeeper(ABC):
     """
@@ -16,31 +19,28 @@ class PegKeeper(ABC):
 
     __slots__ = (
         # === Dependencies === #
-        'pool', # pool object
-
+        "pool",  # pool object
         # === Parameters === #
-        'I', # crvUSD index in pool
-        'caller_share', # share of profits for caller
-        'action_delay', # min delay between actions
-        'stabilization_coef', # smoothing coefficient for stabilizing pool
-        'ceiling', # debt ceiling
-
+        "I",  # crvUSD index in pool
+        "caller_share",  # share of profits for caller
+        "action_delay",  # min delay between actions
+        "stabilization_coef",  # smoothing coefficient for stabilizing pool
+        "ceiling",  # debt ceiling
         # === State Variables === #
-        'debt', # track minted crvUSD
-        'last_change', # timestamp of last action
-        'lp_balance', # track LP balance
+        "debt",  # track minted crvUSD
+        "last_change",  # timestamp of last action
+        "lp_balance",  # track LP balance
     )
 
     def __init__(
-            self,
-            pool: CurvePool,
-            aggregator: AggregateStablePrice,
-            caller_share: float,
-            ceiling: float,
-            action_delay: int=15*60,
-            stabilization_coef: float=0.2,
-        ) -> None:
-
+        self,
+        pool: CurvePool,
+        aggregator: AggregateStablePrice,
+        caller_share: float,
+        ceiling: float,
+        action_delay: int = 15 * 60,
+        stabilization_coef: float = 0.2,
+    ) -> None:
         self.pool = pool
         self.caller_share = caller_share
         self.aggregator = aggregator
@@ -49,17 +49,17 @@ class PegKeeper(ABC):
         self.ceiling = ceiling
 
         # Precision tracking
-        self.precisions = self.pool.metadata['coins']['decimals']
-        self.I = pool.metadata['coins']['addresses'].index(CRVUSD_ADDRESS)
-        assert self.I == 1, ValueError('All PK pools should have index==1')
+        self.precisions = self.pool.metadata["coins"]["decimals"]
+        self.I = pool.metadata["coins"]["addresses"].index(CRVUSD_ADDRESS)
+        assert self.I == 1, ValueError("All PK pools should have index==1")
 
         # TODO need to incorporate non-zero debt and lp_balance at initialization
         self.debt = 0
         self.last_change = None
-        self.lp_balance = 0 
+        self.lp_balance = 0
 
     # === Properties === #
-    
+
     @property
     def profit(self):
         """
@@ -69,8 +69,8 @@ class PegKeeper(ABC):
         """
         virtual_price = self.pool.get_virtual_price() / PRECISION
         lp_debt = self.debt / virtual_price + PROFIT_THRESHOLD
-        return self.lp_balance - lp_debt # TODO in contract they floor at 0, why?
-    
+        return self.lp_balance - lp_debt  # TODO in contract they floor at 0, why?
+
     @property
     def left_to_mint(self):
         """
@@ -84,7 +84,7 @@ class PegKeeper(ABC):
     def update(self, ts: int) -> float:
         """
         @notice Update the pool to maintain peg. Either deposit to lower price
-        or withdraw to raise price. Can only be called if profitable, and is the 
+        or withdraw to raise price. Can only be called if profitable, and is the
         only action performed by the Peg Keeper.
         @param ts timestamp to update at
         @return profit in LP tokens to caller
@@ -94,18 +94,24 @@ class PegKeeper(ABC):
         balance_pegged = self.pool.balances[self.I] / self.precisions[self.I]
         balance_peg = self.pool.balances[1 - self.I] / self.precisions[1 - self.I]
 
-        assert self.update_allowed(balance_peg, balance_pegged, ts), ValueError("Update not allowed")
+        assert self.update_allowed(balance_peg, balance_pegged, ts), ValueError(
+            "Update not allowed"
+        )
 
         change = self.calc_change(balance_peg, balance_pegged)
 
         if balance_peg > balance_pegged:
-             self.provide(change)  # this dumps stablecoin
+            self.provide(change)  # this dumps stablecoin
         else:
             self.withdraw(change)  # this pumps stablecoin
 
-        new_profit = self.profit # new profit since self.debt and self.lp_balance have been updated
+        new_profit = (
+            self.profit
+        )  # new profit since self.debt and self.lp_balance have been updated
         caller_profit = (new_profit - initial_profit) * self.caller_share
-        assert new_profit >= initial_profit, "Update unprofitable" # NOTE if this fails, state (incl pool) is corrupted
+        assert (
+            new_profit >= initial_profit
+        ), "Update unprofitable"  # NOTE if this fails, state (incl pool) is corrupted
 
         self.last_change = ts
 
@@ -117,8 +123,10 @@ class PegKeeper(ABC):
         @param amount amount to deposit into stableswap pool
         """
         assert amount > 0, ValueError("Must provide positive amount")
-        
-        amount = min(amount, self.left_to_mint) # Can deposit at most the amount left to mint
+
+        amount = min(
+            amount, self.left_to_mint
+        )  # Can deposit at most the amount left to mint
         amounts = np.zeros(2)
         amounts[self.I] = self.precise(amount, self.I)
 
@@ -134,8 +142,10 @@ class PegKeeper(ABC):
         @param amount amount to withdraw from stableswap pool
         """
         assert amount < 0, ValueError("Must withdraw negative amount")
-        
-        amount = min(-1*amount, self.debt) # Can withdraw at most the outstanding debt, is positive now
+
+        amount = min(
+            -1 * amount, self.debt
+        )  # Can withdraw at most the outstanding debt, is positive now
         amounts = np.zeros(2)
         amounts[self.I] = self.precise(amount, self.I)
 
@@ -146,25 +156,31 @@ class PegKeeper(ABC):
         self.debt -= amount
 
     # === Helpers === #
-    
+
     def calc_future_profit(
-            self, 
-            amount: float, 
-        ) -> float:
+        self,
+        amount: float,
+    ) -> float:
         """
         @notice calculate change in LP token profit.
         @param amount amount of token being deposited (positive) or removed (negative)
         @return future profit
         """
         if amount < 0:
-            amount = -1*min(-1*amount, self.debt) # Can withdraw at most the outstanding debt
+            amount = -1 * min(
+                -1 * amount, self.debt
+            )  # Can withdraw at most the outstanding debt
         else:
-            amount = min(amount, self.left_to_mint) # Can deposit at most the amount left to mint
+            amount = min(
+                amount, self.left_to_mint
+            )  # Can deposit at most the amount left to mint
 
         amounts = np.zeros(2)
         amounts[self.I] = amount
 
-        lp_balance_diff = self.pool.calc_token_amount(amounts) # not accounting for fees
+        lp_balance_diff = self.pool.calc_token_amount(
+            amounts
+        )  # not accounting for fees
 
         lp_balance = self.lp_balance + lp_balance_diff
         debt = self.debt + amount
@@ -175,8 +191,8 @@ class PegKeeper(ABC):
         virtual_price = self.pool.get_virtual_price() / PRECISION
         lp_debt = debt / virtual_price + PROFIT_THRESHOLD
 
-        return lp_balance - lp_debt # TODO in contract they floor at 0, why?
-    
+        return lp_balance - lp_debt  # TODO in contract they floor at 0, why?
+
     def estimate_caller_profit(self, ts: int) -> float:
         """
         @notice Estimate the profit (in LP tokens) of the caller
@@ -191,9 +207,11 @@ class PegKeeper(ABC):
 
         if not self.update_allowed(balance_peg, balance_pegged, ts):
             return 0
-        
-        new_profit = self.calc_future_profit(self.calc_change(balance_peg, balance_pegged))
-        
+
+        new_profit = self.calc_future_profit(
+            self.calc_change(balance_peg, balance_pegged)
+        )
+
         if new_profit < initial_profit:
             # update can only be called if its profitable
             return 0
@@ -201,10 +219,10 @@ class PegKeeper(ABC):
         return (new_profit - initial_profit) * self.caller_share
 
     def calc_change(
-            self, 
-            balance_peg: float, 
-            balance_pegged: float,
-        ) -> float:
+        self,
+        balance_peg: float,
+        balance_pegged: float,
+    ) -> float:
         """
         @notice calculate amount of crvUSD to mint or deposit
         @param balance_peg amount of PK token in pool
@@ -213,11 +231,7 @@ class PegKeeper(ABC):
         """
         return (balance_peg - balance_pegged) * self.stabilization_coef
 
-    def precise(
-            self, 
-            amount: float, 
-            i: int
-        ) -> int:
+    def precise(self, amount: float, i: int) -> int:
         """
         @notice convert a float to a precise integer for interacting with
         curvesim.
