@@ -1,44 +1,11 @@
 from typing import List
 from .aggregator import AggregateStablePrice
 from .pegkeeper import PegKeeper
+from .pricepair import PricePair
 from curvesim.pool.stableswap import CurvePool
 import math
 
 CRVUSD_ADDRESS = '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' 
-
-class PricePair:
-
-    __slots__ = (
-        'pool', # CurvePool object
-        'is_inverse',
-    )
-
-    def __init__(self, pool):
-
-        self.pool = pool
-        if pool.metadata['coins']['names'][1] == 'crvUSD':
-            self.is_inverse = False
-        else:
-            self.is_inverse = True
-    
-    def get_p(self):
-        """
-        @return stablecoins/crvUSD price from CurvePool
-        """
-        if self.is_inverse:
-            return self.pool.dydx(0, 1)
-        else:
-            return self.pool.dydx(1, 0)
-        
-    def price_oracle(self):
-        """
-        TODO Need to figure out how to implement this.
-        Curve StableSwap pool doesn't track block timestamps
-        so can't use it for EMA.
-
-        It's just an EMA of `get_p`.
-        """
-        pass
 
 class PegKeeperRegulator:
 

@@ -139,7 +139,7 @@ class PegKeeper(ABC):
         amounts = np.zeros(2)
         amounts[self.I] = self.precise(amount, self.I)
 
-        burned = self.pool.remove_liquidity_imbalance(amounts, 2**256-1)
+        burned, _ = self.pool.remove_liquidity_imbalance(amounts)
 
         # Update state variables
         self.lp_balance -= burned / PRECISION
