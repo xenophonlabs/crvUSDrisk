@@ -1,8 +1,44 @@
-from .pegkeeperregulator import PegKeeperRegulator
+from typing import List
 from .aggregator import AggregateStablePrice
+from .pegkeeper import PegKeeper
 from curvesim.pool.stableswap import CurvePool
+import math
 
 CRVUSD_ADDRESS = '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' 
+
+class PricePair:
+
+    __slots__ = (
+        'pool', # CurvePool object
+        'is_inverse',
+    )
+
+    def __init__(self, pool):
+
+        self.pool = pool
+        if pool.metadata['coins']['names'][1] == 'crvUSD':
+            self.is_inverse = False
+        else:
+            self.is_inverse = True
+    
+    def get_p(self):
+        """
+        @return stablecoins/crvUSD price from CurvePool
+        """
+        if self.is_inverse:
+            return self.pool.dydx(0, 1)
+        else:
+            return self.pool.dydx(1, 0)
+        
+    def price_oracle(self):
+        """
+        TODO Need to figure out how to implement this.
+        Curve StableSwap pool doesn't track block timestamps
+        so can't use it for EMA.
+
+        It's just an EMA of `get_p`.
+        """
+        pass
 
 class PegKeeperRegulator:
 
@@ -12,76 +48,81 @@ class PegKeeperRegulator:
 
         # === State Variables === #
         'price_deviation', # max price deviation to mint/burn
+        'price_pairs', # list of CurvePool objects
     )
 
     def __init__(
             self,
             aggregator: AggregateStablePrice,
-            deviation: float=5*10**(18-4) # 0.0005 = 0.05%,
+            deviation: float=5*10**(18-4), # 0.0005 = 0.05%
+            pools: List[CurvePool]=[],
         ) -> None:
 
         self.aggregator = aggregator
-        # TODO what is this?
         self.price_deviation = deviation
-        self.price_pairs = []
+        self.price_pairs = [PricePair(pool) for pool in pools]
 
-    def get_price(self, pair):
-        # implements stableswap get_price
-        # dx_0 / dx_1 only, however can have any number of coins in pool
-        if self.pair_prices.get(pair)!=None:
-            return self.pair_prices[pair]
-        else: return False
+    def get_price(self, pair: PricePair):
+        """
+        @return stablecoins/crvUSD price from CurvePool
+        """
+        return pair.get_p()
     
-    def get_price_oracle(self,pair):
-        if self.pair_oracle_prices.get(pair)!=None:
-            return self.pair_oracle_prices[pair]
-        else: return False
+    def get_price_oracle(self, pair):
+        """
+        @return EMA price
+        """
+        return pair.price_oracle()
 
-    def price_in_range(self,p0,p1):
-        # NOTE: we think p0 is p and p1 is p_oracle
-         # |p1 - p0| <= deviation
-        # -deviation <= p1 - p0 <= deviation
-        # 0 < deviation + p1 - p0 <= 2 * deviation
-        # NOTE: they mightve swapped the order of p0 and p1 here
-        return abs(p1 - p0) <= self.price_deviation
+    def price_in_range(self, p0: float, p1: float):
+        """
+        @notice checks that EMA price is within range from spot price.
+        @param p0 EMA price (oracle) or spot price
+        @param p1 EMA price (oracle) or spot price
+        @return True if price is in range, False otherwise
+        """
+        return abs(p0 - p1) <= self.price_deviation
     
-    def provide_allowed(self,pk):
-        # Checks that: 
-        # 1) current price in range of oracle in case of spam-attack
-        # 2) current price location among other pools in case of contrary coin depeg
-        # 3) stablecoin price is above 1
-
-        if self.aggregator.price() < 1e18: return False
-        price = sys.maxsize
+    def provide_allowed(self, pk: PegKeeper):
+        """
+        @notice Allow Peg Keeper to provide stablecoin to the pool.
+        @param pk Peg Keeper object
+        @return True if provide is allowed, False otherwise
+        @dev Checks that: 
+            1) current price in range of oracle in case of spam-attack
+            2) current price location among other pools in case of contrary coin depeg
+            3) stablecoin price is above 1
+        """
+        if self.aggregator.price() < 1e18: 
+            return False
+        
+        price = math.inf
         largest_price = 0
-        # iterate through all pairs for  smallest_price: uint256 = max_value(uint256)
-        # return whether the price is greater than the smallest price for all pairs
-        # @TODO: simplify this logic
         for pair in self.price_pairs:
             pair_price = self.get_price_oracle(pair)
-            pool_match = (self.pool_addresses[pair] == pk)
-            
-            if pool_match and not self.price_in_range(price, self.get_price(pair)): 
-                return False
-            if pool_match and self.price_in_range(price, self.get_price(pair)): 
-                continue               
-            if not pool_match and largest_price < pair_price: 
-                largest_price = pair_price
-            if not pool_match and largest_price >= pair_price:
-                pass
+            if pair.pool.address == pk.pool_address:
+                price = pair_price
+                if self.price_in_range(pair_price, self.get_price(pair)):
+                    return False
+                continue
+            largest_price = max(largest_price, pair_price)
+
         return largest_price >= (price - 3 * 10 ** (18 - 4))
 
-    def withdraw_allowed(self,pk):
+    def withdraw_allowed(self, pk: PegKeeper):
         """
         @notice Allow Peg Keeper to withdraw stablecoin from the pool
-        Checks
+        @param pk Peg Keeper object
+        @return True if withdraw is allowed, False otherwise
+        @dev Checks
             1) current price in range of oracle in case of spam-attack
             2) stablecoin price is below 1
         """
-        if self.aggregator.price() > 1e18: return False
+        if self.aggregator.price() > 1e18: 
+            return False
 
         for pair in self.price_pairs:
-            pool_match = (self.pool_addresses[pair] == pk)
-            if pool_match:
+            if pair.pool.address == pk.pool.address:
                 return self.price_in_range(self.get_price(pair), self.get_price_oracle(pair))
         return False  # dev: not found
+    
