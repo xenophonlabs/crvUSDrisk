@@ -34,7 +34,7 @@ class Oracle:
             price: float
         ) -> float:
         """
-        @notice for now, we are feeding in an ETH/USD price 
+        For now, we are feeding in an ETH/USD price 
         from a GBM and applying EMA.
         @param t current timestamp
         @param price current spot price
