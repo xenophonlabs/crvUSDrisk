@@ -83,19 +83,22 @@ class AggregateStablePrice:
             The aggregated stablecoin price.
         """
         n = len(self.price_pairs)
-        prices = D = errors = np.zeros(n)
+        prices = np.zeros(n)
 
         # Compute LWA
-        Dsum = DPsum = 0
+        D = np.zeros(n)
+        Dsum = 0
+        DPsum = 0
         for i, pair in enumerate(self.price_pairs):
             if pair.pool.tokens > self.min_liquidity:
-                prices[i] = pair.price_oracle() / PRECISION
-                D = pair.pool.tokens / PRECISION
-                Dsum += D
-                DPsum += D * prices[i]
+                prices[i] = pair.price_oracle()
+                D[i] = pair.pool.tokens / PRECISION
+                Dsum += D[i]
+                DPsum += D[i] * prices[i]
         p_avg = DPsum / Dsum
 
         # Compute error weights
+        errors = np.zeros(n)
         for i in range(n):
             errors[i] = (
                 (max(prices[i], p_avg) - min(prices[i], p_avg)) / self.sigma
@@ -103,7 +106,8 @@ class AggregateStablePrice:
         min_error = min(errors)
 
         # Compute error weighted average
-        wsum = wpsum = 0
+        wsum = 0
+        wpsum = 0
         for i in range(n):
             w = D[i] * math.exp(-(errors[i] - min_error))
             wsum += w

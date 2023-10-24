@@ -169,7 +169,16 @@ class Liquidator:
         ext_swap_fee: float,
     ) -> float:
         """
-        Calculate optimal arbitrage and perform it.
+        Calculate optimal arbitrage and perform it. 
+        For p in range [p_amm, p_mkt] or [p_mkt, p_amm] we:
+            1. Calculate amt_in: the amount of token_in required
+            to move price to p.
+            2. Calculate amt_out: the amount of token_out received
+            from moving price to p.
+            3. Calculate pnl: the profit (in USDC) received from 
+            swapping amt_out externally for a stablecoin (USDC or USDT).
+        We then return the price p that maximizes the profits from step 3.
+        Notice that step 3 incorporates market liquidity (e.g. Uniswap)
 
         Parameters
         ----------
@@ -292,7 +301,8 @@ class Liquidator:
 
         Parameters
         ----------
-        LLAMMA object
+        amm : LLAMMA
+            LLAMMA object
         p_new : float
             Price to move AMM to
         ext_stable_liquidity : float
@@ -409,6 +419,14 @@ class Liquidator:
         ------
         AssertionError
             If the swap amounts do not match
+        
+        Note
+        ----
+        TODO Would be cool to implement this using a snapshot
+        context manager like in `curvesim`. E.g., something like:
+        with amm.use_snapshot_context():
+            amm.swap(...)
+            assert ...
         """
         amm_cp = copy.deepcopy(amm)
         amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm_cp, p_new)

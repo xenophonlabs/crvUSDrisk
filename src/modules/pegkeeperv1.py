@@ -32,7 +32,7 @@ class PegKeeperV1(PegKeeper):
         self.ceiling = ceiling
 
         # Precision tracking
-        self.precisions = self.pool.metadata["coins"]["decimals"]
+        self.precisions = [10**d for d in self.pool.metadata["coins"]["decimals"]]
         self.I = pool.metadata["coins"]["addresses"].index(CRVUSD_ADDRESS)
         assert self.I == 1, ValueError("All PK pools should have index==1")
 

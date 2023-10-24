@@ -30,35 +30,21 @@ class PegKeeper(ABC):
         "debt",  # track minted crvUSD
         "last_change",  # timestamp of last action
         "lp_balance",  # track LP balance
+        "precisions",  # precision of each token
     )
 
-    def __init__(
-        self,
-        pool: CurvePool,
-        aggregator: AggregateStablePrice,
-        caller_share: float,
-        ceiling: float,
-        action_delay: int = 15 * 60,
-        stabilization_coef: float = 0.2,
-    ) -> None:
-        self.pool = pool
-        self.caller_share = caller_share
-        self.aggregator = aggregator
-        self.action_delay = action_delay
-        self.stabilization_coef = stabilization_coef
-        self.ceiling = ceiling
-
-        # Precision tracking
-        self.precisions = self.pool.metadata["coins"]["decimals"]
-        self.I = pool.metadata["coins"]["addresses"].index(CRVUSD_ADDRESS)
-        assert self.I == 1, ValueError("All PK pools should have index==1")
-
-        # TODO need to incorporate non-zero debt and lp_balance at initialization
-        self.debt = 0
-        self.last_change = None
-        self.lp_balance = 0
+    @abstractmethod
+    def __init__(self):
+        pass
 
     # === Properties === #
+
+    @property
+    def name(self):
+        """
+        Tokens in underlying pool.
+        """
+        return self.pool.metadata['name'].replace("Curve.fi Factory Plain Pool: ", "")
 
     @property
     def profit(self):
@@ -149,10 +135,10 @@ class PegKeeper(ABC):
         amounts = np.zeros(2)
         amounts[self.I] = self.precise(amount, self.I)
 
-        burned, _ = self.pool.remove_liquidity_imbalance(amounts)
+        burned, _ = self.pool.remove_liquidity_imbalance(amounts) / PRECISION
 
         # Update state variables
-        self.lp_balance -= burned / PRECISION
+        self.lp_balance -= burned 
         self.debt -= amount
 
     # === Helpers === #
@@ -180,7 +166,7 @@ class PegKeeper(ABC):
 
         lp_balance_diff = self.pool.calc_token_amount(
             amounts
-        )  # not accounting for fees
+        ) / PRECISION # not accounting for fees
 
         lp_balance = self.lp_balance + lp_balance_diff
         debt = self.debt + amount
