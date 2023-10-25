@@ -5,11 +5,11 @@ import numpy as np
 from .llamma import LLAMMA
 from .mpolicy import MonetaryPolicy
 
-DEAD_SHARES = 1e-15 # to init shares in a band
-EPSILON = 1e-18 # to avoid division by 0
+DEAD_SHARES = 1e-15  # to init shares in a band
+EPSILON = 1e-18  # to avoid division by 0
+
 
 class Position:
-
     def __init__(self, user, x, y, debt, health):
         self.user = user
         self.x = x
@@ -18,10 +18,11 @@ class Position:
         self.health = health
 
     def __repr__(self) -> str:
-        return f'Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})'
-    
+        return f"Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})"
+
     def __str__(self) -> str:
-        return f'Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})'
+        return f"Position:(user={self.user},x={self.x},y={self.y},debt={self.debt},health={self.health})"
+
 
 class Controller:
     """
@@ -39,31 +40,28 @@ class Controller:
 
     __slots__ = (
         # === Parameters === #
-        'loan_discount', # defines initial LTV
-        'liquidation_discount', # defines liquidation threshold
-        'MIN_TICKS', # minimum number of bands for position
-        'MAX_TICKS', # maximum number of bands for position
-        'A', # A parameter
-
+        "loan_discount",  # defines initial LTV
+        "liquidation_discount",  # defines liquidation threshold
+        "MIN_TICKS",  # minimum number of bands for position
+        "MAX_TICKS",  # maximum number of bands for position
+        "A",  # A parameter
         # === State variables === #
-        'loans', # loans[user] = debt
-        'total_debt', # total debt
-
+        "loans",  # loans[user] = debt
+        "total_debt",  # total debt
         # === Dependencies/Inputs === #
-        'monetary_policy', # MonetaryPolicy object
-        'amm', # LLAMMA object
+        "monetary_policy",  # MonetaryPolicy object
+        "amm",  # LLAMMA object
     )
 
     def __init__(
-            self, 
-            amm: LLAMMA, 
-            monetary_policy: MonetaryPolicy,
-            loan_discount: float,
-            liquidation_discount: float,
-            MIN_TICKS: int=4,
-            MAX_TICKS: int=50,
-        ):
-
+        self,
+        amm: LLAMMA,
+        monetary_policy: MonetaryPolicy,
+        loan_discount: float,
+        liquidation_discount: float,
+        MIN_TICKS: int = 4,
+        MAX_TICKS: int = 50,
+    ):
         self.A = amm.A
         self.monetary_policy = monetary_policy
         self.amm = amm
@@ -71,21 +69,21 @@ class Controller:
         self.liquidation_discount = liquidation_discount
         self.MIN_TICKS = MIN_TICKS
         self.MAX_TICKS = MAX_TICKS
-        
+
         self.total_debt = 0
         self.loans = defaultdict(int)
 
     def gen_borrowers(
         self,
         n: int,
-        coins: float, # target collateral
+        coins: float,  # target collateral
         mean_N: int = 10,
         std_N: int = 3,
         v: bool = False,
-        ):
+    ):
         """
         @notice generate n borrowers. borrowers are
-        a tuple (collateral, debt, N). 
+        a tuple (collateral, debt, N).
         @param n number of borrowers to generate
         @param coins number of collateral tokens
         @param mean_N mean of normal distribution for N
@@ -113,9 +111,11 @@ class Controller:
             debt = riskiness * max_borrowable
             borrowers.append((collateral[i], debt, Ns[i]))
         borrowers = np.array(borrowers)
-        assert abs(borrowers[:,0].sum() - coins) <= 1e-3
+        assert abs(borrowers[:, 0].sum() - coins) <= 1e-3
         if v:
-            print(f"Total collateral: {round(borrowers[:,0].sum() * self.amm.base_price / 1e6)} Mns USD")
+            print(
+                f"Total collateral: {round(borrowers[:,0].sum() * self.amm.base_price / 1e6)} Mns USD"
+            )
             print(f"Total debt: {round(borrowers[:,1].sum() / 1e6)} Mns USD")
         return borrowers
 
@@ -127,21 +127,27 @@ class Controller:
         @return health of user
         TODO: missing the get_sum_xy component if full=True on the contract
         """
-        health = (self.amm.get_x_down(user) * (1 - self.liquidation_discount)/self.loans[user]) - 1
+        health = (
+            self.amm.get_x_down(user)
+            * (1 - self.liquidation_discount)
+            / self.loans[user]
+        ) - 1
         if full:
-            n = min(self.amm.user_shares[user].keys()) # top band == most negative band
+            n = min(self.amm.user_shares[user].keys())  # top band == most negative band
             if n > self.amm.active_band:  # We are not in liquidation mode
                 p = self.amm.p_o
                 p_up = self.amm.p_o_up(n)
                 if p > p_up:
-                    health += (p - p_up) * self.amm.get_sum_xy(user)[1] / self.loans[user]
+                    health += (
+                        (p - p_up) * self.amm.get_sum_xy(user)[1] / self.loans[user]
+                    )
         return health
 
     def liquidate(
-            self, 
-            user: str,
-            frac: float,
-        ) -> None:
+        self,
+        user: str,
+        frac: float,
+    ) -> None:
         """
         @notice liquidate a fraction of a user's debt. This is a hard liquidation.
         @param user user address
@@ -153,14 +159,16 @@ class Controller:
         debt_initial = self.loans[user]
         debt_liquidated = debt_initial * frac
         debt_final = debt_initial - debt_liquidated
-        
+
         x_liquidated, y_liquidated = self.amm.withdraw(user, frac)
 
         # delta is the amount of crvUSD leftover from position
         # or is the remaining crvUSD needed to close position
         delta = x_liquidated - debt_liquidated
-        x_pnl = delta # liquidator either pockets a positive delta or pays a negative delta
-        y_pnl = y_liquidated # liquidator pockets collateral
+        x_pnl = (
+            delta  # liquidator either pockets a positive delta or pays a negative delta
+        )
+        y_pnl = y_liquidated  # liquidator pockets collateral
 
         if debt_final == 0:
             del self.loans[user]
@@ -170,30 +178,26 @@ class Controller:
         self.total_debt -= debt_liquidated
 
         return x_pnl, y_pnl
-    
+
     def check_liquidate(self, user, frac):
         assert self.health(user) < 0, "Not enough rekt"
 
         debt_initial = self.loans[user]
         debt_liquidated = debt_initial * frac
-        
+
         x_liquidated, y_liquidated = self.amm.get_sum_xy(user) * frac
 
         # delta is the amount of crvUSD leftover from position
         # or is the remaining crvUSD needed to close position
         delta = x_liquidated - debt_liquidated
-        x_pnl = delta # liquidator either pockets a positive delta or pays a negative delta
-        y_pnl = y_liquidated # liquidator pockets collateral
+        x_pnl = (
+            delta  # liquidator either pockets a positive delta or pays a negative delta
+        )
+        y_pnl = y_liquidated  # liquidator pockets collateral
 
         return x_pnl, y_pnl
 
-    def create_loan(
-            self, 
-            user: str, 
-            collateral: float, 
-            debt: float, 
-            N: int
-        ) -> None:
+    def create_loan(self, user: str, collateral: float, debt: float, N: int) -> None:
         assert self.MIN_TICKS <= N <= self.MAX_TICKS, "Invalid number of bands"
         assert self.loans[user] == 0, "User already has a loan"
 
@@ -218,7 +222,12 @@ class Controller:
         @notice Compute the system health
         @return system health
         """
-        return np.array([self.health(user) * debt for user, debt in self.loans.items()]).sum() / self.total_debt
+        return (
+            np.array(
+                [self.health(user) * debt for user, debt in self.loans.items()]
+            ).sum()
+            / self.total_debt
+        )
 
     def users_to_liquidate(self) -> List[Position]:
         to_liquidate = []
@@ -227,35 +236,39 @@ class Controller:
                 x, y = self.amm.get_sum_xy(user)
                 to_liquidate.append(Position(user, x, y, debt, self.health(user)))
         return to_liquidate
-    
+
     def max_borrowable(
-            self,
-            collateral: float,
-            N: int,
-        ) -> float:
+        self,
+        collateral: float,
+        N: int,
+    ) -> float:
         """
         @notice compute max debt for a given collateral amount
-        TODO using amm.p_o_down(amm.active_band) is not the same 
+        TODO using amm.p_o_down(amm.active_band) is not the same
         as max_p_base() from controller contract.
         """
-        return self.get_y_effective(collateral, N) * self.amm.p_o_down(self.amm.active_band)
+        return self.get_y_effective(collateral, N) * self.amm.p_o_down(
+            self.amm.active_band
+        )
 
     def get_y_effective(self, collateral, N) -> float:
         """
-        @notice Compute the value of the collateral 
+        @notice Compute the value of the collateral
         @param collateral Amount of collateral to get the value for
         @param N Number of bands the deposit is made into
         @param discount Loan discount at 1e18 base (e.g. 1e18 == 100%)
         @return y_effective
         """
-        discount = min(self.loan_discount + DEAD_SHARES / max(collateral / N, DEAD_SHARES), 1)
-        d_y_effective = collateral / N * (1 - discount) * ((self.A-1)/self.A) ** 0.5
+        discount = min(
+            self.loan_discount + DEAD_SHARES / max(collateral / N, DEAD_SHARES), 1
+        )
+        d_y_effective = collateral / N * (1 - discount) * ((self.A - 1) / self.A) ** 0.5
         y_effective = d_y_effective
         for _ in range(1, N):
             d_y_effective = d_y_effective * (self.A - 1) / self.A
             y_effective += d_y_effective
         return y_effective
-    
+
     def calculate_debt_n1(self, collateral, debt, N) -> int:
         """
         @notice Calculate the upper band number for the deposit to sit in to support
@@ -273,7 +286,7 @@ class Controller:
         y_effective = self.get_y_effective(collateral, N)
         ratio = y_effective * p_base / (debt + EPSILON)
 
-        n_delta = math.ceil(math.log(ratio, self.A/(self.A - 1))) 
+        n_delta = math.ceil(math.log(ratio, self.A / (self.A - 1)))
         # n_delta = math.ceil(math.log(ratio) / math.log(self.A / (self.A - 1)))
 
         n1 = n0 + n_delta

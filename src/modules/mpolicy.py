@@ -1,3 +1,2 @@
-class MonetaryPolicy():
-
+class MonetaryPolicy:
     pass

@@ -1,5 +1,6 @@
 import math
 
+
 class Oracle:
     """
     @notice simple oracle for llamma
@@ -9,32 +10,24 @@ class Oracle:
     """
 
     __slots__ = (
-        'last_timestamp', # timestamp since last update
+        "last_timestamp",  # timestamp since last update
         # 'last_tvl', # tvl for last update
         # 'TVL_MA_TIME', # EMA window for tvl
-        'last_price', # temp price for last update to do bootleg EMA
-        'PRICE_MA_TIME', # temp EMA window for price
-        'v', # verbose
+        "last_price",  # temp price for last update to do bootleg EMA
+        "PRICE_MA_TIME",  # temp EMA window for price
+        "v",  # verbose
     )
 
-    def __init__(
-            self,
-            PRICE_MA_TIME: int,
-            v: bool = False
-        ):
-            self.PRICE_MA_TIME = PRICE_MA_TIME
-            self.v = v
+    def __init__(self, PRICE_MA_TIME: int, v: bool = False):
+        self.PRICE_MA_TIME = PRICE_MA_TIME
+        self.v = v
 
     def price(self):
         return self.last_price
 
-    def update(
-            self, 
-            t: int, 
-            price: float
-        ) -> float:
+    def update(self, t: int, price: float) -> float:
         """
-        @notice for now, we are feeding in an ETH/USD price 
+        For now, we are feeding in an ETH/USD price
         from a GBM and applying EMA.
         @param t current timestamp
         @param price current spot price
@@ -49,7 +42,7 @@ class Oracle:
         6. Transform TriCrypto and PK prices into liquidity-weighted ETH/crvUSD
         7. Multiply by StableSwap agg prices to get ETH/USD
         """
-        if not hasattr(self, 'last_timestamp') or not hasattr(self, 'last_price'):
+        if not hasattr(self, "last_timestamp") or not hasattr(self, "last_price"):
             # No EMA to perform
             self.last_timestamp = t
             self.last_price = price

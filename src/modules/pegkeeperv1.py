@@ -6,25 +6,24 @@ import numpy as np
 
 # TODO move to config
 PRECISION = 1e18
-PROFIT_THRESHOLD = 1 # I'm not sure why this is used, but let's err on the side of keeping it
-CRVUSD_ADDRESS = '0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E' 
+PROFIT_THRESHOLD = (
+    1  # I'm not sure why this is used, but let's err on the side of keeping it
+)
+CRVUSD_ADDRESS = "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
+
 
 class PegKeeperV1(PegKeeper):
-
-    __slots__ = PegKeeper.__slots__ + (
-        'aggregator', # aggregator object
-    )
+    __slots__ = PegKeeper.__slots__ + ("aggregator",)  # aggregator object
 
     def __init__(
-            self,
-            pool: CurvePool,
-            aggregator: AggregateStablePrice,
-            caller_share: float,
-            ceiling: float,
-            action_delay: int=15*60,
-            stabilization_coef: float=0.2,
-        ) -> None:
-
+        self,
+        pool: CurvePool,
+        aggregator: AggregateStablePrice,
+        caller_share: float,
+        ceiling: float,
+        action_delay: int = 15 * 60,
+        stabilization_coef: float = 0.2,
+    ) -> None:
         self.pool = pool
         self.caller_share = caller_share
         self.aggregator = aggregator
@@ -33,14 +32,14 @@ class PegKeeperV1(PegKeeper):
         self.ceiling = ceiling
 
         # Precision tracking
-        self.precisions = self.pool.metadata['coins']['decimals']
-        self.I = pool.metadata['coins']['addresses'].index(CRVUSD_ADDRESS)
-        assert self.I == 1, ValueError('All PK pools should have index==1')
+        self.precisions = [10**d for d in self.pool.metadata["coins"]["decimals"]]
+        self.I = pool.metadata["coins"]["addresses"].index(CRVUSD_ADDRESS)
+        assert self.I == 1, ValueError("All PK pools should have index==1")
 
         # TODO need to incorporate non-zero debt and lp_balance at initialization
         self.debt = 0
         self.last_change = None
-        self.lp_balance = 0 
+        self.lp_balance = 0
 
     def update_allowed(self, balance_peg, balance_pegged, ts):
         """
@@ -51,8 +50,8 @@ class PegKeeperV1(PegKeeper):
         """
         if self.last_change and self.last_change + self.action_delay > ts:
             return False
-        
-        p_agg = self.aggregator.price() # crvUSD/USD price from Aggregator
+
+        p_agg = self.aggregator.price()  # crvUSD/USD price from Aggregator
 
         if balance_peg == balance_pegged:
             return False
@@ -62,7 +61,7 @@ class PegKeeperV1(PegKeeper):
             if p_agg < 1:
                 # this pool is off-sync with other pools in aggregator
                 return False
-        
+
         else:
             # more crvUSD -> crvUSD price below 1 -> withdraw crvUSD
             if p_agg > 1:
