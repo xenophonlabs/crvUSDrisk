@@ -9,6 +9,9 @@ class Slippage:
     def lin_collat_output(self,x):
         return min(1,1.081593506690093e-06*x+0.0004379110082802476)
     
+    def multi_var_collat_output(self,tokens_in,volatility):
+        return 0.4157 + 0.0313 * volatility + 0.0650 * tokens_in
+
     def collateral_auction(self,tokens_in,price,price_path=[]):
         # price defined as token0/token1 eg ETHUSD so amount of USD per ETH
         # tokens_in defined as amount of WETH being sold
@@ -29,6 +32,5 @@ class Slippage:
         y = [self.lin_collat_output(x_i) for x_i in x]
         plt.plot(x, y, color='blue')
         plt.show()
-        
         pass
     
