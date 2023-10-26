@@ -1,4 +1,3 @@
-from decimal import Decimal
 from .pegkeeper import PegKeeper
 from .aggregator import AggregateStablePrice
 from curvesim.pool.stableswap import CurvePool

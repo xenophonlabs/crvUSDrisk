@@ -90,7 +90,7 @@ class Liquidator:
         # Sell y_pnl collateral for USD
         y_pnl = external_swap(
             ext_stable_liquidity, ext_collat_liquidity, y_pnl, ext_swap_fee, True
-        ) # p_mkt * (1-f(y_pnl, sigma)) * y_pnl <- USDC out
+        )  # p_mkt * (1-f(y_pnl, sigma)) * y_pnl <- USDC out
         pnl = x_pnl + y_pnl
         if pnl > self.tolerance:
             # TODO need to account for gas
@@ -169,13 +169,13 @@ class Liquidator:
         ext_swap_fee: float,
     ) -> float:
         """
-        Calculate optimal arbitrage and perform it. 
+        Calculate optimal arbitrage and perform it.
         For p in range [p_amm, p_mkt] or [p_mkt, p_amm] we:
             1. Calculate amt_in: the amount of token_in required
             to move price to p.
             2. Calculate amt_out: the amount of token_out received
             from moving price to p.
-            3. Calculate pnl: the profit (in USDC) received from 
+            3. Calculate pnl: the profit (in USDC) received from
             swapping amt_out externally for a stablecoin (USDC or USDT).
         We then return the price p that maximizes the profits from step 3.
         Notice that step 3 incorporates market liquidity (e.g. Uniswap)
@@ -419,7 +419,7 @@ class Liquidator:
         ------
         AssertionError
             If the swap amounts do not match
-        
+
         Note
         ----
         TODO Would be cool to implement this using a snapshot

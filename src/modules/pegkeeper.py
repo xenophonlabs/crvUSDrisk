@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from .aggregator import AggregateStablePrice
-from curvesim.pool.stableswap import CurvePool
 import numpy as np
 
 # TODO move to config
@@ -45,7 +43,7 @@ class PegKeeper(ABC):
         """
         Tokens in underlying pool.
         """
-        return self.pool.metadata['name'].replace("Curve.fi Factory Plain Pool: ", "")
+        return self.pool.metadata["name"].replace("Curve.fi Factory Plain Pool: ", "")
 
     @property
     def profit(self):
@@ -95,7 +93,9 @@ class PegKeeper(ABC):
         else:
             self.withdraw(change)  # this pumps stablecoin
 
-        new_profit = self.profit  # new profit since self.debt and self.lp_balance have been updated
+        new_profit = (
+            self.profit
+        )  # new profit since self.debt and self.lp_balance have been updated
         caller_profit = (new_profit - initial_profit) * self.caller_share
         assert (
             new_profit >= initial_profit
@@ -132,7 +132,7 @@ class PegKeeper(ABC):
         assert amount < 0, ValueError("Must withdraw negative amount")
 
         amounts = np.zeros(2)
-        amounts[self.I] = self.precise(-1*amount, self.I) # make positive
+        amounts[self.I] = self.precise(-1 * amount, self.I)  # make positive
 
         burned, _ = self.pool.remove_liquidity_imbalance(amounts)
 
@@ -163,13 +163,13 @@ class PegKeeper(ABC):
 
         if amount == 0:
             return 0
-            
+
         amounts = np.zeros(2)
         amounts[self.I] = amount
 
-        lp_balance_diff = self.pool.calc_token_amount(
-            amounts
-        ) / PRECISION # not accounting for fees
+        lp_balance_diff = (
+            self.pool.calc_token_amount(amounts) / PRECISION
+        )  # not accounting for fees
 
         lp_balance = self.lp_balance + lp_balance_diff
         debt = self.debt + amount

@@ -9,6 +9,7 @@ def gen_gbm(S0, mu, sigma, dt, T):
     S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma**2) * dt + sigma * W))
     return S
 
+
 def slippage(size, sigma):
     # TODO understand what the actual trades would be
     # for the arbitrage. Would they
@@ -17,11 +18,13 @@ def slippage(size, sigma):
     b = 0.0004379110082802476
     return m * size + b
 
+
 def get_crvUSD_index(pool):
     """
     Return index of crvUSD in pool.
     """
     return pool.metadata["coins"]["names"].index("crvUSD")
+
 
 def external_swap(x, y, swap, fee, y_in):
     """
@@ -221,12 +224,14 @@ def plot_system_health(
 def plot_sim(df, scale=0.1) -> None:
     # Define plot bounds
     min_time, max_time = df.index.min(), df.index.max()
-    min_price, max_price = df["spot"].min() * (1 - scale), df["spot"].max() * (
-        1 + scale
+    min_price, max_price = (
+        df["spot"].min() * (1 - scale),
+        df["spot"].max() * (1 + scale),
     )
-    min_pnl, max_pnl = 0, max(
-        df["liquidation_pnl"].max(), df["arbitrage_pnl"].max()
-    ) * (1 + scale)
+    min_pnl, max_pnl = (
+        0,
+        max(df["liquidation_pnl"].max(), df["arbitrage_pnl"].max()) * (1 + scale),
+    )
     min_bad_debt, max_bad_debt = 0, df["bad_debt"].max() * (1 + scale)
     min_system_health, max_system_health = 0, df["system_health"].max() * (1 + scale)
 

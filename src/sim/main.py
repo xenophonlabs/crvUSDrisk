@@ -142,6 +142,7 @@ import numpy as np
 
 from pricegenerator import PriceGenerator
 
+
 def main():
     # df = sim(
     #     T=1,
@@ -154,30 +155,43 @@ def main():
     #     external_swap_fee=0.005,
     # )
     price_generator = PriceGenerator()
-    
+
     T = 1
-    dt = 1/(365*24)
+    dt = 1 / (365 * 24)
     n_assets = 8
-    mu = np.zeros(n_assets),
+    mu = (np.zeros(n_assets),)
     sigma = np.full(n_assets, 0.05)
-    S0 = np.full(n_assets,1)  # Initial price for each asset
+    S0 = np.full(n_assets, 1)  # Initial price for each asset
     # jump list of ordered pairs (jump_size, cumulative probability)
-    jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
-    jump_direction = [1,-1]
+    jump_list = [(0.02, 0.02 / 24), (0.05, 0.01 / 24)]
+    jump_direction = [1, -1]
     recovery_perc = 1
-    recovery_speed=9*24
+    recovery_speed = 9 * 24
 
     sparse_cor = {
-    0: {1: 0.95, 2: 0.95, 3: 0.95, 4: 0.95, 5: 0.95, 6: 0.95, 7: 0.95},
-    1: {2: 0.9025, 3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    2: {3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    3: {4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    4: {5: 0.9025, 6: 0.9025, 7: 0.9025},
-    5: {6: 0.9025, 7: 0.9025},
-    6: {7: 0.9025}}
+        0: {1: 0.95, 2: 0.95, 3: 0.95, 4: 0.95, 5: 0.95, 6: 0.95, 7: 0.95},
+        1: {2: 0.9025, 3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+        2: {3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+        3: {4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+        4: {5: 0.9025, 6: 0.9025, 7: 0.9025},
+        5: {6: 0.9025, 7: 0.9025},
+        6: {7: 0.9025},
+    }
 
-    cor_matrix=price_generator.gen_cor_matrix(n_assets,sparse_cor)
-    generated_prices = price_generator.gen_cor_jump_gbm(n_assets,T,dt,mu,sigma,S0,cor_matrix,jump_list,jump_direction,recovery_perc,recovery_speed)
+    cor_matrix = price_generator.gen_cor_matrix(n_assets, sparse_cor)
+    generated_prices = price_generator.gen_cor_jump_gbm(
+        n_assets,
+        T,
+        dt,
+        mu,
+        sigma,
+        S0,
+        cor_matrix,
+        jump_list,
+        jump_direction,
+        recovery_perc,
+        recovery_speed,
+    )
 
     # T = 1
     # dt = 1/(365*24)
@@ -186,7 +200,7 @@ def main():
     # sigma = 0.05
     # S0 = 1500  # Initial price for each asset
     # # jump list of ordered pairs (jump_size, cumulative probability)
-    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
+    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
     # jump_direction = [-1]
     # recovery_perc = .9
     # recovery_speed=3*24
@@ -194,7 +208,8 @@ def main():
 
     S = generated_prices
     # plot GBM paths
-    price_generator.plot_gbms(S,n_assets)    
+    price_generator.plot_gbms(S, n_assets)
+
 
 if __name__ == "__main__":
     main()
