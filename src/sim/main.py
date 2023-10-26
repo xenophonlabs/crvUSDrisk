@@ -153,8 +153,8 @@ def main():
     # T = 1
     # dt = 1/(365*24)
     # n_assets = 8
-    # mu = np.zeros(n_assets),
-    # sigma = np.full(n_assets, 0.05)
+    # mu = np.full(n_assets,-7.048389410022259e-07),
+    # sigma = np.full(n_assets, 0.0030879241521733092)
     # S0 = np.full(n_assets,1)  # Initial price for each asset
     # # jump list of ordered pairs (jump_size, cumulative probability)
     # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
@@ -179,8 +179,8 @@ def main():
     # T = 1
     # dt = 1/(365*24)
     # n_assets = 1
-    # mu = 0.0
-    # sigma = 0.05
+    # mu = 8.569081760129549e-05
+    # sigma = 0.022516670770215422
     # S0 = 1500  # Initial price for each asset
     # # jump list of ordered pairs (jump_size, cumulative probability)
     # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
@@ -200,7 +200,8 @@ def main():
     # slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
     
     # Multivariate Slippage
-    slippage_engine.plot_multi_var_collat_slippage(low_tokens=-9,high_tokens=5,low_vol=0,high_vol=.4,x0_type="log",x1_type="lin")
+    slippage_engine.plot_multi_var_collat_slippage(low_tokens=1e-9,high_tokens=1e5,low_vol=0,high_vol=.4,x0_type="lin",x1_type="lin")
+    slippage_engine.collateral_auction(tokens_in=1e5,price=2000,price_path=np.random.normal(1000,1500,10))
 
 if __name__ == "__main__":
     main()

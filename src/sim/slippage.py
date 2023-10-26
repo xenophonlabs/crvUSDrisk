@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import random
 from itertools import product
 import pandas as pd
+import plotly.express as px
 
 class Slippage:
     def __init__(self):
@@ -20,13 +21,13 @@ class Slippage:
         # price defined as token0/token1 eg ETHUSD so amount of USD per ETH
         # tokens_in defined as amount of WETH being sold
         perc_loss = self.lin_output(tokens_in)
-        volatility = .2        
-        return tokens_in*price
+        volatility=pd.DataFrame(price_path).rolling(window=min(9,len(price_path))).std().to_numpy().flatten()[-1]
+        return self.multi_var_collat_output(tokens_in,volatility)*price
     
     def stable_auction(self,tokens_in,price,price_path):
         # defined as token0/token1 eg crvUSD-USDC so amount of USDC per crvUSD
         price
-        return tokens_in*price
+        return tokens_in*price*.995
     
     def plot_lin_collat_slippage(self,low,high,x_type="lin"):
         if x_type=="log":
@@ -52,6 +53,6 @@ class Slippage:
         combinations = list(product(x0, x1))
         df = pd.DataFrame(combinations, columns=['tokens', 'volatility'])
         df["price_impact"] = df.apply(lambda row: self.multi_var_collat_output(row["tokens"],row["volatility"]), axis=1)
-        print(df)
-        
+        fig = px.scatter_3d(df,x="tokens",y="volatility",z="price_impact",color="price_impact")
+        fig.show()
         pass
