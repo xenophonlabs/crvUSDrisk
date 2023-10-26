@@ -6,9 +6,10 @@ import numpy as np
 
 # TODO move to config
 PRECISION = 1e18
-PROFIT_THRESHOLD = (
-    1  # I'm not sure why this is used, but let's err on the side of keeping it
-)
+# PROFIT_THRESHOLD = (
+#     1  # FIXME I'm not sure why this is used, but let's err on the side of keeping it
+# )
+PROFIT_THRESHOLD = 1
 CRVUSD_ADDRESS = "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
 
 
@@ -86,14 +87,15 @@ class PegKeeper(ABC):
 
         change = self.calc_change(balance_peg, balance_pegged)
 
+        if change == 0:
+            return 0
+
         if balance_peg > balance_pegged:
             self.provide(change)  # this dumps stablecoin
         else:
             self.withdraw(change)  # this pumps stablecoin
 
-        new_profit = (
-            self.profit
-        )  # new profit since self.debt and self.lp_balance have been updated
+        new_profit = self.profit  # new profit since self.debt and self.lp_balance have been updated
         caller_profit = (new_profit - initial_profit) * self.caller_share
         assert (
             new_profit >= initial_profit
@@ -129,16 +131,13 @@ class PegKeeper(ABC):
         """
         assert amount < 0, ValueError("Must withdraw negative amount")
 
-        amount = min(
-            -1 * amount, self.debt
-        )  # Can withdraw at most the outstanding debt, is positive now
         amounts = np.zeros(2)
-        amounts[self.I] = self.precise(amount, self.I)
+        amounts[self.I] = self.precise(-1*amount, self.I) # make positive
 
-        burned, _ = self.pool.remove_liquidity_imbalance(amounts) / PRECISION
+        burned, _ = self.pool.remove_liquidity_imbalance(amounts)
 
         # Update state variables
-        self.lp_balance -= burned 
+        self.lp_balance -= burned / PRECISION
         self.debt -= amount
 
     # === Helpers === #
@@ -152,15 +151,19 @@ class PegKeeper(ABC):
         @param amount amount of token being deposited (positive) or removed (negative)
         @return future profit
         """
-        if amount < 0:
-            amount = -1 * min(
-                -1 * amount, self.debt
-            )  # Can withdraw at most the outstanding debt
-        else:
-            amount = min(
-                amount, self.left_to_mint
-            )  # Can deposit at most the amount left to mint
+        # TODO delete this, calc_change does it now
+        # if amount < 0:
+        #     amount = -1 * min(
+        #         -1 * amount, self.debt
+        #     )  # Can withdraw at most the outstanding debt
+        # else:
+        #     amount = min(
+        #         amount, self.left_to_mint
+        #     )  # Can deposit at most the amount left to mint
 
+        if amount == 0:
+            return 0
+            
         amounts = np.zeros(2)
         amounts[self.I] = amount
 
@@ -215,7 +218,18 @@ class PegKeeper(ABC):
         @param balance_pegged amount of crvUSD in pool
         @return amount of crvUSD to mint (positive) or deposit (negative)
         """
-        return (balance_peg - balance_pegged) * self.stabilization_coef
+        amount = (balance_peg - balance_pegged) * self.stabilization_coef
+        if amount < 0:
+            # withdraw
+            amount = -1 * min(
+                -1 * amount, self.debt
+            )  # Can withdraw at most the outstanding debt
+        else:
+            # deposit
+            amount = min(
+                amount, self.left_to_mint
+            )  # Can deposit at most the amount left to mint
+        return amount
 
     def precise(self, amount: float, i: int) -> int:
         """
@@ -224,8 +238,9 @@ class PegKeeper(ABC):
         @param amount amount to convert
         @param i index of token
         @return integer with requisite precision
+        FIXME this is useless now since CurveSimPools are normalized
         """
-        return int(Decimal(amount) * Decimal(self.precision[i]))
+        return int(Decimal(amount) * Decimal(self.precisions[i]))
 
     @abstractmethod
     def update_allowed(self, balance_peg, balance_pegged, ts):

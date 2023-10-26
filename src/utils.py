@@ -9,6 +9,19 @@ def gen_gbm(S0, mu, sigma, dt, T):
     S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma**2) * dt + sigma * W))
     return S
 
+def slippage(size, sigma):
+    # TODO understand what the actual trades would be
+    # for the arbitrage. Would they
+    # FIXME Ignoring volatility for now
+    m = 1.081593506690093e-06
+    b = 0.0004379110082802476
+    return m * size + b
+
+def get_crvUSD_index(pool):
+    """
+    Return index of crvUSD in pool.
+    """
+    return pool.metadata["coins"]["names"].index("crvUSD")
 
 def external_swap(x, y, swap, fee, y_in):
     """

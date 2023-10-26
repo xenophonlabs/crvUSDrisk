@@ -90,7 +90,7 @@ class Liquidator:
         # Sell y_pnl collateral for USD
         y_pnl = external_swap(
             ext_stable_liquidity, ext_collat_liquidity, y_pnl, ext_swap_fee, True
-        )
+        ) # p_mkt * (1-f(y_pnl, sigma)) * y_pnl <- USDC out
         pnl = x_pnl + y_pnl
         if pnl > self.tolerance:
             # TODO need to account for gas
