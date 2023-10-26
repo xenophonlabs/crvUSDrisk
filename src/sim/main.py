@@ -146,7 +146,7 @@ from pricegenerator import PriceGenerator
 from slippage import Slippage
 
 def main():
-    ## price generation
+    ## Price Generation
     price_generator = PriceGenerator()
     
     # Multi Stablecoin Paths
@@ -194,7 +194,13 @@ def main():
 
     # Slippage    
     slippage_engine = Slippage()
-    slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
+   
+    #@TODO: change logspace index from power to number of tokens
+    # Linear Slippage
+    # slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
+    
+    # Multivariate Slippage
+    slippage_engine.plot_multi_var_collat_slippage(low_tokens=-9,high_tokens=5,low_vol=0,high_vol=.4,x0_type="log",x1_type="lin")
 
 if __name__ == "__main__":
     main()
