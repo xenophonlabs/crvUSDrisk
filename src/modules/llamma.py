@@ -1,6 +1,6 @@
 from collections import defaultdict
 from .oracle import Oracle
-from ..utils import _plot_reserves
+from ..utils.utils import _plot_reserves
 
 EPSILON = 1e-18  # to avoid division by 0
 DEAD_SHARES = 1e-15  # to init shares in a band
@@ -354,23 +354,23 @@ class LLAMMA:
         for n in range(n1, n2 + 1):
             share = self.user_shares[user][n] / self.total_shares[n]
 
-            I = self.inv(n)
+            inv = self.inv(n)
             f = self.f(n)
             g = self.g(n)
 
             if self.p_o > self.p_o_up(n):
-                y_o = I / f - g
+                y_o = inv / f - g
                 assert y_o > 0
                 x_down += y_o * self.p_o_up(n) * ((self.A - 1) / self.A) ** 0.5 * share
 
             elif self.p_o < self.p_o_down(n):
-                x_o = I / g - f
+                x_o = inv / g - f
                 assert x_o > 0
                 x_down += x_o * share
 
             else:
                 y_o = self.A * self.y0(n) * (self.p_o - self.p_o_down(n)) / self.p_o
-                x_o = I / (g + y_o) - f
+                x_o = inv / (g + y_o) - f
                 assert y_o > 0
                 assert x_o > 0
                 x_down += x_o + y_o * (self.p_o_down(n) * self.p_o) ** 0.5 * share

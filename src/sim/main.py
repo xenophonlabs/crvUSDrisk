@@ -183,7 +183,7 @@ def main():
     # sigma = 0.022516670770215422
     # S0 = 1500  # Initial price for each asset
     # # jump list of ordered pairs (jump_size, cumulative probability)
-    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
+    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
     # jump_direction = [-1]
     # recovery_perc = .9
     # recovery_speed=3*24

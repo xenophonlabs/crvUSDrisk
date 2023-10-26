@@ -2,7 +2,6 @@ from .pegkeeper import PegKeeper
 from .pegkeeperregulator import PegKeeperRegulator
 from curvesim.pool.stableswap import CurvePool
 
-import numpy as np
 
 # TODO move to config
 PRECISION = 1e18
