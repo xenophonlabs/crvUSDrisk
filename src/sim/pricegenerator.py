@@ -3,14 +3,8 @@ import matplotlib.pyplot as plt
 import random
 
 class PriceGenerator:
-    # __slots__ = (
-    #     "pool",  # CurvePool object
-    #     "is_inverse",
-    # )
-
-    def __init__(self,pool_type="collateral",n=1):
-       self.pool_type = pool_type  
-       self.n=n     
+    def __init__(self):
+       pass     
 
     def gen_single_gbm(self,S0, mu, sigma, dt, T):
         W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
