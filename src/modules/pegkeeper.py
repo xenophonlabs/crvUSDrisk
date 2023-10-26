@@ -7,7 +7,7 @@ PRECISION = 1e18
 # PROFIT_THRESHOLD = (
 #     1  # FIXME I'm not sure why this is used, but let's err on the side of keeping it
 # )
-PROFIT_THRESHOLD = 1
+PROFIT_THRESHOLD = 0
 CRVUSD_ADDRESS = "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
 
 
@@ -195,13 +195,14 @@ class PegKeeper(ABC):
         initial_profit = self.profit
 
         if not self.update_allowed(balance_peg, balance_pegged, ts):
+            print("Update not allowed")
             return 0
 
-        new_profit = self.calc_future_profit(
-            self.calc_change(balance_peg, balance_pegged)
-        )
+        change = self.calc_change(balance_peg, balance_pegged)
+        new_profit = self.calc_future_profit(change)
 
         if new_profit < initial_profit:
+            print("Update unprofitable")
             # update can only be called if its profitable
             return 0
 

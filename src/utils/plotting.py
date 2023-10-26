@@ -2,72 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
-
-
-def gen_gbm(S0, mu, sigma, dt, T):
-    W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
-    S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma**2) * dt + sigma * W))
-    return S
-
-
-def slippage(size, sigma):
-    # TODO understand what the actual trades would be
-    # for the arbitrage. Would they
-    # FIXME Ignoring volatility for now
-    m = 1.081593506690093e-06
-    b = 0.0004379110082802476
-    return m * size + b
-
-
-def get_crvUSD_index(pool):
-    """
-    Return index of crvUSD in pool.
-    """
-    return pool.metadata["coins"]["names"].index("crvUSD")
-
-
-def external_swap(x, y, swap, fee, y_in):
-    """
-    @notice account for slippage when trading against open market
-    Assuming that we trade against Uniswap is a conservative assumption
-    since not accounting for CEX.
-    However, we are not accounting for crvUSD liquidity in Curve pools yet.
-    # Fit this curve
-    # f(x | sigma) = c * sigma * x <- Gauntlet found this empirically in Compound report
-    # f(x | sigma) = c * sigma * x**0.5 <- TradFi empirical finding
-    # f(x | sigma) = c * sigma * x**2 <- Perhaps more like a simple CFMM
-    """
-    # TODO: Need to incorporate concentrated liquidity (e.g., no more liquidity beyond ]a, b[)
-    # TODO: Need to incorproate the StableSwap invariant for crvUSD pool liquidity
-    k = x * y
-
-    if y_in:
-        new_y = y + swap
-        new_x = k / new_y
-        out = (x - new_x) * (1 - fee)
-    else:
-        new_x = x + swap
-        new_y = k / new_x
-        out = (y - new_y) * (1 - fee)
-
-    return out
-
-
-# === PLOTTING === #
+from .utils import get_crvUSD_index
 
 FPS = 3
 
-fn_frames_reserves = "./figs/frames/test_reserves_{}.png"
-fn_gif_reserves = "./figs/gifs/test_reserves.gif"
+FRAMES_PATH = "../figs/frames/test_"
+GIFS_PATH = "../figs/gifs/test_"
 
-fn_frames_actions = "./figs/frames/test_actions_{}.png"
-fn_gif_actions = "./figs/gifs/test_actions.gif"
+fn_frames_stableswap_bals = FRAMES_PATH + "stableswap_bals_{}.png"
+fn_gif_stableswap_bals = GIFS_PATH + "stableswap_bals.gif"
 
-fn_frames_bad_debt = "./figs/frames/test_bad_debt_{}.png"
-fn_gif_bad_debt = "./figs/gifs/test_bad_debt.gif"
+fn_frames_reserves = FRAMES_PATH + "reserves_{}.png"
+fn_gif_reserves = GIFS_PATH + "reserves.gif"
 
-fn_frames_system_health = "./figs/frames/test_system_health_{}.png"
-fn_gif_system_health = "./figs/gifs/test_system_health.gif"
+fn_frames_actions = FRAMES_PATH + "actions_{}.png"
+fn_gif_actions = GIFS_PATH + "actions.gif"
+
+fn_frames_bad_debt = FRAMES_PATH + "bad_debt_{}.png"
+fn_gif_bad_debt = GIFS_PATH + "bad_debt.gif"
+
+fn_frames_system_health = FRAMES_PATH + "system_health_{}.png"
+fn_gif_system_health = GIFS_PATH + "system_health.gif"
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams.update({"font.size": 10})
@@ -80,7 +35,65 @@ plt.rcParams["grid.linestyle"] = "-"
 plt.rcParams["grid.linewidth"] = 2
 
 
-def plot_combined(df):
+def make_gif(frames_fn, gif_fn, n, fps=FPS):
+    frames = [imageio.v2.imread(frames_fn.format(i)) for i in range(n)]
+    imageio.mimsave(gif_fn, frames, fps=fps)
+
+
+def plot_stableswap_balances(pools, bals, width=0.25, fn=None, ylim=None):
+    """
+    Simple barchart of pool balances.
+
+    Note
+    ----
+    We take in `pools` to get the index of crvUSD. We don't use it
+    for balances since we are plotting the previous balances passed in
+    by the `bals` array.
+    """
+    n = len(pools)
+    width = 1 / (2 * n)
+    ind = np.arange(n)
+
+    pool_names = [
+        p.metadata["name"].replace("Curve.fi Factory Plain Pool: ", "") for p in pools
+    ]
+
+    f, ax = plt.subplots()
+
+    crvUSD_balances = []
+    other_balances = []
+
+    for i in range(n):
+        # Assume bals = [pool_0_coin_0, pool_0_coin_1, pool_1_coin_0, ..., pool_n_coin_1]
+        # so crvUSD idx for pool i is 2*i + get_crvUSD_index(pool i)
+        crvUSD_idx = get_crvUSD_index(pools[i])
+        other_idx = 2 * i + crvUSD_idx ^ 1
+        crvUSD_idx = 2 * i + crvUSD_idx
+        crvUSD_balances.append(bals[crvUSD_idx] / 1e6)
+        other_balances.append(bals[other_idx] / 1e6)
+
+    ax.bar(ind, crvUSD_balances, width, label="crvUSD Balance", color="indianred")
+    ax.bar(ind + width, other_balances, width, label="Other Balance", color="royalblue")
+
+    ax.set_xticks(ind + width / 2, pool_names)
+    ax.set_ylabel("Token Balance (Mns)")
+    ax.set_xlabel("Pool Tokens")
+    ax.set_title("crvUSD Pool Balances")
+
+    if ylim:
+        ax.set_ylim(0, ylim / 1e6)
+
+    f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=2)
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_combined():
     # Read frames from both GIFs
     reader1 = imageio.get_reader(fn_gif_reserves)
     reader2 = imageio.get_reader(fn_gif_actions)
@@ -272,21 +285,10 @@ def plot_sim(df, scale=0.1) -> None:
         )
         frame += 1
 
-    imageio.mimsave(
-        fn_gif_actions,
-        [imageio.v2.imread(fn_frames_actions.format(i)) for i in range(len(df))],
-        fps=FPS,
-    )
-    imageio.mimsave(
-        fn_gif_bad_debt,
-        [imageio.v2.imread(fn_frames_bad_debt.format(i)) for i in range(len(df))],
-        fps=FPS,
-    )
-    imageio.mimsave(
-        fn_gif_system_health,
-        [imageio.v2.imread(fn_frames_system_health.format(i)) for i in range(len(df))],
-        fps=FPS,
-    )
+    n = len(df)
+    make_gif(fn_frames_actions, fn_gif_actions, n)
+    make_gif(fn_frames_bad_debt, fn_gif_bad_debt, n)
+    make_gif(fn_gif_system_health, fn_frames_system_health, n)
 
 
 def _plot_reserves(llamma, fn=None):

@@ -3,7 +3,7 @@ from curvesim.pool import SimCurvePool
 from typing import List
 from scipy.optimize import minimize_scalar
 from dataclasses import dataclass
-from ..utils import get_crvUSD_index
+from ..utils.utils import get_crvUSD_index
 
 PRECISION = 1e18
 
@@ -151,6 +151,7 @@ class Arbitrageur:
         other pools do arbitrageurs integrate with? Example: TriCRV.
         NOTE assuming that arbitrageurs don't have crvUSD inventory.
         FIXME move to utils?
+        FIXME convert to
         """
         amt_in = int(amt_in * PRECISION)  # convert to 1e18 units
 
@@ -167,7 +168,10 @@ class Arbitrageur:
             amt_out, _ = pool2.trade(coin_in, coin_out, int(amt_mid))
 
         # amt_out is non crvUSD (e.g. USDT)
-        return (amt_out - amt_in * p) / 1e18  # FIXME incorporate slippage
+        # FIXME incorporate slippage and convert to USD
+        # E.g., arbitrageurs will sell the USDT profits at prevailing
+        # USDT/USD market price.
+        return (amt_out - amt_in * p) / 1e18
 
     @staticmethod
     def neg_profit(amt_in, pool1, pool2, p):

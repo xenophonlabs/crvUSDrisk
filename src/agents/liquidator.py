@@ -1,6 +1,6 @@
 from ..modules.controller import Controller, Position
 from ..modules.llamma import LLAMMA
-from ..utils import external_swap
+from ..utils.utils import external_swap
 from typing import List
 import matplotlib.pyplot as plt
 import copy

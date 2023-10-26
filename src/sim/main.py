@@ -140,7 +140,7 @@ import numpy as np
 #     # Update metrics in dfs <- e.g., calculate loss/bad debt
 #     return total_gains_and_losses
 
-from pricegenerator import PriceGenerator
+from .pricegenerator import PriceGenerator
 
 
 def main():

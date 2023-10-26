@@ -51,6 +51,7 @@ class PegKeeperV1(PegKeeper):
         @return True if update is allowed, False otherwise
         """
         if self.last_change and self.last_change + self.action_delay > ts:
+            print("Blocked by action delay.")
             return False
 
         p_agg = self.aggregator.price()  # crvUSD/USD price from Aggregator
@@ -61,12 +62,14 @@ class PegKeeperV1(PegKeeper):
         elif balance_peg > balance_pegged:
             # less crvSUD -> crvUSD price above 1 -> deposit more crvUSD
             if p_agg < 1:
+                print("Blocked by aggregator, can't mint when p_agg < 1.")
                 # this pool is off-sync with other pools in aggregator
                 return False
 
         else:
             # more crvUSD -> crvUSD price below 1 -> withdraw crvUSD
             if p_agg > 1:
+                print("Blocked by aggregator, can't burn when p_agg > 1.")
                 # this pool is off-sync with other pools in aggregator
                 return False
 

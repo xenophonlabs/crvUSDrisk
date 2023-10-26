@@ -1,6 +1,6 @@
 from collections import defaultdict
 from .oracle import Oracle
-from ..utils import _plot_reserves
+from ..utils.utils import _plot_reserves
 
 EPSILON = 1e-18  # to avoid division by 0
 DEAD_SHARES = 1e-15  # to init shares in a band
