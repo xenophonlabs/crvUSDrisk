@@ -10,7 +10,8 @@ class Slippage:
         return min(1,1.081593506690093e-06*x+0.0004379110082802476)
     
     def multi_var_collat_output(self,tokens_in,volatility):
-        return 0.4157 + 0.0313 * volatility + 0.0650 * tokens_in
+        beta_vals = [0.0004361338100091548,7.410748420112993e-06,1.0751863352735611e-06]
+        return beta_vals[0] + beta_vals[1] * volatility + beta_vals[2] * tokens_in
 
     def collateral_auction(self,tokens_in,price,price_path=[]):
         # price defined as token0/token1 eg ETHUSD so amount of USD per ETH
