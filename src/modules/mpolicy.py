@@ -1,0 +1,2 @@
+class MonetaryPolicy:
+    pass
