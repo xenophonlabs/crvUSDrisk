@@ -51,6 +51,22 @@ $$ l_{ij} = \frac{1}{l_{jj}} \left( a_{ij} - \sum_{k=1}^{j-1} l_{ik} l_{jk} \rig
 
 The decomposition is unique; given a particular matrix $A$, there is only one lower triangular matrix $L$ with positive diagonal entries that satisfies the equation $A = LL^T$.
 
+### Scenarios
+
+1. Collateral Assets (e.g. ETH)
+
+![ETH Price Path](./images/eth_price_path.png "ETH Price Path")
+
+Here we can see a sample GBM generated for a potential price path of ETH. We specify a $\mu$, $\sigma$, $T$, and $dt$ for our GBM. We can derive reasonable values for these via historical analysis of directionality and volatility of collateral assets like ETH. 
+
+Additionally we can sample historical distributions of daily price movements to compare the magnitude of daily price drops in our simulated asset prices with historical price drops in assets like ETH to develop a sense of any additional outlier "jumps" we would see in reality that do not occur in vanilla GBM price paths. See the below figure for a histogram of actual ETH price data since January 2022. 
+
+![Historical ETH Price Movements](./images/eth_historical_jumps.png "Historical ETH Price Movements")
+
+The x axis is 
+
+2. Correlated Stablecoins
+3. Stablecoin De-peg
 
 ## Jumps/Depegs 
 <p>
