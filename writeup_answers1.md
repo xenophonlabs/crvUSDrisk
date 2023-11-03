@@ -106,6 +106,24 @@ Above we can see when the price exits the green dotted line region away from $1 
 3. A polished description of the liquidity/slippage analysis you did, and how we are incorporating it into our model. Specifically, would be great to show the regression results on the Univ3 data and a corresponding visualization. This should describe why this approach is reasonable, and discuss some potential limitations/enhancements, ~5 or so paragraphs.
 </p>
 
+One key source of risk/losses in any AMM or lending protocol is slippage and price impact. These are historically defined a bit differently than in crypto, largely as a result of new mechanism design space within DeFi. That said, we will define the terms as such: price impact is the amount that a reference or oracle price is moved as a result of performing a trade of size $x$ where $x$ represents an amount of tokens being sold. On a constant-function market maker (CFMM) this is typically a deterministically predictable amount given some knowledge of the reserves of the (let's say 2) assets in the pool, eg reserves $X$ and $Y$ in their respective numeraires. For Uniswap v2, this was based on the constant-product invariant and for StableSwap pools it was a combination of the constant-product and constant-sum invariant. For Uniswap v3, it is a little more complex as the distribution of liquidity (not just total reserves) is a factor as well. But, for the most part, it is deterministic given the right information. There is, of course, an additional nondeterministic component as well (MEV, gas, front-running, etc.). This is a layer of variance on top of the predictable price impact, which we shall refer to as slippage (as this is how Uniswap has referred to it in their literature on the topic). In traditional finance, there is rarely a distinction between these terms. 
+
+For the purposes of this model, our goal is simply to accurately approximate the # of tokens we will receive when attempting to liquidate or sell $x$ amount of some token on external exchanges/markets. One such case where this is relevant is in the soft liquidation of collateral by arbitrageurs. This impacts the profitability of arbitrage and by extension the logic of when we should expect soft liquidations to occur. We could apply random noise/variance to our price impact function but since this is non-directional in expectation, it would simply average out over a sufficiently high number of iterations of a Monte Carlo simulation. As such, we will simply focus on establishing reasonable expectations of price impact, with backing from historical data analysis of Uniswap V3 AMM trades. The case of Uniswap v2 price impact is fairly deterministic and follows these equations:
+
+#### Constant Product Invariant: 
+$XY = k$
+
+#### New reserve of token B after the sale of $x$ amount of token A: 
+$Y' = \frac{XY}{X + x}$
+
+#### Amount $y$ of token B received from the sale:
+$y = Y - Y' = Y - \frac{XY}{X + x}$
+
+#### Price impact:
+$\pi = 1 - \frac{Y}{Y + y}$
+
+We could then in theory integrate this formula across some distribution of price ticks for reserve amounts $X_i$ and $Y_i$ in each price tick $i$. This would then require making assumptions for the expected amount and distribution of concentrated liquidity. Given that we are attempting to model Curve liquidity and trading behavior, this would add an undesired amount of complexity. Instead, we will look at some historical analysis of trade sizes and price impact values for trades in Uniswap v3 pools and examine cross correlations with price volatility to avoid this additional dependency. 
+
 
 
 ## Borrower and Liquidity Distributions
