@@ -77,9 +77,13 @@ As per the Cholesky Decomposition, we can also simulate multiple correlated stab
 
 For the most part, stablecoins are fairly mean-reverting. However, we have historically observed a few incidents of temporary de-pegs from the target price. For example the dislocation above peg observed in USDT during the Silicon Valley Bank in March 2023.
 
+![Stable Depeg](./images/stables_depeg.png "Stable Depeg")
+
+Sometimes these "depegs" occur above the target price and sometimes below. Additionally, we often see the market "bounce back" or recover from these price dislocations over a period of $n$ number of days. We can perform an historical analysis on these stablecoin prices to see when prices exit some arbitrarily chosen sensitivity threshold away from the target price (peg) and similarly when the price re-enters a range we would consider to be a mean reversion. 
+
 ![USDT-USDC Depeg Above](./images/usdt_usdc_depeg_above.png "USDT-USDC Depeg Above")
 
-Sometimes these "depegs" occur above the target price and sometimes below. Additionally, we often see the market "bounce back" or recover from these price dislocations over a period of $n$ number of days. We can perform an historical analysis on these stablecoin prices to see when prices exit some arbitrarily chosen sensitivity threshold away from the target price (peg) and similarly when the price re-enters a range we would consider to be a mean reversion. Above we can see when the price exits the green dotted line region away from $1 and when it subsequently get close enough to $1 again ~4 days later. We can use analysis like this to approximate parameters for when our simulated price paths should recover from jumps. You can also see that while the price gets close to $1 again, it does not recover 100% of the dislocation at first. This is something we also include as a parameter of our price paths (% recovery from jump). 
+Above we can see when the price exits the green dotted line region away from $1 and when it subsequently get close enough to $1 again ~4 days later. We can use analysis like this to approximate parameters for when our simulated price paths should recover from jumps. You can also see that while the price gets close to $1 again, it does not recover 100% of the dislocation at first. This is something we also include as a parameter of our price paths (% recovery from jump). 
 
 ## Jumps/Depegs 
 <p>
