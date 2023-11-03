@@ -55,21 +55,31 @@ The decomposition is unique; given a particular matrix $A$, there is only one lo
 
 1. Collateral Assets (e.g. ETH)
 
-![ETH Price Path](./images/eth_price_path.png "ETH Price Path")
+![ETH Price Path](./images/eth_price_path_no_jump.png "ETH Price Path")
 
 Here we can see a sample GBM generated for a potential price path of ETH. We specify a $\mu$, $\sigma$, $T$, and $dt$ for our GBM. We can derive reasonable values for these via historical analysis of directionality and volatility of collateral assets like ETH. 
+
+![Historical ETH Price Movements](./images/eth_price_path_jump.png "Historical ETH Price Movements")
 
 Additionally we can sample historical distributions of daily price movements to compare the magnitude of daily price drops in our simulated asset prices with historical price drops in assets like ETH to develop a sense of any additional outlier "jumps" we would see in reality that do not occur in vanilla GBM price paths. See the below figure for a histogram of actual ETH price data since January 2022. 
 
 ![Historical ETH Price Movements](./images/eth_historical_jumps.png "Historical ETH Price Movements")
 
+We can add additional degrees of realistic behavior to our simulated price paths with something referred to as a Merton Jump Diffusion model, which essentially treats these jumps 
+
 2. Correlated Stablecoins
 
-As per the Cholesky Decomposition, we can also simulate multiple correlated stablecoin prices (for example $1-pegged coins) as shown below.
+As per the Cholesky Decomposition, we can also simulate multiple correlated stablecoin prices (for example $1-pegged coins) as shown below. 
 
-
+![Correlated Stablecoin Price Movements](./images/stable_stables.png "Correlated Stablecoin Price Movements")
 
 3. Stablecoin De-peg
+
+For the most part, stablecoins are fairly mean-reverting. However, we have historically observed a few incidents of temporary de-pegs from the target price. For example the dislocation above peg observed in USDT during the Silicon Valley Bank in March 2023.
+
+![USDT-USDC Depeg Above](./images/usdt_usdc_depeg_above.png "USDT-USDC Depeg Above")
+
+Sometimes these "depegs" occur above the target price and sometimes below. Additionally, we often see the market "bounce back" or recover from these price dislocations over a period of $n$ number of days. We can perform an historical analysis on these stablecoin prices to see when prices exit some arbitrarily chosen sensitivity threshold away from the target price (peg) and similarly when the price re-enters a range we would consider to be a mean reversion. Above we can see when the price exits the green dotted line region away from $1 and when it subsequently get close enough to $1 again ~4 days later. We can use analysis like this to approximate parameters for when our simulated price paths should recover from jumps. You can also see that while the price gets close to $1 again, it does not recover 100% of the dislocation at first. This is something we also include as a parameter of our price paths (% recovery from jump). 
 
 ## Jumps/Depegs 
 <p>
