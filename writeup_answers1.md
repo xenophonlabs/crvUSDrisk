@@ -101,12 +101,14 @@ Sometimes these "depegs" occur above the target price and sometimes below. Addit
 
 Above we can see when the price exits the green dotted line region away from $1 and when it subsequently get close enough to $1 again ~4 days later. We can use analysis like this to approximate parameters for when our simulated price paths should recover from jumps. You can also see that while the price gets close to $1 again, it does not recover 100% of the dislocation at first. This is something we also include as a parameter of our price paths (% recovery from jump). 
 
-## Liquidity, Slippage, and Price Impact
+## External Market Slippage and Price Impact
 <p>
 3. A polished description of the liquidity/slippage analysis you did, and how we are incorporating it into our model. Specifically, would be great to show the regression results on the Univ3 data and a corresponding visualization. This should describe why this approach is reasonable, and discuss some potential limitations/enhancements, ~5 or so paragraphs.
 </p>
 
-## Borrower Distributions
+
+
+## Borrower and Liquidity Distributions
 <p>
 We have a few strategies we can employ for modeling reasonable distributions of liquidit and debt positions on an AMM or lending platform. LLAMMA is a combination of these two mechanisms so it is worth clarifying the assumptions that are reasonable to hold vs the variables that need to be monitored, analyzed and modeled. For example, it is typically reasonable to assume that loans (or debt positions) are self-replacing a la survival analysis techniques. I.e. for a constant amount of total debt, if individual loan positions are liquidated, repayed, or refinanced, we can assume that another loan of similar size would take its place. Therefore, we primarily have to model the health and volume of loans in aggregate to determine when borrowers are likely to mint/borrow or burn/repay their debt. For further degrees of nuance, we can simulate reasonable fluctuations in bands of LTV/position health, effectively creating buckets or tranches of users who share similar behavioral patterns. 
 
