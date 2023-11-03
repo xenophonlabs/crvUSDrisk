@@ -1,0 +1,31 @@
+{
+    "title":"ETH Portfolio Unlimited Jumps",
+    "type":["single","jump"],    
+    "assets": [
+        {
+            "name": "ETH-USDC",
+            "mu": 0,
+            "sigma": 0.05,
+            "S0": 1500,
+            "jump_limit": 100,
+            "jump_data": [
+                {
+                    "size": -0.10,
+                    "annual_prob": 1,
+                    "rec_perc": 0.7,
+                    "rec_speed_days": 30,
+                    "count": 0,
+                    "lag_days": 30
+                },
+                {
+                    "size": -0.2,
+                    "annual_prob": 1,
+                    "rec_perc": 0.7,
+                    "rec_speed_days": 30,
+                    "count": 0,
+                    "lag_days": 30
+                }
+            ]
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 {
     "title":"Leading Correlation Stablecoin Portfolio Single Jump",
+    "type":["multi_corr","jump"],
     "sparse_cor": {
         "0": {
             "1": 0.95,
