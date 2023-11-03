@@ -2,7 +2,6 @@
 
 ## Price Path Generation
 <p>
-1. A polished description of the current price generation approach we are taking of correlated GBMs, ~2 or so paragraphs, and a pretty visualization. This should indicate that we are fitting the necessary parameters using historical data.
 
 We are currently modeling cryptoasset prices as path-dependent stochastic processes. This is a well established methodology in fincial analysis. In particular we model two main types of stochastic processes. 
 </p>
@@ -61,11 +60,28 @@ Here we can see a sample GBM generated for a potential price path of ETH. We spe
 
 ![Historical ETH Price Movements](./images/eth_price_path_jump.png "Historical ETH Price Movements")
 
-Additionally we can sample historical distributions of daily price movements to compare the magnitude of daily price drops in our simulated asset prices with historical price drops in assets like ETH to develop a sense of any additional outlier "jumps" we would see in reality that do not occur in vanilla GBM price paths. See the below figure for a histogram of actual ETH price data since January 2022. 
+We can add additional degrees of realistic behavior to our simulated price paths with something referred to as a Merton Jump Diffusion model, which essentially treats these jumps as a Poisson process.  
+
+### Merton Jump Diffusion Model
+
+The Merton Jump Diffusion model extends the classic Black-Scholes model by incorporating sudden asset price jumps. This model is represented by the stochastic differential equation:
+
+$
+dS_t = \mu S_t dt + \sigma S_t dW_t + dJ_t S_{t^-1}
+$
+
+where $S_t$ is the asset price when the jump occurs, $mu$ is the drift coefficient, $\sigma$ is the volatility, $ dW_t$ is the Wiener process, and $dJ_t$ is the jump process. The jump process $dJ_t$ is defined as:
+
+$
+dJ_t = \sum_{i=1}^{N_t} (\gamma_i - 1)
+$
+
+Here, $N_t$ is a Poisson process with intensity $\lambda$, and $\gamma_i$ are the jump sizes. The Merton model captures both the continuous market risk and the discrete jump risks in asset pricing.
+
 
 ![Historical ETH Price Movements](./images/eth_historical_jumps.png "Historical ETH Price Movements")
 
-We can add additional degrees of realistic behavior to our simulated price paths with something referred to as a Merton Jump Diffusion model, which essentially treats these jumps 
+Additionally we can sample historical distributions of daily price movements to compare the magnitude of daily price drops in our simulated asset prices with historical price drops in assets like ETH to develop a sense of any additional outlier "jumps" we would see in reality that do not occur in vanilla GBM price paths. See the below figure for a histogram of actual ETH price data since January 2022. 
 
 2. Correlated Stablecoins
 
@@ -84,11 +100,6 @@ Sometimes these "depegs" occur above the target price and sometimes below. Addit
 ![USDT-USDC Depeg Above](./images/usdt_usdc_depeg_above.png "USDT-USDC Depeg Above")
 
 Above we can see when the price exits the green dotted line region away from $1 and when it subsequently get close enough to $1 again ~4 days later. We can use analysis like this to approximate parameters for when our simulated price paths should recover from jumps. You can also see that while the price gets close to $1 again, it does not recover 100% of the dislocation at first. This is something we also include as a parameter of our price paths (% recovery from jump). 
-
-## Jumps/Depegs 
-<p>
-2. A polished description of the current approach to enforce jumps/depegs, ~2 of so paragraphs, and a pretty visualization (ideally showing a depeg, perhaps compared to the empirical USDC depeg if you think its appropriate).
-</p>
 
 ## Liquidity, Slippage, and Price Impact
 <p>
