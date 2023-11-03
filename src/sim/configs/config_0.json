@@ -18,7 +18,7 @@
     "assets": [
         {
             "name": "USDC",
-            "mu": -7.04e-07,
+            "mu": 0,
             "sigma": 0.04,
             "S0": 1,
             "jump_limit": 1,
@@ -32,19 +32,19 @@
                     "lag_days": 30
                 },
                 {
-                    "size": 0.04,
+                    "size": 0.06,
                     "annual_prob": 100,
                     "rec_perc": 0.8,
                     "rec_speed_days": 30,
                     "count": 0,
-                    "lag_days": 30
+                    "lag_days": 180
                 }
             ]
         },
         {
             "name": "USDT",
-            "mu": -7.04e-07,
-            "sigma": 0.04,
+            "mu": 0,
+            "sigma": 0.02,
             "S0": 1,
             "jump_limit": 0,
             "jump_data": [
@@ -67,9 +67,9 @@
             ]
         },
         {
-            "name": "PUSD",
-            "mu": -7.04e-07,
-            "sigma": 0.04,
+            "name": "TUSD",
+            "mu": 0,
+            "sigma": 0.06,
             "S0": 1,
             "jump_limit": 0,
             "jump_data": [
@@ -92,9 +92,9 @@
             ]
         },
         {
-            "name": "LUSD",
-            "mu": -7.048e-07,
-            "sigma": 0.04,
+            "name": "FRAX",
+            "mu": 0,
+            "sigma": 0.06,
             "S0": 1,
             "jump_limit": 0,
             "jump_data": [

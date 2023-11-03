@@ -63,9 +63,12 @@ Additionally we can sample historical distributions of daily price movements to 
 
 ![Historical ETH Price Movements](./images/eth_historical_jumps.png "Historical ETH Price Movements")
 
-The x axis is 
-
 2. Correlated Stablecoins
+
+As per the Cholesky Decomposition, we can also simulate multiple correlated stablecoin prices (for example $1-pegged coins) as shown below.
+
+
+
 3. Stablecoin De-peg
 
 ## Jumps/Depegs 

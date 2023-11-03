@@ -112,6 +112,7 @@ class PriceGenerator:
         plt.title(title)
         plt.xlabel("Time Steps")
         plt.ylabel("Asset Price")
+        plt.ylim(.9, 1.1)
         plt.legend()
         plt.show()
 

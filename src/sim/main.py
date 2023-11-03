@@ -13,7 +13,7 @@ def main():
     dt = 1/(365*24)
     
     # Load simulation configuration parameters from a JSON file
-    with open("./configs/config_1.json","r") as infile:
+    with open("./configs/config_0.json","r") as infile:
         config = json.load(infile)
 
     # Extract key parameters from the configuration file
