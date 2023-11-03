@@ -16,14 +16,16 @@ def main():
     with open("./configs/config_0.json","r") as infile:
         config = json.load(infile)
 
+    title = config["title"]
     sparse_cor = config["sparse_cor"]
     assets = config["assets"]
     cor_matrix=price_generator.gen_cor_matrix(len(assets),sparse_cor)
     assets = price_generator.gen_cor_jump_gbm2(assets,cor_matrix,T=1,dt=1/(365*24))
     # plot GBM paths
-    price_generator.plot_gbms(T,dt,assets)
+    price_generator.plot_gbms(T,dt,assets,title=title)
 
-
+if __name__ == "__main__":
+    main()
 
 
 
@@ -46,7 +48,7 @@ def main():
     # price_generator.plot_gbms(S,n_assets)
 
     # Slippage    
-    slippage_engine = Slippage()
+    # slippage_engine = Slippage()
    
     #@TODO: change logspace index from power to number of tokens
     # Linear Slippage
@@ -55,11 +57,6 @@ def main():
     # Multivariate Slippage
     # slippage_engine.plot_multi_var_collat_slippage(low_tokens=1e-9,high_tokens=1e5,low_vol=0,high_vol=.4,x0_type="lin",x1_type="lin")
     # slippage_engine.collateral_auction(tokens_in=1e5,price=2000,price_path=np.random.normal(1000,1500,10))
-
-if __name__ == "__main__":
-    main()
-
-
 
 # from ..modules.llamma import LLAMMA as lm
 # from ..modules.controller import Controller as cntrlr

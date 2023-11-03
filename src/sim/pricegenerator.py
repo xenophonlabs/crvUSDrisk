@@ -61,7 +61,7 @@ class PriceGenerator:
                              asset["S"][t] =  asset["S"][t - 1] * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"] * dW_correlated[t][index])
         return assets
 
-    def plot_gbms(self,T,dt,assets):
+    def plot_gbms(self,T,dt,assets,title="Correlated Geometric Brownian Motions"):
         plt.figure(figsize=(12, 6))
         if len(assets) > 1:
             for index,asset in enumerate(assets):
@@ -70,7 +70,7 @@ class PriceGenerator:
             plt.plot(asset["S"], label="Asset")
         plt.xticks(np.arange(0, T/dt, step=24*10))
         plt.xticks(rotation=90)
-        plt.title("Correlated Geometric Brownian Motions")
+        plt.title(title)
         plt.xlabel("Time Steps")
         plt.ylabel("Asset Price")
         plt.legend()
