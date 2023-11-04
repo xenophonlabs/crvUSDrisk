@@ -124,7 +124,9 @@ $\pi = 1 - \frac{Y}{Y + y}$
 
 We could then in theory integrate this formula across some distribution of price ticks for reserve amounts $X_i$ and $Y_i$ in each price tick $i$. This would then require making assumptions for the expected amount and distribution of concentrated liquidity. Given that we are attempting to model Curve liquidity and trading behavior, this would add an undesired amount of complexity. Instead, we will look at some historical analysis of trade sizes and price impact values for trades in Uniswap v3 pools and examine cross correlations with price volatility in the hopes that we can use this to approximate fluctuations in liquidity and avoid this additional dependency. 
 
+!["Trade Size and Price Impact Linear Regression"](./images/eth_005_size_impact_linreg_vol_color.png "Trade Size and Price Impact Linear Regression")
 
+Here we can see the results of performing a linear regression on price impact and trade size in the Uniswap V3 ETH-USDC pool with a 0.05% fee tier. We collected this data by looking at Uniswap dex trades on Dune Analytics for Ethereum mainnet and comparing sqrtPriceX96 for each trade $i$ with sqrtPriceX96 for each trade $i-1$ (after performing all necessary decimal adjustments of course), divided by trade price $i-1$ to get a % price impact for that trade. In other words, how much does a given trade of size $x$ move the AMM price. We can see here that there is a relatively linear relationship, which seems to be higher when the rolling average of price volatilityis higher (computed over 7 day averages). You could think of this as a line whose slope increases when price is more volatile. We have not inspected the pools more depply yet, but this is presumably due to depletion/concentration of liquidity and/or intra-block MEV. 
 
 ## Borrower and Liquidity Distributions
 <p>
