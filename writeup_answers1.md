@@ -122,7 +122,7 @@ $y = Y - Y' = Y - \frac{XY}{X + x}$
 #### Price impact:
 $\pi = 1 - \frac{Y}{Y + y}$
 
-We could then in theory integrate this formula across some distribution of price ticks for reserve amounts $X_i$ and $Y_i$ in each price tick $i$. This would then require making assumptions for the expected amount and distribution of concentrated liquidity. Given that we are attempting to model Curve liquidity and trading behavior, this would add an undesired amount of complexity. Instead, we will look at some historical analysis of trade sizes and price impact values for trades in Uniswap v3 pools and examine cross correlations with price volatility to avoid this additional dependency. 
+We could then in theory integrate this formula across some distribution of price ticks for reserve amounts $X_i$ and $Y_i$ in each price tick $i$. This would then require making assumptions for the expected amount and distribution of concentrated liquidity. Given that we are attempting to model Curve liquidity and trading behavior, this would add an undesired amount of complexity. Instead, we will look at some historical analysis of trade sizes and price impact values for trades in Uniswap v3 pools and examine cross correlations with price volatility in the hopes that we can use this to approximate fluctuations in liquidity and avoid this additional dependency. 
 
 
 
