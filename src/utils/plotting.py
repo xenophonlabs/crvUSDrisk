@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
 from .utils import get_crvUSD_index
+from datetime import timedelta
 
 FPS = 3
 
@@ -27,9 +28,9 @@ fn_gif_system_health = GIFS_PATH + "system_health.gif"
 plt.rcParams["font.family"] = "serif"
 plt.rcParams.update({"font.size": 10})
 plt.rcParams["axes.spines.top"] = False
-plt.rcParams["axes.spines.right"] = False
+plt.rcParams["axes.spines.right"] = True
 
-plt.rcParams["axes.facecolor"] = "#f5f5f5"
+# plt.rcParams["axes.facecolor"] = "#f5f5f5"
 plt.rcParams["grid.color"] = "white"
 plt.rcParams["grid.linestyle"] = "-"
 plt.rcParams["grid.linewidth"] = 2
@@ -58,7 +59,7 @@ def plot_stableswap_balances(pools, bals, width=0.25, fn=None, ylim=None):
         p.metadata["name"].replace("Curve.fi Factory Plain Pool: ", "") for p in pools
     ]
 
-    f, ax = plt.subplots()
+    f, ax = plt.subplots(figsize=(8, 5))
 
     crvUSD_balances = []
     other_balances = []
@@ -92,8 +93,46 @@ def plot_stableswap_balances(pools, bals, width=0.25, fn=None, ylim=None):
 
     return f
 
+def plot_combined_2(fps=FPS):
+    """
+    FIXME better name
+    FIXME just make it like combined_1 with all the frames being gifs.
+    """
+    # Read frames from both GIFs
+    reader = imageio.get_reader(fn_gif_stableswap_bals)
 
-def plot_combined():
+    # Initialize list to store new frames
+    new_frames = []
+
+    # These are static
+    img2 = Image.open("../figs/test_arbitrage_profits.png")
+    img3 = Image.open("../figs/test_prices.png")
+    img4 = Image.open("../figs/test_agg_price.png")
+
+    # Combine frames
+    for frame in reader:
+        img1 = Image.fromarray(frame)
+
+        # Concatenate images
+        new_img = Image.new("RGB", (img1.width + img2.width, img1.height + img3.height))
+        new_img.paste(img1, (0, 0))
+        new_img.paste(img2, (img1.width, 0))
+        new_img.paste(img3, (0, img1.height))
+        new_img.paste(img4, (img1.width, img1.height))
+
+        # Convert back to array and append to new frames
+        new_frames.append(np.array(new_img))
+
+    # Create new GIF
+    imageio.mimsave("../figs/gifs/combined_2.gif", new_frames, fps=fps)
+
+
+def plot_combined(fn):
+
+    buffer_x = 150
+    buffer_y = 150
+    background = "white"
+
     # Read frames from both GIFs
     reader1 = imageio.get_reader(fn_gif_reserves)
     reader2 = imageio.get_reader(fn_gif_actions)
@@ -111,20 +150,20 @@ def plot_combined():
         img4 = Image.fromarray(frame4)
 
         # Concatenate images
-        new_img = Image.new("RGB", (img1.width + img2.width, img1.height + img3.height))
+        new_img = Image.new("RGB", (img1.width + img2.width + buffer_x, img1.height + img3.height + buffer_y), background)
         new_img.paste(img1, (0, 0))
-        new_img.paste(img2, (img1.width, 0))
-        new_img.paste(img3, (0, img1.height))
-        new_img.paste(img4, (img1.width, img1.height))
+        new_img.paste(img2, (img1.width + buffer_x, 0))
+        new_img.paste(img3, (0, img1.height + buffer_y))
+        new_img.paste(img4, (img1.width + buffer_x, img1.height + buffer_y))
 
         # Convert back to array and append to new frames
         new_frames.append(np.array(new_img))
 
     # Create new GIF
-    imageio.mimsave("./figs/gifs/combined.gif", new_frames, fps=FPS)
+    imageio.mimsave(fn, new_frames, fps=FPS)
 
 
-def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn):
+def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn, alpha=0.75):
     f, ax = plt.subplots(figsize=(8, 5))
 
     ax2 = ax.twinx()
@@ -140,15 +179,26 @@ def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_p
     ax.set_ylim(min_price, max_price)
     ax.set_xlim(min_time, max_time)
 
-    ax2.scatter(
+    width = (df.index[1] - df.index[0])*0.75
+
+    ax2.bar(
         ndf.index,
         ndf["liquidation_pnl"],
         label="Liquidation PnL",
         color="indianred",
-        s=20,
+        width=width,
+        alpha=alpha,
+        zorder=2
     )
-    ax2.scatter(
-        ndf.index, ndf["arbitrage_pnl"], label="Arbitrage PnL", color="royalblue", s=20
+    ax2.bar(
+        ndf.index, 
+        ndf["arbitrage_pnl"], 
+        bottom=ndf['liquidation_pnl'],
+        label="Arbitrage PnL", 
+        color="royalblue",
+        width=width,
+        alpha=alpha,
+        zorder=2
     )
 
     ax2.set_xlim(min_time, max_time)
@@ -288,10 +338,10 @@ def plot_sim(df, scale=0.1) -> None:
     n = len(df)
     make_gif(fn_frames_actions, fn_gif_actions, n)
     make_gif(fn_frames_bad_debt, fn_gif_bad_debt, n)
-    make_gif(fn_gif_system_health, fn_frames_system_health, n)
+    make_gif(fn_frames_system_health, fn_gif_system_health, n)
 
 
-def _plot_reserves(llamma, fn=None):
+def plot_reserves(llamma, fn=None, max_y=None):
     band_range = range(llamma.min_band, llamma.max_band + 1)
     bands_x = [llamma.bands_x[i] for i in band_range]
     bands_y = [llamma.bands_y[i] * llamma.p_o for i in band_range]
@@ -318,17 +368,21 @@ def _plot_reserves(llamma, fn=None):
     ax.axvline(llamma.p, color="green", linestyle="--", label="AMM price")
     # ax.xticks([round(i) for i in band_edges], rotation=45)
 
-    f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=4)
+    if max_y:
+        ax.set_ylim(0, max_y)
+
+    # f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=4)
+    ax.legend()
     f.tight_layout()
 
     if fn:
-        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.savefig(fn, dpi=300)
         plt.close()  # don't show
 
     return f
 
 
-def _plot_borrowers(borrowers, price):
+def plot_borrowers(borrowers, price, fn=None):
     f, ax = plt.subplots(3, figsize=(10, 10))
     n_bins = len(borrowers) // 2
     ax[0].hist(borrowers[:, 0] * price / 1e6, bins=n_bins, color="darkblue")
@@ -341,3 +395,7 @@ def _plot_borrowers(borrowers, price):
     ax[2].set_title("N Distribution")
     ax[2].set_xlabel("N")
     f.tight_layout()
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+    return f

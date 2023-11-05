@@ -20,6 +20,7 @@ class Trade:
     """
 
     size: int
+    profit: float
     pool1: SimCurvePool  # Pool to buy crvUSD from
     pool2: SimCurvePool  # Pool to sell crvUSD to
     p: float  # Market price of stablecoins (e.g. USDC/USDT)
@@ -84,23 +85,44 @@ class Arbitrageur:
         return pnl, count
 
     def arbitrage(self, pools, prices):
-        # FIXME need to handle >2 pools
-        assert len(pools) == 2
+        """
+        Identify the optimal arbitrage between pools
+        and perform it if profitable.
+
+        Parameters
+        ----------
+        pools : List[SimCurvePool]
+            list of curve pool objects
+        prices : List[float]
+            list of external market prices for underlying tokens
+
+        Returns
+        -------
+        profit
+        count
+        volume
+
+        Note
+        ----
+        FIXME need to handle >2 pools
+        FIXME need to return metrics that are pool specific
+        """
+        assert len(pools) == 2, NotImplementedError("Can't arb more than two pools.")
+
         trade = self.search(pools, prices)
+
         count = 0
-        # FIXME this is hacky
-        self.verbose = False
-        profit = self.trade(trade, use_snapshot_context=True)
-        self.verbose = True
-        if profit > self.tolerance:
-            profit = self.trade(trade)
+        profit = 0
+
+        if trade.profit > self.tolerance:
+            profit = self.trade(trade)  # Perform the trade
+            assert profit > self.tolerance, RuntimeError("Trade unprofitable.")
             self.print(f"Arbitrage trade with profit {round(profit)}.")
-            assert profit > self.tolerance
-            self.arbitrage_pnl += profit
-            self.arbitrage_count += 1
             count += 1
-        else:
-            profit = 0
+
+        self.arbitrage_pnl += profit
+        self.arbitrage_count += count
+
         return profit, count
 
     @staticmethod
@@ -122,8 +144,8 @@ class Arbitrageur:
             1. Flash borrow USDC from WETH/USDC pool.
             2. Swap USDC for crvUSD on USDC/crvUSD pool.
             3. Swap crvUSD for USDT on USDT/crvUSD pool.
-            4. Swap USDT for USDC (e.g. on 3pool) to repay flashloan.
-            5. Remaining USDT (or USDC) is profit.
+            4. Swap USDT for WETH to repay flashloan.
+            5. Remaining USDT is profit.
 
         The below pseudo-code explains this at a high-level:
         profit = pool2.trade(pool1.trade(USDC_in, crvusd_in=False), crvusd_in=True)
@@ -233,7 +255,8 @@ class Arbitrageur:
         )
         if res.success:
             amt_in = int(res.x * PRECISION)
-            trade = Trade(amt_in, *args)
+            profit = -res.fun
+            trade = Trade(amt_in, profit, *args)
             return trade
         else:
             raise RuntimeError(

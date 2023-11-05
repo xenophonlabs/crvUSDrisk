@@ -1,4 +1,3 @@
-import numpy as np
 # from ..modules.llamma import LLAMMA as lm
 # from ..modules.controller import Controller as cntrlr
 # from ..modules.oracle import Oracle as orcl
@@ -145,10 +144,11 @@ import numpy as np
 from pricegenerator import PriceGenerator
 from slippage import Slippage
 
+
 def main():
     ## Price Generation
     price_generator = PriceGenerator()
-    
+
     # Multi Stablecoin Paths
     # T = 1
     # dt = 1/(365*24)
@@ -157,7 +157,7 @@ def main():
     # sigma = np.full(n_assets, 0.0030879241521733092)
     # S0 = np.full(n_assets,1)  # Initial price for each asset
     # # jump list of ordered pairs (jump_size, cumulative probability)
-    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]    
+    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
     # jump_direction = [1,-1]
     # recovery_perc = 1
     # recovery_speed=9*24
@@ -192,16 +192,23 @@ def main():
     # plot GBM paths
     # price_generator.plot_gbms(S,n_assets)
 
-    # Slippage    
+    # Slippage
     slippage_engine = Slippage()
-   
-    #@TODO: change logspace index from power to number of tokens
+
+    # @TODO: change logspace index from power to number of tokens
     # Linear Slippage
     # slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
-    
+
     # Multivariate Slippage
-    slippage_engine.plot_multi_var_collat_slippage(low_tokens=1e-9,high_tokens=1e5,low_vol=0,high_vol=.4,x0_type="lin",x1_type="lin")
-    slippage_engine.collateral_auction(tokens_in=1e5,price=2000,price_path=np.random.normal(1000,1500,10))
+    slippage_engine.plot_multi_var_collat_slippage(
+        low_tokens=-9,
+        high_tokens=5,
+        low_vol=0,
+        high_vol=0.4,
+        x0_type="log",
+        x1_type="lin",
+    )
+
 
 if __name__ == "__main__":
     main()

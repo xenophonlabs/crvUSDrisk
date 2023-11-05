@@ -1,6 +1,6 @@
 from collections import defaultdict
 from .oracle import Oracle
-from ..utils.utils import _plot_reserves
+from ..utils.plotting import plot_reserves
 
 EPSILON = 1e-18  # to avoid division by 0
 DEAD_SHARES = 1e-15  # to init shares in a band
@@ -134,9 +134,8 @@ class LLAMMA:
                         assert -1e-6 < x_left
                         x_left = max(x_left, 0)
 
-                        if x_left >= x:
-                            print(x_left, x)
-                        assert x_left <= x  # sanity check
+                        # let it be a little negative because floating point errors FIXME
+                        assert x - x_left > -1e-6  # sanity check
 
                         admin_fee = (in_amount_left - y_dest) * self.admin_fee
 
@@ -193,9 +192,8 @@ class LLAMMA:
                         assert -1e-6 < y_left
                         y_left = max(y_left, 0)
 
-                        if y_left >= y:
-                            print(y_left, y)
-                        assert y_left <= y  # sanity check
+                        # let it be a little negative because floating point errors FIXME
+                        assert y - y_left > -1e-6  # sanity check
 
                         admin_fee = (in_amount_left - x_dest) * self.admin_fee
 
@@ -237,7 +235,7 @@ class LLAMMA:
         @return [amt_in, amt_out] actual amount swapped in and out
         TODO add slippage tolerance
         """
-        assert amt_in > 0
+        assert amt_in > 0, amt_in
 
         # NOTE: amt is amount to swap IN
         s = self._swap(amt_in, y_in)
@@ -352,30 +350,168 @@ class LLAMMA:
         x_down = 0
 
         for n in range(n1, n2 + 1):
-            share = self.user_shares[user][n] / self.total_shares[n]
+            share = self.user_shares[user][n] / (self.total_shares[n] + DEAD_SHARES)
 
             inv = self.inv(n)
             f = self.f(n)
             g = self.g(n)
 
             if self.p_o > self.p_o_up(n):
-                y_o = inv / f - g
+                y_o = max(inv / f, g) - g
                 assert y_o > 0
-                x_down += y_o * self.p_o_up(n) * ((self.A - 1) / self.A) ** 0.5 * share
+                x_down += (y_o * self.p_o_up(n) * ((self.A - 1) / self.A) ** 0.5) * share
 
             elif self.p_o < self.p_o_down(n):
-                x_o = inv / g - f
+                x_o = max(inv / g, f) - f
                 assert x_o > 0
                 x_down += x_o * share
 
             else:
                 y_o = self.A * self.y0(n) * (self.p_o - self.p_o_down(n)) / self.p_o
-                x_o = inv / (g + y_o) - f
+                x_o = max(inv / (g + y_o), f) - f
                 assert y_o > 0
                 assert x_o > 0
-                x_down += x_o + y_o * (self.p_o_down(n) * self.p_o) ** 0.5 * share
+                x_down += (x_o + y_o * (self.p_o_down(n) * self.p_o) ** 0.5) * share
 
         return x_down
+
+    def get_x_down2(self, user):
+        """
+        testing a bunch of the functionality in LLAMMA against vyper code.
+        this is the get_xy_up() function from Vyper, copied over. we place a 
+        bunch of asserts to test some of our helper methods. this should
+        ultimately be ported over into a testing file, maybe we use 
+        boa to compare vyper with python implementations, or maybe we just use
+        crvusdsim by 0xreviews.
+        """
+        SQRT_BAND_RATIO = (self.A / (self.A - 1))**0.5
+
+        user_bands = self.user_shares[user].keys()
+        n1 = min(user_bands)
+        n2 = max(user_bands)
+        ns = [n1, n2]
+
+        p_o = self.p_o
+        assert p_o != 0
+
+        n = ns[0] - 1
+        n_active = self.active_band
+        p_o_down = self.p_o_up(ns[0])
+        XY = 0
+
+        for n in range(n1, n2 + 1):
+            x = 0
+            y = 0
+            if n >= n_active:
+                y = self.bands_y[n]
+            if n <= n_active:
+                x = self.bands_x[n]
+            # p_o_up: uint256 = self._p_oracle_up(n)
+            p_o_up = p_o_down
+            assert abs(p_o_up - self.p_o_up(n))/p_o_up <= 1e-6
+            # p_o_down = self._p_oracle_up(n + 1)
+            p_o_down = p_o_down * (self.A - 1) / self.A
+            assert abs(p_o_down - self.p_o_down(n))/p_o_down <= 1e-6
+            if x == 0:
+                if y == 0:
+                    continue
+
+            total_share = self.total_shares[n]
+            user_share = self.user_shares[user][n]
+            if total_share == 0:
+                continue
+            if user_share == 0:
+                continue
+            total_share += DEAD_SHARES
+            # Also ideally we'd want to add +1 to all quantities when calculating with shares
+            # but we choose to save bytespace and slightly under-estimate the result of this call
+            # which is also more conservative
+
+            # Also this will revert if p_o_down is 0, and p_o_down is 0 if p_o_up is 0
+            p_current_mid = p_o**2 / p_o_down * p_o / p_o_up
+
+            # if p_o > p_o_up - we "trade" everything to y and then convert to the result
+            # if p_o < p_o_down - "trade" to x, then convert to result
+            # otherwise we are in-band, so we do the more complex logic to trade
+            # to p_o rather than to the edge of the band
+            # trade to the edge of the band == getting to the band edge while p_o=const
+
+            # Cases when special conversion is not needed (to save on computations)
+            if x == 0 or y == 0:
+                if p_o > p_o_up:  # p_o < p_current_down
+                    # all to y at constant p_o, then to target currency adiabatically
+                    y_equiv = y
+                    if y == 0:
+                        y_equiv = x / p_current_mid
+                    XY += (y_equiv * p_o_up / SQRT_BAND_RATIO) * user_share / total_share
+                    continue
+
+                elif p_o < p_o_down:  # p_o > p_current_up
+                    # all to x at constant p_o, then to target currency adiabatically
+                    x_equiv = x
+                    if x == 0:
+                        x_equiv = y * p_current_mid
+                    XY += x_equiv * user_share / total_share
+                    continue
+
+            # If we are here - we need to "trade" to somewhere mid-band
+            # So we need more heavy math
+
+            y0 = self._get_y0(x, y, p_o, p_o_up)
+            assert abs(y0 - self.y0(n))/y0 < 1e-6
+            f = (self.A * y0 * p_o ** 2 / p_o_up) 
+            assert abs(f - self.f(n))/f < 1e-6
+            g = (self.A - 1) * y0 * p_o_up / p_o
+            assert abs(g - self.g(n))/g < 1e-6
+            Inv = (f + x) * (g + y)
+            assert abs(Inv - self.inv(n))/Inv < 1e-6
+
+            # First, "trade" in this band to p_oracle
+            x_o = 0
+            y_o = 0
+
+            if p_o > p_o_up:  # p_o < p_current_down, all to y
+                # x_o = 0
+                y_o = max(Inv / f, g) - g
+                XY += (y_o * p_o_up / SQRT_BAND_RATIO) * user_share / total_share
+
+            elif p_o < p_o_down:  # p_o > p_current_up, all to x
+                # y_o = 0
+                x_o = max(Inv / g, f) - f
+                XY += x_o * user_share / total_share
+
+            else:
+                y_o = self.A * y0 * (p_o - p_o_down) / p_o
+                x_o = max(Inv / (g + y_o), f) - f
+                XY += (x_o + y_o * (p_o_down * p_o)**0.5) * user_share / total_share
+
+        return XY
+    
+    def _get_y0(self, x, y, p_o, p_o_up):
+        """
+        @notice Calculate y0 for the invariant based on current liquidity in band.
+                The value of y0 has a meaning of amount of collateral when band has no stablecoin
+                but current price is equal to both oracle price and upper band price.
+        @param x Amount of stablecoin in band
+        @param y Amount of collateral in band
+        @param p_o External oracle price
+        @param p_o_up Upper boundary of the band
+        @return y0
+        """
+        assert p_o != 0
+        # solve:
+        # p_o * A * y0**2 - y0 * (p_oracle_up/p_o * (A-1) * x + p_o**2/p_oracle_up * A * y) - xy = 0
+        b = 0
+        # p_o_up * unsafe_sub(A, 1) * x / p_o + A * p_o**2 / p_o_up * y / 10**18
+        if x != 0:
+            b = p_o_up * (self.A - 1) * x / p_o
+        if y != 0:
+            b += self.A * p_o**2 / p_o_up * y
+        if x > 0 and y > 0:
+            D = b**2 + 4 * self.A * p_o * y * x
+            return (b + D**0.5) / (2 * self.A * p_o)
+        else:
+            return b / (self.A * p_o)
 
     def get_sum_xy(self, user):
         """
@@ -461,9 +597,9 @@ class LLAMMA:
 
     # === Plotting Functions === #
 
-    def plot_reserves(self, fn=None):
+    def _plot_reserves(self, fn=None):
         """
         @notice Plot reserves in each band
         NOTE: for now, assume collateral price is = oracle price, and crvUSD price = $1
         """
-        _plot_reserves(self, fn=fn)
+        plot_reserves(self, fn=fn)

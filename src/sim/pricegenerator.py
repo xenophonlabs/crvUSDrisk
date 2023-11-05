@@ -5,12 +5,44 @@ import random
 
 class PriceGenerator:
     def __init__(self):
-       pass     
+        pass
 
     def gen_single_gbm(self, S0, mu, sigma, dt, T):
         W = np.random.normal(loc=0, scale=np.sqrt(dt), size=int(T / dt))
         S = S0 * np.exp(np.cumsum((mu - 0.5 * sigma**2) * dt + sigma * W))
         return S
+    
+    def brownian_bridge_gbm(start, end, length, dt, drift, vol):
+        """
+        Simulate a Brownian Bridge for Geometric Brownian Motion between two fixed points.
+        
+        Parameters:
+            start (float): The starting value of the process.
+            end (float): The ending value of the process.
+            length (int): The number of steps in the bridge.
+            dt (float): The time increment.
+            drift (float): The drift rate of the GBM.
+            vol (float): The volatility of the GBM.
+        
+        Returns:
+            np.array: Simulated values of the GBM following a Brownian Bridge.
+        """
+        # Time vector
+        t = np.linspace(0, length*dt, length+1)
+        # Standard Brownian Motion increments
+        dW = np.random.normal(0, np.sqrt(dt), length)
+        W = np.cumsum(dW)
+        
+        # Scale the Brownian Motion to the start and end values
+        bridge = start * np.exp((drift - 0.5 * vol**2) * t[:-1] + vol * W)
+        # Adjust the bridge to end at 'end' value
+        bridge -= ((t[:-1] - dt) / (length*dt - dt)) * (bridge - end * np.exp((drift - 0.5 * vol**2) * t[:-1]))
+        
+        # Include the start and end values
+        bridge = np.insert(bridge, 0, start)
+        bridge = np.append(bridge, end)
+        
+        return bridge
 
     def gen_single_jump_gbm(
         self,
