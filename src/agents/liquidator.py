@@ -1,7 +1,7 @@
 from ..modules.controller import Controller, Position
 from ..modules.llamma import LLAMMA
 from ..utils.utils import external_swap
-from typing import List
+from typing import List, Any
 import matplotlib.pyplot as plt
 import copy
 import numpy as np
@@ -107,7 +107,7 @@ class Liquidator:
         ext_stable_liquidity: float,
         ext_collat_liquidity: float,
         ext_swap_fee: float,
-    ) -> List[float, float]:
+    ) -> List[float]:
         """
         Loops through all liquidatable users and liquidates if profitable.
 
@@ -203,7 +203,7 @@ class Liquidator:
         )
         amt_in, _, pump = Liquidator.calc_arb_amounts(amm, p_opt)
 
-        if amt_in > 0 and pnl > self.tolerance:
+        if amt_in > 1e-6 and pnl > self.tolerance:
             self.print(f"Performed arbitrage, profit: {round(pnl)} USD")
             amm.swap(amt_in, not pump)
             self.arbitrage_pnl += pnl
@@ -212,7 +212,7 @@ class Liquidator:
         return max(pnl, 0)
 
     @staticmethod
-    def calc_arb_amounts(amm: LLAMMA, p: float) -> List[float, float, bool]:
+    def calc_arb_amounts(amm: LLAMMA, p: float) -> List[Any]:
         """
         Calculates the swap_in and swap_out for an arbitrageur
         moving LLAMMA price to p.
@@ -318,7 +318,7 @@ class Liquidator:
             pnl in crvUSD units
         """
         amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm, p_new)
-        if amt_in == 0 or amt_out == 0:
+        if amt_in <= 1e-6 or amt_out <= 1e-6: # FIXME handle floating point fuck ups
             return 0
 
         Liquidator.test_arb(amm, p_new)  # not necessary

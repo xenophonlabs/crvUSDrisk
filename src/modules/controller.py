@@ -107,7 +107,7 @@ class Controller:
         Ns = np.clip(np.random.normal(mean_N, std_N, n), 4, 50).astype(int)
         for i in range(n):
             max_borrowable = self.max_borrowable(collateral[i], Ns[i])
-            riskiness = np.random.uniform(low=0.5)
+            riskiness = np.random.uniform(low=0.5, high=1)
             debt = riskiness * max_borrowable
             borrowers.append((collateral[i], debt, Ns[i]))
         borrowers = np.array(borrowers)
