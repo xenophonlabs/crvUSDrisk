@@ -128,6 +128,14 @@ We could then in theory integrate this formula across some distribution of price
 
 Here we can see the results of performing a linear regression on price impact and trade size in the Uniswap V3 ETH-USDC pool with a 0.05% fee tier. We collected this data by looking at Uniswap dex trades on Dune Analytics for Ethereum mainnet and comparing sqrtPriceX96 for each trade $i$ with sqrtPriceX96 for each trade $i-1$ (after performing all necessary decimal adjustments of course), divided by trade price $i-1$ to get a % price impact for that trade. In other words, how much does a given trade of size $x$ move the AMM price. We can see here that there is a relatively linear relationship, which seems to be higher when the rolling average of price volatilityis higher (computed over 7 day averages). You could think of this as a line whose slope increases when price is more volatile. We have not inspected the pools more depply yet, but this is presumably due to depletion/concentration of liquidity and/or intra-block MEV. 
 
+We can also perform a multi-variate linear regression between trade size and volatility against price impact and obtain a fairly high R-squared value of 0.811. This shows us that the combination of these two variables can explain most of the price impact we see in the DEX pool (again presupposing volatility is a decent proxy for liquidity which we can later test as well). 
+
+!["Trade Size x Volatility and Price Impact Linear Regression"](./images/eth_005_size_x_vol_impact_linreg_vol_color.png "Trade Size x Volatility and Price Impact Linear Regression")
+
+Additionally, we can take the product of trade size and volatility and run a linear regression against price impact (a slightly different method of confirming this relationship). 
+
+
+
 ## Borrower and Liquidity Distributions
 <p>
 We have a few strategies we can employ for modeling reasonable distributions of liquidit and debt positions on an AMM or lending platform. LLAMMA is a combination of these two mechanisms so it is worth clarifying the assumptions that are reasonable to hold vs the variables that need to be monitored, analyzed and modeled. For example, it is typically reasonable to assume that loans (or debt positions) are self-replacing a la survival analysis techniques. I.e. for a constant amount of total debt, if individual loan positions are liquidated, repayed, or refinanced, we can assume that another loan of similar size would take its place. Therefore, we primarily have to model the health and volume of loans in aggregate to determine when borrowers are likely to mint/borrow or burn/repay their debt. For further degrees of nuance, we can simulate reasonable fluctuations in bands of LTV/position health, effectively creating buckets or tranches of users who share similar behavioral patterns. 
