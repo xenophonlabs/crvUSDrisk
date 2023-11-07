@@ -62,7 +62,6 @@ class PriceGenerator:
                         else:
                              asset["S"][t] =  asset["S"][t - 1] * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"] * dW_correlated[t][index])
         return assets
-
     
     def gen_jump_gbm2(self,assets,T,dt):
         n_steps = int(T / dt)
@@ -103,20 +102,64 @@ class PriceGenerator:
                              asset["S"][t] =  asset["S"][t - 1] * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"]*W)
         return assets
     
-    def plot_gbms(self,T,dt,assets,title="Geometric Brownian Motion"):
-        plt.figure(figsize=(12, 6))
-        for index,asset in enumerate(assets):
-                plt.plot(asset["S"], label=f'Asset {asset["name"]}')
-        plt.xticks(np.arange(0, T/dt, step=24*10))
-        plt.xticks(rotation=90)
-        plt.title(title)
-        plt.xlabel("Time Steps")
-        plt.ylabel("Asset Price")
-        plt.legend()
+    def plot_gbms(self, T, dt, assets, title="Geometric Brownian Motion"):
+        # Set the style parameters similar to your ETH/BTC graph
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.size"] = 10
+        plt.rcParams["axes.spines.top"] = False
+        plt.rcParams["axes.spines.right"] = True  # Enable right spine for secondary y-axis
+        plt.rcParams["grid.color"] = "grey"
+        plt.rcParams["grid.linestyle"] = "--"
+        plt.rcParams["grid.linewidth"] = 0.5
+
+        # Create the figure and primary axis objects
+        fig, ax_left = plt.subplots(figsize=(12, 6))
+        ax_right = ax_left.twinx()  # Secondary y-axis for the right side
+
+        # Initialize right axis usage flag
+        right_axis_used = False
+
+        # Plot each asset in the assets list
+        for index, asset in enumerate(assets):
+            if asset['plot_left']=="False":
+                # Plot on the left axis
+                ax_left.plot(asset["S"], label=f'{asset["name"]}', color=f'C{index}')  # Use a consistent color cycle
+                ax_left.set_ylabel("Asset Price", color=f'C{index}')
+                ax_left.tick_params(axis='y', labelcolor=f'C{index}')
+            else:
+                # Plot on the right axis
+                ax_right.plot(asset["S"], label=f'{asset["name"]}', color=f'C{index}')  # Use a consistent color cycle
+                ax_right.set_ylabel("Asset Price", color=f'C{index}')
+                ax_right.tick_params(axis='y', labelcolor=f'C{index}')
+                right_axis_used = True
+
+        # Set ticks and format dates on the x-axis if needed
+        # Assuming that 'T' is total time and 'dt' is the time step
+        time_steps = np.arange(0, T/dt + 1, 1)
+        ax_left.set_xticks(time_steps[::int(24*10/dt)])  # Adjust this if your time steps are not hourly
+        ax_left.set_xticklabels(time_steps[::int(24*10/dt)], rotation=45)  # Rotate for better spacing
+
+        # Add labels and title
+        ax_left.set_xlabel("Time Steps")
+        ax_left.set_title(title)
+
+        # Enable the grid
+        ax_left.grid(True)
+
+        # Add a combined legend for both axes if the right axis is used, else just add for the left
+        if right_axis_used:
+            lines, labels = ax_left.get_legend_handles_labels()
+            lines2, labels2 = ax_right.get_legend_handles_labels()
+            ax_left.legend(lines + lines2, labels + labels2)
+        else:
+            ax_left.legend()
+
+        # Adjust the subplot to fit the figure area
+        plt.tight_layout()
+
+        # Show the plot
         plt.show()
-
-
-
+        return 0
 
 
 #### Archive below this line ####
