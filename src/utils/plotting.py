@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
 from .utils import get_crvUSD_index
-from datetime import timedelta
 
 FPS = 3
 
@@ -399,3 +398,54 @@ def plot_borrowers(borrowers, price, fn=None):
         plt.savefig(fn, bbox_inches="tight", dpi=300)
         plt.close()  # don't show
     return f
+
+def plot_predictions(df0, df1, fn=None):
+
+    f, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    axs[0].scatter(df0['amount0_adjusted'], -df0['amount1_adjusted'], label='True', c='indianred', s=1)
+    axs[0].scatter(df0['amount0_adjusted'], -df0['predicted'], label='Pred', c='royalblue', s=1)
+    axs[0].set_xlabel('Token In')
+    axs[0].set_ylabel('Token Out')
+
+    axs[1].scatter(df1['amount1_adjusted'], -df1['amount0_adjusted'], c='indianred', s=1)
+    axs[1].scatter(df1['amount1_adjusted'], -df1['predicted'], c='royalblue', s=1)
+    axs[1].set_xlabel('Token In')
+    axs[1].set_ylabel('Token Out')
+
+    f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=2)
+    f.tight_layout()
+
+    axs[0].set_title('Predicted vs Actual Token Out')
+    axs[1].set_title('Predicted vs Actual Token Out')
+
+    if fn:
+        plt.savefig(fn, dpi=300)
+        plt.close()  # don't show
+    
+    return f
+
+# def plot_price_impact(df, name, col_in, cmap='viridis', fn=None):
+
+#     ols = regress(df, x_vars=[col_in], y_var=["price_impact"])
+
+#     f, ax = plt.subplots(figsize=(8,5))
+#     ax.scatter(df["trade_size_x"], df["price_impact"]*100, c=df["rolling_volatility"], s=10, cmap=cmap)
+#     f.colorbar(plt.cm.ScalarMappable(cmap=cmap), ax=ax, label="Normalized Rolling Volatility")
+
+#     b, m = ols.params
+#     x = np.linspace(0, df['trade_size_x'].max())
+#     y = (m*x + b)*100
+#     ax.plot(x, y, c='indianred', linestyle='--', lw=1)
+
+#     ax.set_ylabel('Price Impact %')
+#     ax.set_xlabel('Trade Size (ETH)')
+#     ax.set_title(f'Price Impact on {name}')
+
+#     f.tight_layout()
+
+#     if fn:
+#         plt.savefig(fn, bbox_inches="tight", dpi=300)
+#         plt.close()
+
+#     return f

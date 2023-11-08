@@ -1,7 +1,5 @@
 # fetch fresh stable price data
 
-import os
-import time
 import sys
 
 sys.path.append("/Users/starklab/Documents/Code/Xenophon/Curve/crvUSDrisk/")

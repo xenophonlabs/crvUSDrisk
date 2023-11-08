@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import random
-import pprint
 
 class PriceGenerator:
     def __init__(self):

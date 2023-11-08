@@ -19,7 +19,7 @@ class Liquidator:
         "liquidation_count",
         "arbitrage_pnl",
         "arbitrage_count",
-        "verbose",  # print statements
+        "verbose",  # print statements 
     )
 
     def __init__(

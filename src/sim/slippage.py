@@ -1,69 +1,133 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from itertools import product
 import pandas as pd
-import plotly.express as px
+import numpy as np
+import statsmodels.api as sm
+from src.modules.market import ExternalMarket
+from src.utils.plotting import plot_predictions
 
+"""
+TODO Things we need do to make this better.
 
-class Slippage:
-    def __init__(self):
-        pass
+    - Write a productionized script for pulling trade data
+    for relevant markets.
+    - Write a script to determine which markets to pull data
+    from.
+    - Revise this methodology for stablecoin trades.
+    - Incorporate volatility if necessary.
+    - Save results somewhere.
+"""
 
-    def lin_collat_output(self,x):
-        #@TODO: should this be max(.01,func)
-        return min(.99,1.081593506690093e-06*x+0.0004379110082802476)
+def process_trades(df, decimals):
+    """
+    Process trade data for a given market.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Unprocessed trades
+    decimals : List[int]
+        Decimals of tokens in market.
+
+    Returns
+    -------
+    pd.DataFrame
+        Processed trades where token0 is being sold
+    pd.DataFrame
+        Processed trades where token1 is being sold
+    """
+    df = df.copy()
+
+    price_cols = ['price_implied', 'price_actual', 'previous_price_actual']
+
+    # NOTE these adjustments are stupid, the data is coming in wrong.
+    # The amounts should be adhering to the decimals of each token.
+    # Instead, the amounts are just all fucked up. 
+
+    # Make sure price is token_out for token_in instead of 
+    # amount0 for amount1
+    cond = df['amount1_adjusted'] < 0 
+    for col in price_cols:
+        df.loc[cond, col] = df.loc[cond, col].apply(lambda x: x / 10**sum(decimals))
+        df.loc[~cond, col] = df.loc[~cond, col].apply(lambda x: 1/x * 10**sum(decimals))
+
+    df['amount0_adjusted'] *= 10**(decimals[0] - decimals[1])
+    df['amount1_adjusted'] /= 10**(decimals[0] - decimals[1])
     
-    def multi_var_collat_output(self,tokens_in,volatility):
-        beta_vals = [0.00044410620128718933,-1.2023638988922835e-05,1.0899943426418682e-06]
-        output = beta_vals[0] + beta_vals[1] * volatility + beta_vals[2] * tokens_in
-        #@TODO: try running this with univariate vol * trade size
-        return min(.99,output)
+    df["price_impact"] = (df["price_implied"] - df["previous_price_actual"]) / (df["previous_price_actual"])
 
-    def collateral_auction(self, tokens_in, price, price_path=[]):
-        # price defined as token0/token1 eg ETHUSD so amount of USD per ETH
-        # tokens_in defined as amount of WETH being sold
-        perc_loss = self.lin_output(tokens_in)
-        volatility = 0.2
-        return tokens_in * price
+    # Date cols
+    df['date'] = pd.to_datetime(df['evt_block_time']).dt.date
+    df.sort_values(by="evt_block_time", axis=0, ascending=True, inplace=True, kind='quicksort', na_position='last')
 
-    def stable_auction(self, tokens_in, price, price_path):
-        # defined as token0/token1 eg crvUSD-USDC so amount of USDC per crvUSD
-        price
-        return tokens_in * price
+    return df[df['amount0_adjusted'] > 0], df[df['amount0_adjusted'] < 0]
 
-    def plot_lin_collat_slippage(self, low, high, x_type="lin"):
-        if x_type == "log":
-            x = np.logspace(low, high, endpoint=True, base=10.0, dtype=None, axis=0)
-        else:
-            x = np.linspace(low, high, 100)
-        y = [self.lin_collat_output(x_i) for x_i in x]
-        plt.plot(x, y, color="blue")
-        plt.show()
-        pass
+def regress(df, x_vars, y_var, v=False):
+    """
+    Perform a simple OLS regression of the form:
+    
+        y = c dot x + b
 
-    def plot_multi_var_collat_slippage(
-        self, low_tokens, high_tokens, low_vol, high_vol, x0_type="lin", x1_type="lin"
-    ):
-        if x0_type == "log":
-            x0 = np.logspace(
-                low_tokens, high_tokens, endpoint=True, base=10.0, dtype=None, axis=0
-            )
-        else:
-            x0 = np.linspace(low_tokens, high_tokens, 100)
+    where c is a vector of coefficients, x is a 
+    vector of input variables, and b is the intercept.
 
-        if x1_type == "log":
-            x1 = np.logspace(
-                low_vol, high_vol, endpoint=True, base=10.0, dtype=None, axis=0
-            )
-        else:
-            x1 = np.linspace(low_vol, high_vol, 100)
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Trades
+    x_vars : List[str]
+        Input variables
+    y_var : str
+        Output variable
+    v : Optional[bool]
+        Whether to print OLS results.
+    
+    Returns
+    -------
+    OLSResults
+        The results object for the statsmodels OLS 
+        method. Contains params and rsquared value.
+    """  
+    X = sm.add_constant(df[x_vars])
+    y = df[y_var]
+    model = sm.OLS(y, X).fit()
+    if v:
+        print(model.summary())
+    return model
 
-        combinations = list(product(x0, x1))
-        df = pd.DataFrame(combinations, columns=["tokens", "volatility"])
-        df["price_impact"] = df.apply(
-            lambda row: self.multi_var_collat_output(row["tokens"], row["volatility"]),
-            axis=1,
-        )
-        print(df)
+def analyze(fn, decimals, plot=False):
 
-        pass
+    with open(fn,"r") as f: 
+        df = pd.read_csv(f)
+
+    df0, df1 = process_trades(df, decimals)
+
+    coefs = np.zeros((2, 2))
+    intercepts = np.zeros((2, 2))
+    results = np.zeros((2, 2))
+
+    ols = regress(df0, x_vars=["amount0_adjusted"], y_var=["price_impact"], v=False)
+    b, m = ols.params
+    coefs[0][1] = m
+    intercepts[0][1] = b
+    results[0][1] = ols.rsquared_adj
+
+    ols = regress(df1, x_vars=["amount1_adjusted"], y_var=["price_impact"], v=False)
+    b, m = ols.params
+    coefs[1][0] = m
+    intercepts[1][0] = b
+    results[1][0] = ols.rsquared_adj
+
+    if plot:
+        market = ExternalMarket(2, coefs, intercepts)
+
+        df0['predicted'] = df0.apply(lambda row: -market.trade(row['amount0_adjusted'], row['previous_price_actual'], 0, 1), axis=1)
+        df0['pct_error'] = df0.apply(lambda row: -abs(row['amount1_adjusted'] - row['predicted'])/row['amount1_adjusted']*100, axis=1)
+        print(f"Mean percentage error: {df0['pct_error'].mean():.3f}%")
+
+        df1['predicted'] = df1.apply(lambda row: -market.trade(row['amount1_adjusted'], row['previous_price_actual'], 1, 0), axis=1)
+        df1['pct_error'] = df1.apply(lambda row: -abs(row['amount0_adjusted'] - row['predicted'])/row['amount0_adjusted']*100, axis=1)
+        print(f"Mean percentage error: {df1['pct_error'].mean():.3f}%")
+
+        plot_predictions(df0, df1)
+    
+    # TODO where do we want to save these results?
+    return coefs, intercepts, results

@@ -1,3 +1,5 @@
+This file is stale. To do: update.
+
 Current assumptions and plans for eliminating [some of] them. The vast majority of these assumptions revolve around liquidity on external liquidity venues like Uniswap, and internal liquidity venues like TriCrypto-ng and Stableswap pools.
 
 # Weak Assumptions
