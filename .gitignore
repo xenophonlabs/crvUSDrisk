@@ -163,6 +163,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-data/weth_usdc_005_tier_trades2.csv
-data/weth_usdc_005_tier_trades.csv
-data/weth_usdc_03_tier_trades.csv
+data/

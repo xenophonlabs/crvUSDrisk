@@ -9,17 +9,15 @@ class Slippage:
     def __init__(self):
         pass
 
-    def lin_collat_output(self, x):
-        return min(0.99, 1.081593506690093e-06 * x + 0.0004379110082802476)
-
-    def multi_var_collat_output(self, tokens_in, volatility):
-        beta_vals = [
-            0.00044410620128718933,
-            -1.2023638988922835e-05,
-            1.0899943426418682e-06,
-        ]
+    def lin_collat_output(self,x):
+        #@TODO: should this be max(.01,func)
+        return min(.99,1.081593506690093e-06*x+0.0004379110082802476)
+    
+    def multi_var_collat_output(self,tokens_in,volatility):
+        beta_vals = [0.00044410620128718933,-1.2023638988922835e-05,1.0899943426418682e-06]
         output = beta_vals[0] + beta_vals[1] * volatility + beta_vals[2] * tokens_in
-        return min(0.99, output)
+        #@TODO: try running this with univariate vol * trade size
+        return min(.99,output)
 
     def collateral_auction(self, tokens_in, price, price_path=[]):
         # price defined as token0/token1 eg ETHUSD so amount of USD per ETH

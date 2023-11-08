@@ -1,0 +1,63 @@
+{
+    "title":"ETH - BTC Uncorrelated Sim",
+    "type":["multi_corr","jump"],
+    "sparse_cor": {
+        "0": {
+            "1": 0.0
+        }
+    },    
+    "assets": [
+        {
+            "name": "ETH",
+            "mu": -0.20,
+            "sigma": 0.5,
+            "S0": 3600,
+            "jump_limit": 1,
+            "jump_data": [
+                {
+                    "size": -0.02,
+                    "annual_prob": 0.50,
+                    "rec_perc": 0.8,
+                    "rec_speed_days": 30,
+                    "count": 0,
+                    "lag_days": 30
+                },
+                {
+                    "size": -0.06,
+                    "annual_prob": 0.50,
+                    "rec_perc": 0.8,
+                    "rec_speed_days": 30,
+                    "count": 0,
+                    "lag_days": 180
+                }
+            ],
+            "plot_left":"True"
+        },
+        {
+            "name": "BTC",
+            "mu": -0.20,
+            "sigma": 0.5,
+            "S0": 46000,
+            "jump_limit": 1,
+            "jump_data": [
+                {
+                    "size": -0.02,
+                    "annual_prob": 0.50,
+                    "rec_perc": 0.8,
+                    "rec_speed_days": 9,
+                    "count": 0,
+                    "lag_days": 10
+                },
+                {
+                    "size": -0.07,
+                    "annual_prob": 0.50,
+                    "rec_perc": 0.8,
+                    "rec_speed_days": 9,
+                    "count": 0,
+                    "lag_days": 30
+                }
+            ],
+            "plot_left":"False"
+        }
+    ]
+}
