@@ -359,7 +359,9 @@ class LLAMMA:
             if self.p_o > self.p_o_up(n):
                 y_o = max(inv / f, g) - g
                 assert y_o > 0
-                x_down += (y_o * self.p_o_up(n) * ((self.A - 1) / self.A) ** 0.5) * share
+                x_down += (
+                    y_o * self.p_o_up(n) * ((self.A - 1) / self.A) ** 0.5
+                ) * share
 
             elif self.p_o < self.p_o_down(n):
                 x_o = max(inv / g, f) - f
@@ -378,13 +380,13 @@ class LLAMMA:
     def get_x_down2(self, user):
         """
         testing a bunch of the functionality in LLAMMA against vyper code.
-        this is the get_xy_up() function from Vyper, copied over. we place a 
+        this is the get_xy_up() function from Vyper, copied over. we place a
         bunch of asserts to test some of our helper methods. this should
-        ultimately be ported over into a testing file, maybe we use 
+        ultimately be ported over into a testing file, maybe we use
         boa to compare vyper with python implementations, or maybe we just use
         crvusdsim by 0xreviews.
         """
-        SQRT_BAND_RATIO = (self.A / (self.A - 1))**0.5
+        SQRT_BAND_RATIO = (self.A / (self.A - 1)) ** 0.5
 
         user_bands = self.user_shares[user].keys()
         n1 = min(user_bands)
@@ -408,10 +410,10 @@ class LLAMMA:
                 x = self.bands_x[n]
             # p_o_up: uint256 = self._p_oracle_up(n)
             p_o_up = p_o_down
-            assert abs(p_o_up - self.p_o_up(n))/p_o_up <= 1e-6
+            assert abs(p_o_up - self.p_o_up(n)) / p_o_up <= 1e-6
             # p_o_down = self._p_oracle_up(n + 1)
             p_o_down = p_o_down * (self.A - 1) / self.A
-            assert abs(p_o_down - self.p_o_down(n))/p_o_down <= 1e-6
+            assert abs(p_o_down - self.p_o_down(n)) / p_o_down <= 1e-6
             if x == 0:
                 if y == 0:
                     continue
@@ -443,7 +445,9 @@ class LLAMMA:
                     y_equiv = y
                     if y == 0:
                         y_equiv = x / p_current_mid
-                    XY += (y_equiv * p_o_up / SQRT_BAND_RATIO) * user_share / total_share
+                    XY += (
+                        (y_equiv * p_o_up / SQRT_BAND_RATIO) * user_share / total_share
+                    )
                     continue
 
                 elif p_o < p_o_down:  # p_o > p_current_up
@@ -458,13 +462,13 @@ class LLAMMA:
             # So we need more heavy math
 
             y0 = self._get_y0(x, y, p_o, p_o_up)
-            assert abs(y0 - self.y0(n))/y0 < 1e-6
-            f = (self.A * y0 * p_o ** 2 / p_o_up) 
-            assert abs(f - self.f(n))/f < 1e-6
+            assert abs(y0 - self.y0(n)) / y0 < 1e-6
+            f = self.A * y0 * p_o**2 / p_o_up
+            assert abs(f - self.f(n)) / f < 1e-6
             g = (self.A - 1) * y0 * p_o_up / p_o
-            assert abs(g - self.g(n))/g < 1e-6
+            assert abs(g - self.g(n)) / g < 1e-6
             Inv = (f + x) * (g + y)
-            assert abs(Inv - self.inv(n))/Inv < 1e-6
+            assert abs(Inv - self.inv(n)) / Inv < 1e-6
 
             # First, "trade" in this band to p_oracle
             x_o = 0
@@ -483,10 +487,10 @@ class LLAMMA:
             else:
                 y_o = self.A * y0 * (p_o - p_o_down) / p_o
                 x_o = max(Inv / (g + y_o), f) - f
-                XY += (x_o + y_o * (p_o_down * p_o)**0.5) * user_share / total_share
+                XY += (x_o + y_o * (p_o_down * p_o) ** 0.5) * user_share / total_share
 
         return XY
-    
+
     def _get_y0(self, x, y, p_o, p_o_up):
         """
         @notice Calculate y0 for the invariant based on current liquidity in band.

@@ -19,7 +19,7 @@ class Liquidator:
         "liquidation_count",
         "arbitrage_pnl",
         "arbitrage_count",
-        "verbose",  # print statements 
+        "verbose",  # print statements
     )
 
     def __init__(
@@ -318,7 +318,7 @@ class Liquidator:
             pnl in crvUSD units
         """
         amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm, p_new)
-        if amt_in <= 1e-6 or amt_out <= 1e-6: # FIXME handle floating point fuck ups
+        if amt_in <= 1e-6 or amt_out <= 1e-6:  # FIXME handle floating point fuck ups
             return 0
 
         Liquidator.test_arb(amm, p_new)  # not necessary

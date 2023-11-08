@@ -19,9 +19,9 @@ class ExternalMarket:
     def __init__(self, n, coefs, intercepts):
         """
         Initialize market with OLS params:
-        
+
         price_impact = m * trade_size + b
-        
+
         Parameters
         ----------
         n : int
@@ -46,7 +46,7 @@ class ExternalMarket:
         ----------
         price : float
             The external market price for exchanging
-            token i for token j. 
+            token i for token j.
         i : int
             The index of the in token.
         j : int
@@ -56,14 +56,14 @@ class ExternalMarket:
         -------
         int
             The amount of token j the user gets out
-        
+
         Note
         ----
-        The market's fee should already be incorporated into the 
+        The market's fee should already be incorporated into the
         price impact estimation.
         """
         return amt_in * price * (1 + self.price_impact(amt_in, i, j))
-    
+
     def price_impact(self, amt_in, i, j):
         """
         We model price impact as a linear regression
@@ -74,12 +74,12 @@ class ExternalMarket:
         ----------
         price : float
             The external market price for exchanging
-            token i for token j. 
+            token i for token j.
         i : int
             The index of the in token.
         j : int
             The index of the out token.
-        
+
         Returns
         -------
         float

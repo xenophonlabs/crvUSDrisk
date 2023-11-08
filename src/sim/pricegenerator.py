@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class PriceGenerator:
     def __init__(self):
         pass
@@ -16,96 +17,130 @@ class PriceGenerator:
                     cor_matrix[i][j] = sparse_cor[str(pair[0])][str(pair[1])]
         return cor_matrix
 
-    def gen_cor_jump_gbm2(self,assets,cor_matrix,T,dt):
-        cor_matrix=self.gen_cor_matrix(len(assets),cor_matrix)
-        
+    def gen_cor_jump_gbm2(self, assets, cor_matrix, T, dt):
+        cor_matrix = self.gen_cor_matrix(len(assets), cor_matrix)
+
         n_steps = int(T / dt)
-        n_assets = len(assets)            
-        
+        n_assets = len(assets)
+
         # Generate uncorrelated Brownian motions
-        dW = np.sqrt(dt) * np.random.randn(n_steps,n_assets)
+        dW = np.sqrt(dt) * np.random.randn(n_steps, n_assets)
         # Apply Cholesky decomposition to get correlated Brownian motions
-        L = np.linalg.cholesky(cor_matrix)                                
+        L = np.linalg.cholesky(cor_matrix)
         # get the dot product of the weiner processes and the transpose of the cholesky matrix
         dW_correlated = dW.dot(L.T)
-        
+
         # Initialize asset prices
-        for index,asset in enumerate(assets):
+        for index, asset in enumerate(assets):
             # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
-            asset["jump_data"]=sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
+            asset["jump_data"] = sorted(
+                asset["jump_data"], key=lambda x: x["annual_prob"]
+            )
             S = np.zeros(n_steps)
             S[0] = asset["S0"]
             asset["S"] = S
             asset["recovery_period"] = 0
             asset["jump_to_recover"] = 0
-        
+
         # Iterate over each time step
         for t in range(1, n_steps):
-            for index,asset in enumerate(assets):
+            for index, asset in enumerate(assets):
                 rand_num = np.random.rand()
 
                 if asset["recovery_period"] > 0:
-                    asset["recovery_period"] -= 1                    
-                    asset["S"][t] = (asset["S"][t-1] + (asset["jump_to_recover"])) * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"] * dW_correlated[t][index])
-                else:                
+                    asset["recovery_period"] -= 1
+                    asset["S"][t] = (
+                        asset["S"][t - 1] + (asset["jump_to_recover"])
+                    ) * np.exp(
+                        (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+                        + asset["sigma"] * dW_correlated[t][index]
+                    )
+                else:
                     # jump diffusion based on poisson process
                     for jump in asset["jump_data"]:
-                        lag = jump["lag_days"]*24
-                        if rand_num < (jump["annual_prob"]/(365*24)) and jump["count"] < asset["jump_limit"] and t>lag:
-                            asset["S"][t] = asset["S"][t-1] * (1 + jump["size"])
-                            asset["recovery_period"] = (jump["rec_speed_days"]*24)                            
-                            asset["jump_to_recover"] = (-1*jump["rec_perc"]*jump["size"]*asset["S"][t-1])/(asset["recovery_period"])
-                            jump["count"]=1+jump["count"]
+                        lag = jump["lag_days"] * 24
+                        if (
+                            rand_num < (jump["annual_prob"] / (365 * 24))
+                            and jump["count"] < asset["jump_limit"]
+                            and t > lag
+                        ):
+                            asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
+                            asset["recovery_period"] = jump["rec_speed_days"] * 24
+                            asset["jump_to_recover"] = (
+                                -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
+                            ) / (asset["recovery_period"])
+                            jump["count"] = 1 + jump["count"]
                             break
                         else:
-                             asset["S"][t] =  asset["S"][t - 1] * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"] * dW_correlated[t][index])
+                            asset["S"][t] = asset["S"][t - 1] * np.exp(
+                                (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+                                + asset["sigma"] * dW_correlated[t][index]
+                            )
         return assets
-    
-    def gen_jump_gbm2(self,assets,T,dt):
+
+    def gen_jump_gbm2(self, assets, T, dt):
         n_steps = int(T / dt)
-        n_assets = len(assets)            
-        
+        n_assets = len(assets)
+
         # Generate uncorrelated Brownian motions
-        dW = np.sqrt(dt) * np.random.randn(n_steps,n_assets)
-        
+        dW = np.sqrt(dt) * np.random.randn(n_steps, n_assets)
+
         # Initialize asset prices
-        for index,asset in enumerate(assets):
+        for index, asset in enumerate(assets):
             # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
-            asset["jump_data"]=sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
+            asset["jump_data"] = sorted(
+                asset["jump_data"], key=lambda x: x["annual_prob"]
+            )
             S = np.zeros(n_steps)
             S[0] = asset["S0"]
             asset["S"] = S
             asset["recovery_period"] = 0
             asset["jump_to_recover"] = 0
-        
+
         # Iterate over each time step
         for t in range(1, n_steps):
-            for index,asset in enumerate(assets):
+            for index, asset in enumerate(assets):
                 rand_num = np.random.rand()
                 W = np.random.normal(loc=0, scale=np.sqrt(dt))
                 if asset["recovery_period"] > 0:
-                    asset["recovery_period"] -= 1                    
-                    asset["S"][t] = (asset["S"][t-1] + (asset["jump_to_recover"])) * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"]*W)
-                else:                
+                    asset["recovery_period"] -= 1
+                    asset["S"][t] = (
+                        asset["S"][t - 1] + (asset["jump_to_recover"])
+                    ) * np.exp(
+                        (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+                        + asset["sigma"] * W
+                    )
+                else:
                     # jump diffusion based on poisson process
                     for jump in asset["jump_data"]:
-                        lag = jump["lag_days"]*24
-                        if rand_num < (jump["annual_prob"]/(365*24)) and jump["count"] < asset["jump_limit"] and t>lag:
-                            asset["S"][t] = asset["S"][t-1] * (1 + jump["size"])
-                            asset["recovery_period"] = (jump["rec_speed_days"]*24)                            
-                            asset["jump_to_recover"] = (-1*jump["rec_perc"]*jump["size"]*asset["S"][t-1])/(asset["recovery_period"])
-                            jump["count"]=1+jump["count"]
+                        lag = jump["lag_days"] * 24
+                        if (
+                            rand_num < (jump["annual_prob"] / (365 * 24))
+                            and jump["count"] < asset["jump_limit"]
+                            and t > lag
+                        ):
+                            asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
+                            asset["recovery_period"] = jump["rec_speed_days"] * 24
+                            asset["jump_to_recover"] = (
+                                -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
+                            ) / (asset["recovery_period"])
+                            jump["count"] = 1 + jump["count"]
                             break
                         else:
-                             asset["S"][t] =  asset["S"][t - 1] * np.exp(( asset["mu"] - 0.5 *  asset["sigma"]**2) * dt +  asset["sigma"]*W)
+                            asset["S"][t] = asset["S"][t - 1] * np.exp(
+                                (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+                                + asset["sigma"] * W
+                            )
         return assets
-    
+
     def plot_gbms(self, T, dt, assets, title="Geometric Brownian Motion"):
         # Set the style parameters similar to your ETH/BTC graph
         plt.rcParams["font.family"] = "serif"
         plt.rcParams["font.size"] = 10
         plt.rcParams["axes.spines.top"] = False
-        plt.rcParams["axes.spines.right"] = True  # Enable right spine for secondary y-axis
+        plt.rcParams[
+            "axes.spines.right"
+        ] = True  # Enable right spine for secondary y-axis
         plt.rcParams["grid.color"] = "grey"
         plt.rcParams["grid.linestyle"] = "--"
         plt.rcParams["grid.linewidth"] = 0.5
@@ -119,16 +154,20 @@ class PriceGenerator:
 
         # Plot each asset in the assets list
         for index, asset in enumerate(assets):
-            if asset['plot_left']=="False":
+            if asset["plot_left"] == "False":
                 # Plot on the left axis
-                ax_left.plot(asset["S"], label=f'{asset["name"]}', color=f'C{index}')  # Use a consistent color cycle
-                ax_left.set_ylabel("Asset Price", color=f'C{index}')
-                ax_left.tick_params(axis='y', labelcolor=f'C{index}')
+                ax_left.plot(
+                    asset["S"], label=f'{asset["name"]}', color=f"C{index}"
+                )  # Use a consistent color cycle
+                ax_left.set_ylabel("Asset Price", color=f"C{index}")
+                ax_left.tick_params(axis="y", labelcolor=f"C{index}")
             else:
                 # Plot on the right axis
-                ax_right.plot(asset["S"], label=f'{asset["name"]}', color=f'C{index}')  # Use a consistent color cycle
-                ax_right.set_ylabel("Asset Price", color=f'C{index}')
-                ax_right.tick_params(axis='y', labelcolor=f'C{index}')
+                ax_right.plot(
+                    asset["S"], label=f'{asset["name"]}', color=f"C{index}"
+                )  # Use a consistent color cycle
+                ax_right.set_ylabel("Asset Price", color=f"C{index}")
+                ax_right.tick_params(axis="y", labelcolor=f"C{index}")
                 right_axis_used = True
 
         # Set ticks and format dates on the x-axis if needed
@@ -162,4 +201,3 @@ class PriceGenerator:
         # Show the plot
         plt.show()
         return 0
-

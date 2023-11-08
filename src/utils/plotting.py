@@ -92,6 +92,7 @@ def plot_stableswap_balances(pools, bals, width=0.25, fn=None, ylim=None):
 
     return f
 
+
 def plot_combined_2(fps=FPS):
     """
     FIXME better name
@@ -127,7 +128,6 @@ def plot_combined_2(fps=FPS):
 
 
 def plot_combined(fn):
-
     buffer_x = 150
     buffer_y = 150
     background = "white"
@@ -149,7 +149,11 @@ def plot_combined(fn):
         img4 = Image.fromarray(frame4)
 
         # Concatenate images
-        new_img = Image.new("RGB", (img1.width + img2.width + buffer_x, img1.height + img3.height + buffer_y), background)
+        new_img = Image.new(
+            "RGB",
+            (img1.width + img2.width + buffer_x, img1.height + img3.height + buffer_y),
+            background,
+        )
         new_img.paste(img1, (0, 0))
         new_img.paste(img2, (img1.width + buffer_x, 0))
         new_img.paste(img3, (0, img1.height + buffer_y))
@@ -162,7 +166,9 @@ def plot_combined(fn):
     imageio.mimsave(fn, new_frames, fps=FPS)
 
 
-def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn, alpha=0.75):
+def plot_actions(
+    df, i, min_time, max_time, min_price, max_price, min_pnl, max_pnl, fn, alpha=0.75
+):
     f, ax = plt.subplots(figsize=(8, 5))
 
     ax2 = ax.twinx()
@@ -178,7 +184,7 @@ def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_p
     ax.set_ylim(min_price, max_price)
     ax.set_xlim(min_time, max_time)
 
-    width = (df.index[1] - df.index[0])*0.75
+    width = (df.index[1] - df.index[0]) * 0.75
 
     ax2.bar(
         ndf.index,
@@ -187,17 +193,17 @@ def plot_actions(df, i, min_time, max_time, min_price, max_price, min_pnl, max_p
         color="indianred",
         width=width,
         alpha=alpha,
-        zorder=2
+        zorder=2,
     )
     ax2.bar(
-        ndf.index, 
-        ndf["arbitrage_pnl"], 
-        bottom=ndf['liquidation_pnl'],
-        label="Arbitrage PnL", 
+        ndf.index,
+        ndf["arbitrage_pnl"],
+        bottom=ndf["liquidation_pnl"],
+        label="Arbitrage PnL",
         color="royalblue",
         width=width,
         alpha=alpha,
-        zorder=2
+        zorder=2,
     )
 
     ax2.set_xlim(min_time, max_time)
@@ -399,31 +405,42 @@ def plot_borrowers(borrowers, price, fn=None):
         plt.close()  # don't show
     return f
 
-def plot_predictions(df0, df1, fn=None):
 
+def plot_predictions(df0, df1, fn=None):
     f, axs = plt.subplots(1, 2, figsize=(10, 5))
 
-    axs[0].scatter(df0['amount0_adjusted'], -df0['amount1_adjusted'], label='True', c='indianred', s=1)
-    axs[0].scatter(df0['amount0_adjusted'], -df0['predicted'], label='Pred', c='royalblue', s=1)
-    axs[0].set_xlabel('Token In')
-    axs[0].set_ylabel('Token Out')
+    axs[0].scatter(
+        df0["amount0_adjusted"],
+        -df0["amount1_adjusted"],
+        label="True",
+        c="indianred",
+        s=1,
+    )
+    axs[0].scatter(
+        df0["amount0_adjusted"], -df0["predicted"], label="Pred", c="royalblue", s=1
+    )
+    axs[0].set_xlabel("Token In")
+    axs[0].set_ylabel("Token Out")
 
-    axs[1].scatter(df1['amount1_adjusted'], -df1['amount0_adjusted'], c='indianred', s=1)
-    axs[1].scatter(df1['amount1_adjusted'], -df1['predicted'], c='royalblue', s=1)
-    axs[1].set_xlabel('Token In')
-    axs[1].set_ylabel('Token Out')
+    axs[1].scatter(
+        df1["amount1_adjusted"], -df1["amount0_adjusted"], c="indianred", s=1
+    )
+    axs[1].scatter(df1["amount1_adjusted"], -df1["predicted"], c="royalblue", s=1)
+    axs[1].set_xlabel("Token In")
+    axs[1].set_ylabel("Token Out")
 
     f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=2)
     f.tight_layout()
 
-    axs[0].set_title('Predicted vs Actual Token Out')
-    axs[1].set_title('Predicted vs Actual Token Out')
+    axs[0].set_title("Predicted vs Actual Token Out")
+    axs[1].set_title("Predicted vs Actual Token Out")
 
     if fn:
         plt.savefig(fn, dpi=300)
         plt.close()  # don't show
-    
+
     return f
+
 
 # def plot_price_impact(df, name, col_in, cmap='viridis', fn=None):
 
