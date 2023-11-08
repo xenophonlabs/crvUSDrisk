@@ -22,19 +22,17 @@ class Slippage:
     def collateral_auction(self, tokens_in, price, price_path=[]):
         # price defined as token0/token1 eg ETHUSD so amount of USD per ETH
         # tokens_in defined as amount of WETH being sold
-        # @TODO: remove this line
-        # @TODO: incorporate fees? or are they already included in price_implied vs price_actual
-        # perc_loss = self.lin_output(tokens_in)
-        volatility=pd.DataFrame(price_path).rolling(window=min(9,len(price_path))).std().to_numpy().flatten()[-1]
-        return self.multi_var_collat_output(tokens_in,volatility)*price
-    
-    def stable_auction(self,tokens_in,price,price_path):
+        perc_loss = self.lin_output(tokens_in)
+        volatility = 0.2
+        return tokens_in * price
+
+    def stable_auction(self, tokens_in, price, price_path):
         # defined as token0/token1 eg crvUSD-USDC so amount of USDC per crvUSD
         price
-        return tokens_in*price*.995
-    
-    def plot_lin_collat_slippage(self,low,high,x_type="lin"):
-        if x_type=="log":
+        return tokens_in * price
+
+    def plot_lin_collat_slippage(self, low, high, x_type="lin"):
+        if x_type == "log":
             x = np.logspace(low, high, endpoint=True, base=10.0, dtype=None, axis=0)
         else:
             x = np.linspace(low, high, 100)
@@ -61,8 +59,11 @@ class Slippage:
             x1 = np.linspace(low_vol, high_vol, 100)
 
         combinations = list(product(x0, x1))
-        df = pd.DataFrame(combinations, columns=['tokens', 'volatility'])
-        df["price_impact"] = df.apply(lambda row: self.multi_var_collat_output(row["tokens"],row["volatility"]), axis=1)
-        fig = px.scatter_3d(df,x="tokens",y="volatility",z="price_impact",color="price_impact")
-        fig.show()
+        df = pd.DataFrame(combinations, columns=["tokens", "volatility"])
+        df["price_impact"] = df.apply(
+            lambda row: self.multi_var_collat_output(row["tokens"], row["volatility"]),
+            axis=1,
+        )
+        print(df)
+
         pass
