@@ -443,7 +443,7 @@ def plot_predictions(df0, df1, fn=None):
     return f
 
 
-def plot_prices(df, fn=None):
+def plot_prices(df, df2=None, fn=None):
     """
     Plot prices in df. Assumes that each col
     in the df is a coin.
@@ -468,10 +468,14 @@ def plot_prices(df, fn=None):
         for j in range(m):
             col = cols.pop()
             ax = axs[i, j]
-            ax.plot(df.index, df[col], lw=1)
+            ax.plot(df.index, df[col], lw=1, c="royalblue", label="Real")
             ax.set_title(f"{col} Prices")
             ax.set_ylabel("Price (USD)")
             ax.tick_params(axis="x", rotation=45)
+
+            if df2 is not None:
+                ax.plot(df.index, df2[col], lw=1, c="indianred", label="Simulated")
+                ax.legend()
 
     f.tight_layout()
 
