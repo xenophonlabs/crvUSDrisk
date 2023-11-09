@@ -442,6 +442,34 @@ def plot_predictions(df0, df1, fn=None):
     return f
 
 
+def plot_coingecko_prices(df, fn=None):
+    # Get coin names
+    cols = [col for col in df.columns if col != "timestamp"]
+
+    n = len(cols)
+    n, m = int(n**0.5), n // int(n**0.5) + (n % int(n**0.5) > 0)
+    # now n, m are the dimensions of the grid
+
+    f, axs = plt.subplots(n, m, figsize=(15, 15))
+
+    for i in range(n):
+        for j in range(m):
+            col = cols.pop()
+            ax = axs[i, j]
+            ax.plot(df.index, df[col], lw=1)
+            ax.set_title(f"{col} Prices")
+            ax.set_ylabel("Price (USD)")
+            ax.tick_params(axis="x", rotation=45)
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, dpi=300)
+        plt.close()
+
+    return f
+
+
 # def plot_price_impact(df, name, col_in, cmap='viridis', fn=None):
 
 #     ols = regress(df, x_vars=[col_in], y_var=["price_impact"])

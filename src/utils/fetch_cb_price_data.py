@@ -1,9 +1,7 @@
-# fetch fresh stable price data
-
 import sys
+from src.utils.coinbaseprices import CoinbasePrices
 
 sys.path.append("/Users/starklab/Documents/Code/Xenophon/Curve/crvUSDrisk/")
-from src.utils.coinbaseprices import CoinbasePrices
 
 path_to_data_dir = "/Users/starklab/Documents/Code/Xenophon/Curve/crvUSDrisk/data/"
 

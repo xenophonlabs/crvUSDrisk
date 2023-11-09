@@ -80,10 +80,6 @@ class PriceGenerator:
 
     def gen_jump_gbm2(self, assets, T, dt):
         n_steps = int(T / dt)
-        n_assets = len(assets)
-
-        # Generate uncorrelated Brownian motions
-        dW = np.sqrt(dt) * np.random.randn(n_steps, n_assets)
 
         # Initialize asset prices
         for index, asset in enumerate(assets):
@@ -172,10 +168,10 @@ class PriceGenerator:
 
         # Set ticks and format dates on the x-axis if needed
         # Assuming that 'T' is total time and 'dt' is the time step
-        total_hours = int(T * 365 * 24)
-        time_steps = np.arange(0, total_hours + 1, 1)  # Every hour
-        ticks_per_day = 24
-        day_interval = ticks_per_day / dt  # Number of ticks per day
+        # total_hours = int(T * 365 * 24)
+        # time_steps = np.arange(0, total_hours + 1, 1)  # Every hour
+        # ticks_per_day = 24
+        # day_interval = ticks_per_day / dt  # Number of ticks per day
         # tick_labels = [f"Day {int(i/ticks_per_day)}" for i in range(0, total_hours + 1, int(day_interval))]
         # ax_left.set_xticks(range(0, total_hours + 1, int(day_interval)))
         # ax_left.set_xticklabels(tick_labels, rotation=45)

@@ -1,6 +1,5 @@
-from pricegenerator import PriceGenerator
+from metricsprocessor import MetricsProcessor
 from scenario import Scenario
-import json
 
 
 def generate(scenario: Scenario):
@@ -16,50 +15,74 @@ def generate(scenario: Scenario):
 
     Returns
     -------
-    inputs : ()
+    inputs :
+    modules :
+    agents : List(Agent)
     """
-    pass
-
-
-def main():
     # Instantiate a PriceGenerator object to simulate asset price paths
-    price_generator = PriceGenerator()
-
-    # Define the time horizon (T) for the price path simulation in years (here 1 year)
-    # and the time step (dt) in hours, assuming 24-hour trading and 365 trading days per year
-    T = 1
-    dt = 1 / (365 * 24)
-
-    # Load simulation configuration parameters from a JSON file
-    with open("./configs/config_1.json", "r") as infile:
-        config = json.load(infile)
-
-    # Extract key parameters from the configuration file
-    title = config[
-        "title"
-    ]  # Title for the simulation, possibly used in plots or reporting
-    assets = config["assets"]  # List of asset identifiers to simulate
-    type = config["type"]  # Type of simulation to perform
-
-    # Check the type of simulation and generate the price paths accordingly
-    if type[0] == "multi_corr":
-        # If the type is 'multi_corr', a correlated multi-asset simulation is conducted
-        sparse_cor = config["sparse_cor"]
-        # Generate correlated GBM price paths with jumps for multiple assets
-        assets = price_generator.gen_cor_jump_gbm2(assets, sparse_cor, T, dt)
-    else:
-        # For other types, assume no correlation is needed in the price path generation
-        sparse_cor = None
-        # Generate GBM price paths with jumps for assets without considering correlations
-        assets = price_generator.gen_jump_gbm2(assets, T, dt)
-
-    # Plot the generated GBM price paths for visualization and analysis
-    price_generator.plot_gbms(T, dt, assets, title=title)
+    # price_generator = PriceGenerator()
+    return None, None, None
 
 
-# This conditional checks if the script is executed as the main program and not imported as a module
-if __name__ == "__main__":
-    main()
+def simulate(scenario: Scenario):
+    """
+    Simulate a stress test scenario.
+
+    Parameters
+    ----------
+    scenario : Scenario
+        A stress test scenario object, containing the
+        necessary parameters for generating inputs, modules,
+        and agents for a simulation.
+
+    Returns
+    -------
+    metrics : MetricsProcessor
+        A metrics processor object, containing the
+        necessary metrics for analyzing the simulation.
+    """
+    inputs, modules, agents = generate(scenario)
+    metrics = MetricsProcessor()
+    return metrics
+
+
+# def main():
+
+#     # Define the time horizon (T) for the price path simulation in years (here 1 year)
+#     # and the time step (dt) in hours, assuming 24-hour trading and 365 trading days per year
+#     T = 1
+#     dt = 1 / (365 * 24)
+
+#     # Load simulation configuration parameters from a JSON file
+#     with open("./configs/config_1.json", "r") as infile:
+#         config = json.load(infile)
+
+#     # Extract key parameters from the configuration file
+#     title = config[
+#         "title"
+#     ]  # Title for the simulation, possibly used in plots or reporting
+#     assets = config["assets"]  # List of asset identifiers to simulate
+#     type = config["type"]  # Type of simulation to perform
+
+#     # Check the type of simulation and generate the price paths accordingly
+#     if type[0] == "multi_corr":
+#         # If the type is 'multi_corr', a correlated multi-asset simulation is conducted
+#         sparse_cor = config["sparse_cor"]
+#         # Generate correlated GBM price paths with jumps for multiple assets
+#         assets = price_generator.gen_cor_jump_gbm2(assets, sparse_cor, T, dt)
+#     else:
+#         # For other types, assume no correlation is needed in the price path generation
+#         sparse_cor = None
+#         # Generate GBM price paths with jumps for assets without considering correlations
+#         assets = price_generator.gen_jump_gbm2(assets, T, dt)
+
+#     # Plot the generated GBM price paths for visualization and analysis
+#     price_generator.plot_gbms(T, dt, assets, title=title)
+
+
+# # This conditional checks if the script is executed as the main program and not imported as a module
+# if __name__ == "__main__":
+#     main()
 
 
 ################ Archived Code ################
@@ -234,73 +257,73 @@ if __name__ == "__main__":
 ## END ARCHIVE
 
 
-from pricegenerator import PriceGenerator
-from slippage import Slippage
+# def main():
+#     ## Price Generation
+#     price_generator = PriceGenerator()
+
+#     # Multi Stablecoin Paths
+#     # T = 1
+#     # dt = 1/(365*24)
+#     # n_assets = 8
+#     # mu = np.full(n_assets,-7.048389410022259e-07),
+#     # sigma = np.full(n_assets, 0.0030879241521733092)
+#     # S0 = np.full(n_assets,1)  # Initial price for each asset
+#     # # jump list of ordered pairs (jump_size, cumulative probability)
+#     # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
+#     # jump_direction = [1,-1]
+#     # recovery_perc = 1
+#     # recovery_speed=9*24
+#     # sparse_cor = {
+#     # 0: {1: 0.95, 2: 0.95, 3: 0.95, 4: 0.95, 5: 0.95, 6: 0.95, 7: 0.95},
+#     # 1: {2: 0.9025, 3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+#     # 2: {3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+#     # 3: {4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
+#     # 4: {5: 0.9025, 6: 0.9025, 7: 0.9025},
+#     # 5: {6: 0.9025, 7: 0.9025},
+#     # 6: {7: 0.9025}}
+#     # cor_matrix=price_generator.gen_cor_matrix(n_assets,sparse_cor)
+#     # generated_prices = price_generator.gen_cor_jump_gbm(n_assets,T,dt,mu,sigma,S0,cor_matrix,jump_list,jump_direction,recovery_perc,recovery_speed)
+#     # S = generated_prices
+#     # plot GBM paths
+#     # price_generator.plot_gbms(S,n_assets)
+
+#     # Single Collateral Path
+#     # T = 1
+#     # dt = 1/(365*24)
+#     # n_assets = 1
+#     # mu = 8.569081760129549e-05
+#     # sigma = 0.022516670770215422
+#     # S0 = 1500  # Initial price for each asset
+#     # # jump list of ordered pairs (jump_size, cumulative probability)
+#     # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
+#     # jump_direction = [-1]
+#     # recovery_perc = .9
+#     # recovery_speed=3*24
+#     # generated_prices = price_generator.gen_single_jump_gbm(S0, mu, sigma, dt, T,jump_list,jump_direction,recovery_perc,recovery_speed)
+#     # S = generated_prices
+#     # plot GBM paths
+#     # price_generator.plot_gbms(S,n_assets)
+
+#     # Slippage
+#     slippage_engine = Slippage()
+
+#     # @TODO: change logspace index from power to number of tokens
+#     # Linear Slippage
+#     # slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
+
+#     # Multivariate Slippage
+#     slippage_engine.plot_multi_var_collat_slippage(
+#         low_tokens=-9,
+#         high_tokens=5,
+#         low_vol=0,
+#         high_vol=0.4,
+#         x0_type="log",
+#         x1_type="lin",
+#     )
 
 
 def main():
-    ## Price Generation
-    price_generator = PriceGenerator()
-
-    # Multi Stablecoin Paths
-    # T = 1
-    # dt = 1/(365*24)
-    # n_assets = 8
-    # mu = np.full(n_assets,-7.048389410022259e-07),
-    # sigma = np.full(n_assets, 0.0030879241521733092)
-    # S0 = np.full(n_assets,1)  # Initial price for each asset
-    # # jump list of ordered pairs (jump_size, cumulative probability)
-    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
-    # jump_direction = [1,-1]
-    # recovery_perc = 1
-    # recovery_speed=9*24
-    # sparse_cor = {
-    # 0: {1: 0.95, 2: 0.95, 3: 0.95, 4: 0.95, 5: 0.95, 6: 0.95, 7: 0.95},
-    # 1: {2: 0.9025, 3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    # 2: {3: 0.9025, 4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    # 3: {4: 0.9025, 5: 0.9025, 6: 0.9025, 7: 0.9025},
-    # 4: {5: 0.9025, 6: 0.9025, 7: 0.9025},
-    # 5: {6: 0.9025, 7: 0.9025},
-    # 6: {7: 0.9025}}
-    # cor_matrix=price_generator.gen_cor_matrix(n_assets,sparse_cor)
-    # generated_prices = price_generator.gen_cor_jump_gbm(n_assets,T,dt,mu,sigma,S0,cor_matrix,jump_list,jump_direction,recovery_perc,recovery_speed)
-    # S = generated_prices
-    # plot GBM paths
-    # price_generator.plot_gbms(S,n_assets)
-
-    # Single Collateral Path
-    # T = 1
-    # dt = 1/(365*24)
-    # n_assets = 1
-    # mu = 8.569081760129549e-05
-    # sigma = 0.022516670770215422
-    # S0 = 1500  # Initial price for each asset
-    # # jump list of ordered pairs (jump_size, cumulative probability)
-    # jump_list = [(0.02, 0.02/24),(0.05,0.01/24)]
-    # jump_direction = [-1]
-    # recovery_perc = .9
-    # recovery_speed=3*24
-    # generated_prices = price_generator.gen_single_jump_gbm(S0, mu, sigma, dt, T,jump_list,jump_direction,recovery_perc,recovery_speed)
-    # S = generated_prices
-    # plot GBM paths
-    # price_generator.plot_gbms(S,n_assets)
-
-    # Slippage
-    slippage_engine = Slippage()
-
-    # @TODO: change logspace index from power to number of tokens
-    # Linear Slippage
-    # slippage_engine.plot_lin_collat_slippage(low=-9,high=6,x_type="log")
-
-    # Multivariate Slippage
-    slippage_engine.plot_multi_var_collat_slippage(
-        low_tokens=-9,
-        high_tokens=5,
-        low_vol=0,
-        high_vol=0.4,
-        x0_type="log",
-        x1_type="lin",
-    )
+    pass
 
 
 if __name__ == "__main__":
