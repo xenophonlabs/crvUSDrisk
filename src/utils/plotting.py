@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
@@ -442,7 +443,18 @@ def plot_predictions(df0, df1, fn=None):
     return f
 
 
-def plot_coingecko_prices(df, fn=None):
+def plot_prices(df, fn=None):
+    """
+    Plot prices in df. Assumes that each col
+    in the df is a coin.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe with prices
+    fn : Optional[str]
+        Filename to save plot to
+    """
     # Get coin names
     cols = [col for col in df.columns if col != "timestamp"]
 
@@ -494,3 +506,110 @@ def plot_coingecko_prices(df, fn=None):
 #         plt.close()
 
 #     return f
+
+
+def plot_gbms(T, dt, assets, title="Geometric Brownian Motion"):
+    # Set the style parameters similar to your ETH/BTC graph
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.size"] = 10
+    plt.rcParams["axes.spines.top"] = False
+    plt.rcParams["axes.spines.right"] = True  # Enable right spine for secondary y-axis
+    plt.rcParams["grid.color"] = "grey"
+    plt.rcParams["grid.linestyle"] = "--"
+    plt.rcParams["grid.linewidth"] = 0.5
+
+    # Create the figure and primary axis objects
+    fig, ax_left = plt.subplots(figsize=(12, 6))
+    ax_right = ax_left.twinx()  # Secondary y-axis for the right side
+
+    # Initialize right axis usage flag
+    right_axis_used = False
+
+    # Plot each asset in the assets list
+    for index, asset in enumerate(assets):
+        if asset["plot_left"] == "False":
+            # Plot on the left axis
+            ax_left.plot(
+                asset["S"], label=f'{asset["name"]}', color=f"C{index}"
+            )  # Use a consistent color cycle
+            ax_left.set_ylabel("Asset Price", color=f"C{index}")
+            ax_left.tick_params(axis="y", labelcolor=f"C{index}")
+        else:
+            # Plot on the right axis
+            ax_right.plot(
+                asset["S"], label=f'{asset["name"]}', color=f"C{index}"
+            )  # Use a consistent color cycle
+            ax_right.set_ylabel("Asset Price", color=f"C{index}")
+            ax_right.tick_params(axis="y", labelcolor=f"C{index}")
+            right_axis_used = True
+
+    # Set ticks and format dates on the x-axis if needed
+    # Assuming that 'T' is total time and 'dt' is the time step
+    # total_hours = int(T * 365 * 24)
+    # time_steps = np.arange(0, total_hours + 1, 1)  # Every hour
+    # ticks_per_day = 24
+    # day_interval = ticks_per_day / dt  # Number of ticks per day
+    # tick_labels = [f"Day {int(i/ticks_per_day)}" for i in range(0, total_hours + 1, int(day_interval))]
+    # ax_left.set_xticks(range(0, total_hours + 1, int(day_interval)))
+    # ax_left.set_xticklabels(tick_labels, rotation=45)
+
+    # Add labels and title
+    ax_left.set_xlabel("Time Steps")
+    ax_left.set_title(title)
+
+    # Enable the grid
+    ax_left.grid(True)
+
+    # Add a combined legend for both axes if the right axis is used, else just add for the left
+    if right_axis_used:
+        lines, labels = ax_left.get_legend_handles_labels()
+        lines2, labels2 = ax_right.get_legend_handles_labels()
+        ax_left.legend(lines + lines2, labels + labels2)
+    else:
+        ax_left.legend()
+
+    # Adjust the subplot to fit the figure area
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
+    return 0
+
+
+def plot_jumps(df, recovery_threshold, fn=None):
+    f, ax = plt.subplots(figsize=(8, 5))
+
+    ax.plot(df["weighted_avg"], color="royalblue", lw=1, label="WAVG Price")
+    ax.plot(
+        df["recovery_mean"] * (1 + recovery_threshold),
+        color="black",
+        linestyle="--",
+        lw=1,
+        label="Recovery Threshold",
+    )
+    ax.plot(
+        df["recovery_mean"] * (1 - recovery_threshold),
+        color="black",
+        linestyle="--",
+        lw=1,
+    )
+    ax.set_ylabel("ETH Price (USD)")
+    ax.set_title("Detecting ETH Jumps")
+
+    for i, row in df.iterrows():
+        left_edge = i - pd.to_timedelta(0.5, unit="D")
+        right_edge = i + pd.to_timedelta(0.5, unit="D")
+        if row["jump_state"]:
+            ax.axvspan(left_edge, right_edge, color="indianred")
+
+    ax.axvspan(None, None, color="indianred", label="Jump")
+    ax.tick_params(axis="x", rotation=45)
+
+    f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=3)
+    f.tight_layout()
+
+    if fn:
+        f.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
