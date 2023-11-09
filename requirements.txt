@@ -14,7 +14,7 @@ click==8.1.7
 comm==0.1.4
 contourpy==1.1.1
 crvusdsim @ git+https://github.com/0xreviews/crvusdsim.git@35f62a5f7f1bae7f2452cf85f6ae81f080fec91f
-curvesim @ git+https://github.com/curveresearch/curvesim.git@6ec7a6099970dfc52609f91fca93c06ce7aee470
+curvesim @ git+https://github.com/curveresearch/curvesim.git@5e0a36b0b99065a695894d8c87b575d3111aa3d2
 cycler==0.12.1
 cytoolz==0.12.2
 debugpy==1.8.0
