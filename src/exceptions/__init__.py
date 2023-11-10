@@ -3,4 +3,8 @@ class crvUSDRiskException(Exception):
 
 
 class coingeckoRateLimitException(crvUSDRiskException):
-    """Coingecko API Rate Limit Exceeded"""
+    """Coingecko API Rate Limit Exceeded."""
+
+
+class ccxtInvalidSymbolException(crvUSDRiskException):
+    """Exchange does not support input symbol."""

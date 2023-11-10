@@ -209,7 +209,7 @@ def log_likelihood(params, X, dt):
     return -log_likelihood  # Negative for minimization
 
 
-def estimate_ou_parameters_MLE(X, dt):
+def estimate_ou_parameters_MLE(X: np.array, dt: float) -> tuple:
     """
     Estimate the parameters of an OU process using MLE.
 
