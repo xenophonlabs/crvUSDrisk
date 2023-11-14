@@ -1,5 +1,5 @@
 import ccxt as ccxt
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 from ..exceptions import ccxtInvalidSymbolException
 import math
@@ -41,13 +41,15 @@ class CCXTDataFetcher:
         dt to UNIX millisecond timestamps.
         """
         exchange = getattr(self, exchange_id)
-        return exchange.parse8601(datetime.isoformat(dt))
+        return exchange.parse8601(datetime.isoformat(dt, tz=timezone.utc))
 
     def to_strftime(self, dt) -> str:
         if isinstance(dt, int):
             # Assumed mili
-            dt = datetime.fromtimestamp(dt / 1000)
+            dt = datetime.fromtimestamp(dt / 1000, tz=timezone.utc)
         return dt.strftime("%d/%m/%Y, %H:%M:%S")
+
+    # def fetch_ohlcv(self, )
 
     def fetch_trades_coinbasepro(self, symbol, since):
         """
@@ -67,8 +69,7 @@ class CCXTDataFetcher:
         pd.DataFrame
             Trades.
         """
-
-        start_time = datetime.now()
+        start_time = datetime.now(tz=timezone.utc)
         exchange = self.coinbasepro
 
         if isinstance(since, datetime):
@@ -90,34 +91,55 @@ class CCXTDataFetcher:
         trades = []
         if symbol in exchange.markets:
             while since < last_trade_ts:
-                new_trades = exchange.fetch_trades(
-                    symbol, params={param_key: param_value}
-                )
-                if not len(new_trades):
-                    break
-                trades.extend(new_trades)
-                after = exchange.last_response_headers.get("Cb-After")
-                if after:
-                    param_key = "after"
-                    param_value = after
-                    last_trade_ts = new_trades[0]["timestamp"]
-                else:
-                    break  # Last page
-                progress = round((1 - (last_trade_ts - since) / total) * 100)
-                if len(bars) and progress in bars:
-                    bars = bars[bars.index(progress) + 1 :]
-                    print(f"Progress: {progress}%", end="\r")
+                try:
+                    new_trades = exchange.fetch_trades(
+                        symbol, params={param_key: param_value}
+                    )
+                    if not len(new_trades):
+                        break
+                    trades.extend(new_trades)
+                    after = exchange.last_response_headers.get("Cb-After")
+                    if after:
+                        param_key = "after"
+                        param_value = after
+                        last_trade_ts = new_trades[0]["timestamp"]
+                    else:
+                        break  # Last page
+                    progress = round((1 - (last_trade_ts - since) / total) * 100)
+                    if len(bars) and progress in bars:
+                        bars = bars[bars.index(progress) + 1 :]
+                        print(f"Progress: {progress}%", end="\r")
+                except ccxt.RateLimitExceeded:
+                    exchange.sleep(10000)
+                except Exception:
+                    raise
         else:
             raise ccxtInvalidSymbolException
 
-        end_time = datetime.now()
+        end_time = datetime.now(tz=timezone.utc)
 
         print(f"\nFinished. Time taken: {end_time - start_time}\n")
 
         return CCXTDataFetcher.trades_to_df(trades)
 
     def fetch_trades_binance(self, symbol, since, end=None):
-        start_time = datetime.now()
+        """
+        `fetchTrades` on binance implements `since` so
+        we can use a straightforward loop without pagination.
+
+        Parameters
+        ----------
+        symbol : str
+            token0/token1.
+        since : int or datetime or 8601 str
+            Earliest trade timestamp in milliseconds.
+
+        Returns
+        -------
+        pd.DataFrame
+            Trades.
+        """
+        start_time = datetime.now(tz=timezone.utc)
         exchange = self.binance
 
         if isinstance(since, datetime):
@@ -129,7 +151,7 @@ class CCXTDataFetcher:
         if isinstance(end, str):
             end = exchange.parse8601(end)
 
-        cur = int(datetime.now().timestamp() * 1000)
+        cur = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
         end = min(end, cur) if end else cur
 
         print(
@@ -160,7 +182,7 @@ class CCXTDataFetcher:
         else:
             raise ccxtInvalidSymbolException
 
-        end_time = datetime.now()
+        end_time = datetime.now(tz=timezone.utc)
 
         print(f"\n\nFinished. Time taken: {end_time - start_time}\n")
 
@@ -168,7 +190,15 @@ class CCXTDataFetcher:
 
     def trades_to_df(trades: list) -> pd.DataFrame:
         df = pd.DataFrame(trades)
-        df.drop(["info"], inplace=True)
+        print(df)
+        # df.drop(["info"], axis=1, inplace=True)
         df.set_index("datetime", inplace=True)
         df.sort_index(inplace=True)
+        return df
+
+    def ohlcv_to_df(self, ohlcv: list) -> pd.DataFrame:
+        df = pd.DataFrame(
+            ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+        df.index = pd.to_datetime(df["timestamp"] / 1000, unit="s")
         return df

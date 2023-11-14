@@ -85,4 +85,5 @@ class ExternalMarket:
         float
             The price_impact (decimals) for given trade.
         """
+        # return -0.003
         return amt_in * self.coefs[i][j] + self.intercepts[i][j]

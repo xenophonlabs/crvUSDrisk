@@ -28,7 +28,7 @@ fn_gif_system_health = GIFS_PATH + "system_health.gif"
 plt.rcParams["font.family"] = "serif"
 plt.rcParams.update({"font.size": 10})
 plt.rcParams["axes.spines.top"] = False
-plt.rcParams["axes.spines.right"] = True
+plt.rcParams["axes.spines.right"] = False
 
 # plt.rcParams["axes.facecolor"] = "#f5f5f5"
 plt.rcParams["grid.color"] = "white"
@@ -435,6 +435,28 @@ def plot_predictions(df0, df1, fn=None):
 
     axs[0].set_title("Predicted vs Actual Token Out")
     axs[1].set_title("Predicted vs Actual Token Out")
+
+    if fn:
+        plt.savefig(fn, dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_price_impact_prediction_error(df, amt_col, fn=None):
+    f, ax = plt.subplots()
+
+    ax.scatter(
+        df[amt_col],
+        -df["price_impact"],
+        s=df["pct_error"] * 100,
+        c="royalblue",
+    )
+    ax.set_xlabel(amt_col)
+    ax.set_ylabel("Price impact")
+    ax.set_title("Predicted Price Impact Error")
+
+    f.tight_layout()
 
     if fn:
         plt.savefig(fn, dpi=300)

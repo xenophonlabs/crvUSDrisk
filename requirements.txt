@@ -1,3 +1,4 @@
+aiodns==3.1.1
 aiohttp==3.8.6
 aiosignal==1.3.1
 altair==5.1.2
@@ -8,12 +9,16 @@ attrs==23.1.0
 backcall==0.2.0
 bitarray==2.8.2
 black==23.10.1
+ccxt==4.1.46
 certifi==2023.7.22
+cffi==1.16.0
 charset-normalizer==3.3.0
 click==8.1.7
 comm==0.1.4
 contourpy==1.1.1
+cramjam==2.7.0
 crvusdsim @ git+https://github.com/0xreviews/crvusdsim.git@35f62a5f7f1bae7f2452cf85f6ae81f080fec91f
+cryptography==41.0.5
 curvesim @ git+https://github.com/curveresearch/curvesim.git@5e0a36b0b99065a695894d8c87b575d3111aa3d2
 cycler==0.12.1
 cytoolz==0.12.2
@@ -29,8 +34,10 @@ eth-typing==3.5.0
 eth-utils==2.2.2
 executing==2.0.0
 fastjsonschema==2.18.1
+fastparquet==2023.10.1
 fonttools==4.43.1
 frozenlist==1.4.0
+fsspec==2023.10.0
 gmpy2==2.1.5
 hexbytes==0.3.1
 idna==3.4
@@ -71,6 +78,9 @@ protobuf==4.24.4
 psutil==5.9.6
 ptyprocess==0.7.0
 pure-eval==0.2.2
+pyarrow==14.0.1
+pycares==4.4.0
+pycparser==2.21
 pycryptodome==3.19.0
 Pygments==2.16.1
 pyparsing==3.1.1

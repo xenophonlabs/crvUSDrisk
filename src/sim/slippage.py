@@ -1,8 +1,9 @@
+from typing import List
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from src.modules.market import ExternalMarket
-from src.utils.plotting import plot_predictions
+from src.utils.plotting import plot_predictions, plot_price_impact_prediction_error
 
 """
 TODO Things we need do to make this better.
@@ -17,7 +18,7 @@ TODO Things we need do to make this better.
 """
 
 
-def process_trades(df, decimals):
+def process_trades(df: pd.DataFrame, decimals: List[int]) -> List[pd.DataFrame]:
     """
     Process trade data for a given market.
 
@@ -107,7 +108,7 @@ def regress(df, x_vars, y_var, v=False):
     return model
 
 
-def analyze(fn, decimals, plot=False):
+def analyze(fn, decimals, plot=False, return_dfs=False):
     with open(fn, "r") as f:
         df = pd.read_csv(f)
 
@@ -161,6 +162,13 @@ def analyze(fn, decimals, plot=False):
         print(f"Mean percentage error: {df1['pct_error'].mean():.3f}%")
 
         plot_predictions(df0, df1)
+        plot_price_impact_prediction_error(df0, "amount0_adjusted")
+        plot_price_impact_prediction_error(df1, "amount1_adjusted")
+
+    out = [coefs, intercepts, results]
+
+    if return_dfs:
+        out.extend([df0, df1])
 
     # TODO where do we want to save these results?
-    return coefs, intercepts, results
+    return out
