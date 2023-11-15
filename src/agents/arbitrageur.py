@@ -109,7 +109,8 @@ class Arbitrageur:
         """
         assert len(pools) == 2, NotImplementedError("Can't arb more than two pools.")
 
-        trade = self.search(pools, prices)
+        # Call search on all combinations of pools
+        trade = self.search(pools, prices) # <- this already tells you the most profitable trade for pools A <-> B
 
         count = 0
         profit = 0

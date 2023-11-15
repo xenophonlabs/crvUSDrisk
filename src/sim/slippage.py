@@ -5,18 +5,13 @@ import statsmodels.api as sm
 from src.modules.market import ExternalMarket
 from src.utils.plotting import plot_predictions, plot_price_impact_prediction_error
 
-"""
-TODO Things we need do to make this better.
+def price_impact_from_quotes(quotes: pd.DataFrame)-> List[float]:
+    best_price = quotes["price"].max() # price = out/in
+    return best_price - quotes["price"] / best_price
 
-    - Write a productionized script for pulling trade data
-    for relevant markets.
-    - Write a script to determine which markets to pull data
-    from.
-    - Revise this methodology for stablecoin trades.
-    - Incorporate volatility if necessary.
-    - Save results somewhere.
-"""
-
+# === ARCHIVED === #
+# We used to analyze uniswap trades here to examine slippage.
+# We now use the output from our 1inch API calls.
 
 def process_trades(df: pd.DataFrame, decimals: List[int]) -> List[pd.DataFrame]:
     """
