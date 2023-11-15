@@ -62,7 +62,7 @@ ALL = {
         "min_trade_size": 0.5,
         "max_trade_size": 50000,
     },
-    "sfrxETH": {
+    "SFRXETH": {
         "address": SFRXETH,
         "decimals": 18,
         "min_trade_size": 0.5,
