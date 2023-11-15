@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 import requests as req
 from typing import List
@@ -7,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from src.types import QuoteResponse
 
-MAX_RETRIES = 5
+MAX_RETRIES = 3
 
 
 def is_rate_limit_error(e):
@@ -24,6 +25,7 @@ class OneInchQuotes:
     https://github.com/RichardAtCT/1inch_wrapper/blob/master/oneinch_py/main.py.
 
     NOTE this uses the legacy 1inch API! Could update with new Fusion API.
+    TODO add logging
     """
 
     version = "v5.2"
@@ -81,7 +83,7 @@ class OneInchQuotes:
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
-        wait=wait_exponential(multiplier=1, min=0.1, max=5),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
         retry=retry_if_exception(is_rate_limit_error),
     )
     def quote(self, in_token: str, out_token: str, in_amount: int) -> QuoteResponse:
@@ -127,10 +129,24 @@ class OneInchQuotes:
             responses.append(res)
         return responses
 
-    def all_quotes(self, tokens: List[str], calls: int) -> List[List[QuoteResponse]]:
+    def all_quotes(
+        self, tokens: List[str], calls: int = None
+    ) -> List[List[QuoteResponse]]:
         """Get the quotes for all pairs of the input tokens."""
         pairs = list(permutations(tokens, 2))
+        n = len(pairs)
         responses = []
-        for pair in pairs:
-            responses.append(self.quotes_for_pair(pair, calls))
+        for i, pair in enumerate(pairs):
+            print(f"Fetching: {pair}... {i+1}/{n}")
+            responses.append(self.quotes_for_pair(pair, calls=calls))
         return responses
+
+    def to_df(
+        self, responses: List[QuoteResponse], fn=None
+    ) -> pd.DataFrame:
+        """Dump quote responses into a pd.DataFrame"""
+        flat_responses = [item for row in responses for item in row]
+        df = pd.concat([res.to_df() for res in flat_responses])
+        if fn:
+            df.to_csv(fn, index=False)
+        return df

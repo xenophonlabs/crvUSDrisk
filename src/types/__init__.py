@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import pandas as pd
+import json
 
 
 @dataclass
@@ -16,8 +17,8 @@ class QuoteResponse:
     protocols: list
 
     def __init__(self, res: dict, in_amount: int, timestamp: int):
-        self.src = res["fromToken"]["symbol"]
-        self.dst = res["toToken"]["symbol"]
+        self.src = res["fromToken"]["address"]
+        self.dst = res["toToken"]["address"]
         self.in_amount = int(in_amount)
         self.out_amount = int(res["toAmount"])
         self.gas = int(res["gas"])
@@ -31,6 +32,12 @@ class QuoteResponse:
         # Cost of buying 1 unit of dst token using src token
 
     def to_df(self) -> pd.DataFrame:
+        """
+        Note
+        ----
+        Dumps protocols field into a JSON string. Is there
+        a better approach?
+        """
         return pd.DataFrame(
             [
                 {
@@ -40,6 +47,7 @@ class QuoteResponse:
                     "out_amount": self.out_amount,
                     "gas": self.gas,
                     "price": self.price,
+                    "protocols": json.dumps(self.protocols),
                     "timestamp": self.timestamp,
                 }
             ]
