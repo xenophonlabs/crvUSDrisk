@@ -141,13 +141,10 @@ class OneInchQuotes:
             responses.append(self.quotes_for_pair(pair, calls=calls))
         return responses
 
-    def dump(
-        self, responses: List[QuoteResponse], method="csv", fn=None
+    def to_df(
+        self, responses: List[QuoteResponse], fn=None
     ) -> pd.DataFrame:
-        """Dump quote responses into the chosen storage."""
-        if method != "csv":
-            # Eventually support "postgres" or "parquet" methods?
-            raise NotImplementedError("Only CSV dumping is supported.")
+        """Dump quote responses into a pd.DataFrame"""
         flat_responses = [item for row in responses for item in row]
         df = pd.concat([res.to_df() for res in flat_responses])
         if fn:
