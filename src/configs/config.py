@@ -2,6 +2,19 @@
 Master config with basic constants.
 """
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+username = os.getenv("PG_USERNAME")
+password = os.getenv("PG_PASSWORD")
+database = os.getenv("PG_DATABASE")
+
+URI = (
+    f"postgresql://{username}:{password}@localhost/{database}"  # defaults to port 5432
+)
+
 COINGECKO_URL = "https://api.coingecko.com/api/v3/"
 
 # Stables

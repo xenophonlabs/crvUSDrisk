@@ -74,7 +74,7 @@ class OneInchQuotes:
     @property
     def header(self) -> dict:
         return {"Authorization": f"Bearer {self.api_key}", "accept": "application/json"}
-    
+
     def protocols(self) -> dict:
         res = req.get(self.protocols_url, headers=self.header)
         return res.json()
@@ -92,7 +92,7 @@ class OneInchQuotes:
             "amount": str(in_amount),
             "includeGas": True,
             "includeTokensInfo": True,
-            "includeProtocols": True
+            "includeProtocols": True,
         }
         res = req.get(self.quote_url, params=params, headers=self.header)
         ts = int(datetime.now().timestamp())
@@ -108,11 +108,14 @@ class OneInchQuotes:
         """
         calls = calls if calls else self.calls  # default to self.calls
         in_token, out_token = pair
-        in_amounts = np.geomspace(
-            self.config[in_token]["min_trade_size"],
-            self.config[in_token]["max_trade_size"],
-            calls,
-        ) * 10 ** self.config[in_token]["decimals"]
+        in_amounts = (
+            np.geomspace(
+                self.config[in_token]["min_trade_size"],
+                self.config[in_token]["max_trade_size"],
+                calls,
+            )
+            * 10 ** self.config[in_token]["decimals"]
+        )
         in_amounts = [int(i) for i in in_amounts]
         responses = []
         for in_amount in in_amounts:
