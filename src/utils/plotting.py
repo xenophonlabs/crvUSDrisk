@@ -639,3 +639,45 @@ def plot_jumps(df, recovery_threshold, fn=None):
         plt.close()  # don't show
 
     return f
+
+
+def plot_price_impact_1inch(res, in_token, out_token, fn: str = None):
+    prices = [r.price for r in res]
+    base_price = max(prices)  # price = out/in
+    price_impact = [100 * (base_price - p) / base_price for p in prices]
+    in_amounts = [r.in_amount / (10**r.in_decimals) for r in res]
+
+    f, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(in_amounts, price_impact, s=10, c="royalblue")
+    ax.set_xscale("log")
+    ax.set_title(f"Price Impact for Swapping {in_token} into {out_token}")
+    ax.set_ylabel("Price Impact (%)")
+    ax.set_xlabel(f"Trade Size ({in_token})")
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_price_1inch(res, in_token, out_token, fn: str = None):
+    prices = [r.price for r in res]
+    in_amounts = [r.in_amount / (10**r.in_decimals) for r in res]
+
+    f, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(in_amounts, prices, s=10, c="royalblue")
+    ax.set_xscale("log")
+    ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
+    ax.set_ylabel("Exchange Rate (out/in)")
+    ax.set_xlabel(f"Trade Size ({in_token})")
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f

@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 import requests as req
 from typing import List
@@ -7,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from src.types import QuoteResponse
 
-MAX_RETRIES = 5
+MAX_RETRIES = 3
 
 
 def is_rate_limit_error(e):
@@ -24,6 +25,7 @@ class OneInchQuotes:
     https://github.com/RichardAtCT/1inch_wrapper/blob/master/oneinch_py/main.py.
 
     NOTE this uses the legacy 1inch API! Could update with new Fusion API.
+    TODO add logging
     """
 
     version = "v5.2"
@@ -74,14 +76,14 @@ class OneInchQuotes:
     @property
     def header(self) -> dict:
         return {"Authorization": f"Bearer {self.api_key}", "accept": "application/json"}
-    
+
     def protocols(self) -> dict:
         res = req.get(self.protocols_url, headers=self.header)
         return res.json()
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
-        wait=wait_exponential(multiplier=1, min=0.1, max=5),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
         retry=retry_if_exception(is_rate_limit_error),
     )
     def quote(self, in_token: str, out_token: str, in_amount: int) -> QuoteResponse:
@@ -92,7 +94,7 @@ class OneInchQuotes:
             "amount": str(in_amount),
             "includeGas": True,
             "includeTokensInfo": True,
-            "includeProtocols": True
+            "includeProtocols": True,
         }
         res = req.get(self.quote_url, params=params, headers=self.header)
         ts = int(datetime.now().timestamp())
@@ -108,11 +110,14 @@ class OneInchQuotes:
         """
         calls = calls if calls else self.calls  # default to self.calls
         in_token, out_token = pair
-        in_amounts = np.geomspace(
-            self.config[in_token]["min_trade_size"],
-            self.config[in_token]["max_trade_size"],
-            calls,
-        ) * 10 ** self.config[in_token]["decimals"]
+        in_amounts = (
+            np.geomspace(
+                self.config[in_token]["min_trade_size"],
+                self.config[in_token]["max_trade_size"],
+                calls,
+            )
+            * 10 ** self.config[in_token]["decimals"]
+        )
         in_amounts = [int(i) for i in in_amounts]
         responses = []
         for in_amount in in_amounts:
@@ -124,10 +129,27 @@ class OneInchQuotes:
             responses.append(res)
         return responses
 
-    def all_quotes(self, tokens: List[str], calls: int) -> List[List[QuoteResponse]]:
+    def all_quotes(
+        self, tokens: List[str], calls: int = None
+    ) -> List[List[QuoteResponse]]:
         """Get the quotes for all pairs of the input tokens."""
         pairs = list(permutations(tokens, 2))
+        n = len(pairs)
         responses = []
-        for pair in pairs:
-            responses.append(self.quotes_for_pair(pair, calls))
+        for i, pair in enumerate(pairs):
+            print(f"Fetching: {pair}... {i+1}/{n}")
+            responses.append(self.quotes_for_pair(pair, calls=calls))
         return responses
+
+    def dump(
+        self, responses: List[QuoteResponse], method="csv", fn=None
+    ) -> pd.DataFrame:
+        """Dump quote responses into the chosen storage."""
+        if method != "csv":
+            # Eventually support "postgres" or "parquet" methods?
+            raise NotImplementedError("Only CSV dumping is supported.")
+        flat_responses = [item for row in responses for item in row]
+        df = pd.concat([res.to_df() for res in flat_responses])
+        if fn:
+            df.to_csv(fn, index=False)
+        return df
