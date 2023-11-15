@@ -52,7 +52,6 @@ class DataHandler:
     ):
         """Insert rows from dataframe."""
         for _, row in df.iterrows():
-            # print(row)
             stmt = insert(entity.__table__).values(**row)
             if replace:
                 stmt = stmt.on_conflict_do_update(
