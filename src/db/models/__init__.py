@@ -1,7 +1,7 @@
 from sqlalchemy import (
     Column,
     Integer,
-    BigInteger,
+    Numeric,
     Float,
     String,
     ForeignKey,
@@ -23,8 +23,8 @@ class Quote(Base):
     __tablename__ = "quotes"
     src = Column(String, ForeignKey("tokens.id"), primary_key=True)
     dst = Column(String, ForeignKey("tokens.id"), primary_key=True)
-    in_amount = Column(BigInteger)
-    out_amount = Column(BigInteger)
+    in_amount = Column(Numeric)
+    out_amount = Column(Numeric)
     gas = Column(Integer)
     price = Column(Float)
     protocols = Column(JSONB)

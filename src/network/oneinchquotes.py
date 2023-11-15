@@ -141,9 +141,7 @@ class OneInchQuotes:
             responses.append(self.quotes_for_pair(pair, calls=calls))
         return responses
 
-    def to_df(
-        self, responses: List[QuoteResponse], fn=None
-    ) -> pd.DataFrame:
+    def to_df(self, responses: List[QuoteResponse], fn=None) -> pd.DataFrame:
         """Dump quote responses into a pd.DataFrame"""
         flat_responses = [item for row in responses for item in row]
         df = pd.concat([res.to_df() for res in flat_responses])
