@@ -2,13 +2,26 @@
 Master config with basic constants.
 """
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+username = os.getenv("PG_USERNAME")
+password = os.getenv("PG_PASSWORD")
+database = os.getenv("PG_DATABASE")
+
+URI = (
+    f"postgresql://{username}:{password}@localhost/{database}"  # defaults to port 5432
+)
+
 COINGECKO_URL = "https://api.coingecko.com/api/v3/"
 
 # Stables
-USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 USDT = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 USDP = "0x8e870d67f660d95d5be530380d0ec0bd388289e1"
-TUSD = "0x0000000000085d4780B73119b644AE5ecd22b376"
+TUSD = "0x0000000000085d4780b73119b644ae5ecd22b376"
 
 # Collateral
 WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
