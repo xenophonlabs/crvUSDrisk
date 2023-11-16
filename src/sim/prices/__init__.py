@@ -1,100 +1,142 @@
 import numpy as np
 import scipy.optimize as so
-import requests as req
+import logging
+import json
 import pandas as pd
+import matplotlib.pyplot as plt
+from typing import List
 from datetime import datetime
-from ...exceptions import coingeckoRateLimitException
-from ...configs.config import COINGECKO_URL, STABLE_CG_IDS
-from curvesim.network.coingecko import coin_ids_from_addresses_sync
+from ...configs.config import STABLE_CG_IDS
+from ...plotting import plot_prices
+from ...network.coingecko import get_prices_df, address_from_coin_id, get_current_prices
 
-### ========== Get Historical Prices ========== ###
+# TODO structure this code/directory better jfc
 
 
-def get_price(coin_id: str, start: int, end: int) -> list:
+class PricePaths:
     """
-    Get price data from coingecko API.
+    Convenient class for storing params required
+    to generate prices.
+    """
+
+    def __init__(self, fn: str, N: int):
+        """
+        Generate price paths from config file.
+
+        Parameters
+        ----------
+        fn : str
+            Path to price config file.
+        N : int
+            Number of timesteps.
+        """
+
+        with open(fn, "r") as f:
+            logging.info(f"Reading price config from {fn}.")
+            config = json.load(f)
+
+        self.N = N
+        self.params = config["params"]
+        self.cov = pd.DataFrame.from_dict(config["cov"])
+        self.freq = config["freq"]
+        self.coin_ids = list(self.params.keys())
+        self.coins = [address_from_coin_id(coin_id) for coin_id in self.coin_ids]
+        self.S0s = get_current_prices(self.coin_ids)
+        self.annual_factor = factor(self.freq)
+        self.dt = 1 / self.annual_factor
+        self.T = self.N * self.dt
+        self.S = gen_cor_prices(
+            self.coin_ids, self.T, self.dt, self.S0s, self.cov, self.params
+        )
+
+
+def gen_price_config(
+    fn: str,
+    coins: List[str],
+    start: int,
+    end: int,
+    freq: str = "1h",
+    plot: bool = False,
+) -> dict:
+    """
+    Generate a config file for prices for each input coin.
+    The file will contain the generative parameters for the coin
+    based on the historical prices between `start` and `end`.
+
+    Parameters for
+        Stablecoins: OU process with `theta`, `mu`, and `sigma`.
+        Other: GBM process with `mu`, and `sigma`.
 
     Parameters
     ----------
-    coin_id : str
-        Coin id from coingecko API.
-    start : int
-        Unix timestamp in milliseconds.
-    end : int
-        Unix timestamp in milliseconds.
-
-    Returns
-    -------
-    list
-        List of price data.
-
-    Note
-    ----
-    The coingecko API returns data in the following
-    granularity:
-        1 day from current time = 5-minutely data
-        1 day from anytime (except from current time) = hourly data
-        2-90 days from current time or anytime = hourly data
-        above 90 days from current time or anytime = daily data (00:00 UTC)
-    """
-    url = COINGECKO_URL + f"coins/{coin_id}/market_chart/range"
-    p = {"vs_currency": "usd", "from": start, "to": end}
-    r = req.get(url, params=p)
-    if r.status_code == 200:
-        return r.json()["prices"]
-    elif r.status_code == 429:
-        raise coingeckoRateLimitException("Coingecko API Rate Limit Exceeded.")
-    else:
-        raise RuntimeError(f"Request failed with status code {r.status_code}.")
-
-
-def get_prices_df(coins: str, start: int, end: int, freq: str = "1d") -> pd.DataFrame:
-    """
-    Get price data from coingecko API and convert
-    into a formatted DataFrame.
-
-    Parameters
-    ----------
-    coin_id : str
-        Coin id from coingecko API or Ethereum address.
+    fn : str
+        Filename to save config to.
+    coins : List[str]
+        List of coin addresses
     start : int
         Unix timestamp in milliseconds.
     end : int
         Unix timestamp in milliseconds.
     freq : Optional[str]
-        Frequency of price data. Default is daily.
+        Frequency of price data. Default is hourly.
+    plot : Optional[bool]
+        Whether to plot simulated prices.
 
     Returns
     -------
-    df : pd.DataFrame
-        DataFrame of price data.
+    config : dict
+        Dictionary of parameters for each coin.
+
+    Note
+    ----
+    TODO Add configs for jumps.
     """
-    dfs = []
-    for coin in coins:
-        if "0x" in coin:
-            # Convert Ethereum address to Coingecko coin id
-            coin = coin_ids_from_addresses_sync([coin], "mainnet")[0]
-        prices = get_price(coin, start, end)
-        cdf = pd.DataFrame(prices, columns=["timestamp", coin])
-        cdf.index = pd.to_datetime(cdf["timestamp"], unit="ms")
-        cdf.index.name = "datetime"
-        cdf.drop(["timestamp"], axis=1, inplace=True)
-        cdf = cdf.resample(freq).mean()
-        dfs.append(cdf)
-    df = pd.concat(dfs, axis=1)
-    df["timestamp"] = df.index
-    df["timestamp"] = df["timestamp"].apply(lambda x: int(datetime.timestamp(x)))
-    df = df.ffill()
-    return df
+    assert fn, "Must provide filename to write to."
+    assert freq in ["1h", "1d"], f"Frequency must be 1h or 1d, not {freq}."
+
+    logging.info("Fetching price data.")
+    df = get_prices_df(coins, start, end, freq)
+    assert df.shape[0] > 0, "Price data is empty."
+
+    logging.info("Processing parameters.")
+    params, cov = process_prices(df, freq)
+    logging.info(f"Params\n{pd.DataFrame.from_dict(params)}")
+    logging.info(f"Cov\n{cov}")
+    config = {
+        "params": params,
+        "cov": cov.to_dict(),
+        "freq": freq,
+        "start": start,
+        "end": end,
+    }
+
+    with open(fn, "w") as f:
+        logging.info(f"Writing price config to {fn}.")
+        json.dump(config, f)
+
+    if plot:
+        start = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+        end = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
+        coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()
+        logging.info(
+            f"Plotting empirical and simulated prices from {start} to {end}.\n"
+        )
+        annual_factor = factor(freq)
+        T = df.shape[0] / annual_factor
+        dt = 1 / annual_factor
+        S0s = df[coin_ids].iloc[0].to_dict()  # Get first row of prices
+        S = gen_cor_prices(coin_ids, T, dt, S0s, cov, params)
+        _ = plot_prices(df[coin_ids], df2=S)
+        plt.show()
+
+    return config
 
 
 ### ========== Analyze Historical Prices ========== ###
 
-# E.g., determine mu, sigma for each asset
-# E.g., determine correlation between assets
 
-
-def factor(freq):
+def factor(freq: str) -> float:
+    """Annualizing factor."""
     if freq == "1d":
         return 365
     elif freq == "1h":
@@ -103,11 +145,11 @@ def factor(freq):
         raise ValueError(f"Invalid frequency: {freq}")
 
 
-def process_prices(df, freq="1d"):
+def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
     """
     Given a DataFrame of prices, compute:
         1. Parameters for the generative process
-        2. covariance matrix between assets
+        2. covariance matrix between coins
         3. Jumps - TODO
 
     The parameters for the gen process are either
@@ -128,6 +170,11 @@ def process_prices(df, freq="1d"):
         Dictionary of params.
     cov : pd.DataFrame
         Covariance matrix.
+
+    Note
+    ----
+    For stablecoins: params = {theta, mu, sigma, type=OU}
+    Else: params = {mu, sigma, type=GBM}
     """
     df = df.copy()  # Avoid modifying original DataFrame
 
@@ -337,16 +384,18 @@ def gen_gbm(mu, sigma, dt, S0, N, dW=None):
     return S
 
 
-def gen_cor_prices(assets, T, dt, S0s, cov, params):
+def gen_cor_prices(
+    coins: List[str], T: float, dt: float, S0s: dict, cov: pd.DataFrame, params: dict
+):
     """
     Generate a matrix of correlated GBMs using
     Cholesky decomposition.
 
     Parameters
     ----------
-    assets : List[str]
+    coins : List[str]
         Asset ids/names.
-    T : int
+    T : float
         Time horizon, in years
     dt : float
         Length of each step, in years.
@@ -368,20 +417,21 @@ def gen_cor_prices(assets, T, dt, S0s, cov, params):
     annual returns, so T and dt must also be in years.
     """
     N = int(T / dt)  # Number of steps
-    n = len(assets)
+    n = len(coins)
 
     # Generate uncorrelated Brownian motions
     dW = gen_dW(dt, (N, n))
+    print(coins)
 
     # Apply Cholesky decomposition to get correlated Brownian motions
-    cov = cov[assets]  # Ensure correct ordering
+    cov = cov[coins]  # Ensure correct ordering
     L = np.linalg.cholesky(cov)
     dW_correlated = dW.dot(L.T)
 
     # Initialize the price matrix and simulate the paths
     S = np.zeros((N, n))
 
-    for i, asset in enumerate(assets):
+    for i, asset in enumerate(coins):
         if asset in STABLE_CG_IDS:
             theta, mu, sigma = (
                 params[asset]["theta"],
@@ -393,128 +443,128 @@ def gen_cor_prices(assets, T, dt, S0s, cov, params):
             mu, sigma = params[asset]["mu"], params[asset]["sigma"]
             S[:, i] = gen_gbm(mu, sigma, dt, S0s[asset], N, dW_correlated[:, i])
 
-    return pd.DataFrame(S, columns=assets)
+    return pd.DataFrame(S, columns=coins)
 
 
 ### ========== Outdated ========== ###
 
 
-def gen_cor_matrix(n_assets, sparse_cor):
-    cor_matrix = np.identity(n_assets)
-    for i in range(n_assets):
-        for j in range(n_assets):
-            pair = sorted([i, j])
-            if i == j:
-                cor_matrix[i][j] = 1.0
-            else:
-                cor_matrix[i][j] = sparse_cor[str(pair[0])][str(pair[1])]
-    return cor_matrix
+# def gen_cor_matrix(n_coins, sparse_cor):
+#     cor_matrix = np.identity(n_coins)
+#     for i in range(n_coins):
+#         for j in range(n_coins):
+#             pair = sorted([i, j])
+#             if i == j:
+#                 cor_matrix[i][j] = 1.0
+#             else:
+#                 cor_matrix[i][j] = sparse_cor[str(pair[0])][str(pair[1])]
+#     return cor_matrix
 
 
-def gen_cor_jump_gbm2(assets, cor_matrix, T, dt):
-    cor_matrix = gen_cor_matrix(len(assets), cor_matrix)
+# def gen_cor_jump_gbm2(coins, cor_matrix, T, dt):
+#     cor_matrix = gen_cor_matrix(len(coins), cor_matrix)
 
-    n_steps = int(T / dt)
-    n_assets = len(assets)
+#     n_steps = int(T / dt)
+#     n_coins = len(coins)
 
-    # Generate uncorrelated Brownian motions
-    dW = np.sqrt(dt) * np.random.randn(n_steps, n_assets)
-    # Apply Cholesky decomposition to get correlated Brownian motions
-    L = np.linalg.cholesky(cor_matrix)
-    # get the dot product of the weiner processes and the transpose of the cholesky matrix
-    dW_correlated = dW.dot(L.T)
+#     # Generate uncorrelated Brownian motions
+#     dW = np.sqrt(dt) * np.random.randn(n_steps, n_coins)
+#     # Apply Cholesky decomposition to get correlated Brownian motions
+#     L = np.linalg.cholesky(cor_matrix)
+#     # get the dot product of the weiner processes and the transpose of the cholesky matrix
+#     dW_correlated = dW.dot(L.T)
 
-    # Initialize asset prices
-    for index, asset in enumerate(assets):
-        # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
-        asset["jump_data"] = sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
-        S = np.zeros(n_steps)
-        S[0] = asset["S0"]
-        asset["S"] = S
-        asset["recovery_period"] = 0
-        asset["jump_to_recover"] = 0
+#     # Initialize asset prices
+#     for index, asset in enumerate(coins):
+#         # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
+#         asset["jump_data"] = sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
+#         S = np.zeros(n_steps)
+#         S[0] = asset["S0"]
+#         asset["S"] = S
+#         asset["recovery_period"] = 0
+#         asset["jump_to_recover"] = 0
 
-    # Iterate over each time step
-    for t in range(1, n_steps):
-        for index, asset in enumerate(assets):
-            rand_num = np.random.rand()
+#     # Iterate over each time step
+#     for t in range(1, n_steps):
+#         for index, asset in enumerate(coins):
+#             rand_num = np.random.rand()
 
-            if asset["recovery_period"] > 0:
-                asset["recovery_period"] -= 1
-                asset["S"][t] = (
-                    asset["S"][t - 1] + (asset["jump_to_recover"])
-                ) * np.exp(
-                    (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
-                    + asset["sigma"] * dW_correlated[t][index]
-                )
-            else:
-                # jump diffusion based on poisson process
-                for jump in asset["jump_data"]:
-                    lag = jump["lag_days"] * 24
-                    if (
-                        rand_num < (jump["annual_prob"] / (365 * 24))
-                        and jump["count"] < asset["jump_limit"]
-                        and t > lag
-                    ):
-                        asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
-                        asset["recovery_period"] = jump["rec_speed_days"] * 24
-                        asset["jump_to_recover"] = (
-                            -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
-                        ) / (asset["recovery_period"])
-                        jump["count"] = 1 + jump["count"]
-                        break
-                    else:
-                        asset["S"][t] = asset["S"][t - 1] * np.exp(
-                            (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
-                            + asset["sigma"] * dW_correlated[t][index]
-                        )
-    return assets
+#             if asset["recovery_period"] > 0:
+#                 asset["recovery_period"] -= 1
+#                 asset["S"][t] = (
+#                     asset["S"][t - 1] + (asset["jump_to_recover"])
+#                 ) * np.exp(
+#                     (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+#                     + asset["sigma"] * dW_correlated[t][index]
+#                 )
+#             else:
+#                 # jump diffusion based on poisson process
+#                 for jump in asset["jump_data"]:
+#                     lag = jump["lag_days"] * 24
+#                     if (
+#                         rand_num < (jump["annual_prob"] / (365 * 24))
+#                         and jump["count"] < asset["jump_limit"]
+#                         and t > lag
+#                     ):
+#                         asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
+#                         asset["recovery_period"] = jump["rec_speed_days"] * 24
+#                         asset["jump_to_recover"] = (
+#                             -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
+#                         ) / (asset["recovery_period"])
+#                         jump["count"] = 1 + jump["count"]
+#                         break
+#                     else:
+#                         asset["S"][t] = asset["S"][t - 1] * np.exp(
+#                             (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+#                             + asset["sigma"] * dW_correlated[t][index]
+#                         )
+#     return coins
 
 
-def gen_jump_gbm2(assets, T, dt):
-    n_steps = int(T / dt)
+# def gen_jump_gbm2(coins, T, dt):
+#     n_steps = int(T / dt)
 
-    # Initialize asset prices
-    for index, asset in enumerate(assets):
-        # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
-        asset["jump_data"] = sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
-        S = np.zeros(n_steps)
-        S[0] = asset["S0"]
-        asset["S"] = S
-        asset["recovery_period"] = 0
-        asset["jump_to_recover"] = 0
+#     # Initialize asset prices
+#     for index, asset in enumerate(coins):
+#         # jump_data = "size","prob","rec_perc","rec_speed","limit","count"
+#         asset["jump_data"] = sorted(asset["jump_data"], key=lambda x: x["annual_prob"])
+#         S = np.zeros(n_steps)
+#         S[0] = asset["S0"]
+#         asset["S"] = S
+#         asset["recovery_period"] = 0
+#         asset["jump_to_recover"] = 0
 
-    # Iterate over each time step
-    for t in range(1, n_steps):
-        for index, asset in enumerate(assets):
-            rand_num = np.random.rand()
-            W = np.random.normal(loc=0, scale=np.sqrt(dt))
-            if asset["recovery_period"] > 0:
-                asset["recovery_period"] -= 1
-                asset["S"][t] = (
-                    asset["S"][t - 1] + (asset["jump_to_recover"])
-                ) * np.exp(
-                    (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt + asset["sigma"] * W
-                )
-            else:
-                # jump diffusion based on poisson process
-                for jump in asset["jump_data"]:
-                    lag = jump["lag_days"] * 24
-                    if (
-                        rand_num < (jump["annual_prob"] / (365 * 24))
-                        and jump["count"] < asset["jump_limit"]
-                        and t > lag
-                    ):
-                        asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
-                        asset["recovery_period"] = jump["rec_speed_days"] * 24
-                        asset["jump_to_recover"] = (
-                            -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
-                        ) / (asset["recovery_period"])
-                        jump["count"] = 1 + jump["count"]
-                        break
-                    else:
-                        asset["S"][t] = asset["S"][t - 1] * np.exp(
-                            (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
-                            + asset["sigma"] * W
-                        )
-    return assets
+#     # Iterate over each time step
+#     for t in range(1, n_steps):
+#         for index, asset in enumerate(coins):
+#             rand_num = np.random.rand()
+#             W = np.random.normal(loc=0, scale=np.sqrt(dt))
+#             if asset["recovery_period"] > 0:
+#                 asset["recovery_period"] -= 1
+#                 asset["S"][t] = (
+#                     asset["S"][t - 1] + (asset["jump_to_recover"])
+#                 ) * np.exp(
+#                     (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt + asset["sigma"] * W
+#                 )
+#             else:
+#                 # jump diffusion based on poisson process
+#                 for jump in asset["jump_data"]:
+#                     lag = jump["lag_days"] * 24
+#                     if (
+#                         rand_num < (jump["annual_prob"] / (365 * 24))
+#                         and jump["count"] < asset["jump_limit"]
+#                         and t > lag
+#                     ):
+#                         asset["S"][t] = asset["S"][t - 1] * (1 + jump["size"])
+#                         asset["recovery_period"] = jump["rec_speed_days"] * 24
+#                         asset["jump_to_recover"] = (
+#                             -1 * jump["rec_perc"] * jump["size"] * asset["S"][t - 1]
+#                         ) / (asset["recovery_period"])
+#                         jump["count"] = 1 + jump["count"]
+#                         break
+#                     else:
+#                         asset["S"][t] = asset["S"][t - 1] * np.exp(
+#                             (asset["mu"] - 0.5 * asset["sigma"] ** 2) * dt
+#                             + asset["sigma"] * W
+#                         )
+#     return coins

@@ -30,7 +30,9 @@ assert INCH_API_KEY, "Missing API Key in .env"
 
 def main():
     dt = int(datetime.now().timestamp())
-    print(f"Fetching quotes on {datetime.fromtimestamp(dt).strftime('%m/%d/%Y, %H:%M:%S')} UTC")
+    print(
+        f"Fetching quotes on {datetime.fromtimestamp(dt).strftime('%m/%d/%Y, %H:%M:%S')} UTC"
+    )
     quoter = OneInchQuotes(INCH_API_KEY, ALL, calls=20)
     payload = quoter.all_quotes(list(ALL.keys()))
     # TODO temporarily caching into a csv

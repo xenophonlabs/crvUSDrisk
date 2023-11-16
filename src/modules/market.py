@@ -1,22 +1,18 @@
+import logging
+
 class ExternalMarket:
     """
     A representation of external liquidity venues
-    for relevant tokens. Examples include:
-        - WETH/USDC market on Uniswap v3.
-        - USDC/USDT market on Binance.
-    This object allows us to estimate the price impact
-    of trades on external markets.
+    for relevant tokens. These markets are directional
+    to account for asymmetric price impact.
 
     Note
     ----
     We always assume that the External Market is *at*
     the market price.
-
-    TODO would this be way faster if it were just implemented
-    using Numpy operations?
     """
 
-    def __init__(self, n, coefs, intercepts):
+    def __init__(self, token_in: str, token_out: str, m: float, b: float):
         """
         Initialize market with OLS params:
 
@@ -24,33 +20,37 @@ class ExternalMarket:
 
         Parameters
         ----------
-        n : int
-            Number of tokens in market.
-        coefs : List[List[float]]
-            coefs[i][j] is the slope of the OLS regression
-            for selling token i for token j.
-        b : List[List[float]]
-            intercepts[i][j] is the intercept of the OLS regression
-            for selling token i for token j.
-        """
-        self.n = n
-        self.coefs = coefs
-        self.intercepts = intercepts
+        token_in = str
+            The token to sell (address).
+        token_out = str
+            The token to buy (address).
+        m : float
+            The slope of the OLS regression.
+        b : float
+            The intercept of the OLS regression.
 
-    def trade(self, amt_in, price, i, j):
+        Note
+        ----
+        Eventually include a multi-variate
+        regression on volatility as well.
+        """
+        self.token_in = token_in
+        self.token_out = token_out
+        self.m = m
+        self.b = b
+
+    def trade(self, amt_in, price):
         """
         Execute a trade on the external market using
         the current price.
 
         Parameters
         ----------
+        amt_in : float
+            The amount of token_in to sell.
         price : float
             The external market price for exchanging
             token i for token j.
-        i : int
-            The index of the in token.
-        j : int
-            The index of the out token.
 
         Returns
         -------
@@ -62,9 +62,9 @@ class ExternalMarket:
         The market's fee should already be incorporated into the
         price impact estimation.
         """
-        return amt_in * price * (1 + self.price_impact(amt_in, i, j))
+        return amt_in * price * (1 - self.price_impact(amt_in))
 
-    def price_impact(self, amt_in, i, j):
+    def price_impact(self, amt_in):
         """
         We model price impact as a linear regression
         with trade size. The coefficients of the linear
@@ -72,18 +72,23 @@ class ExternalMarket:
 
         Parameters
         ----------
-        price : float
-            The external market price for exchanging
-            token i for token j.
-        i : int
-            The index of the in token.
-        j : int
-            The index of the out token.
+        amt_in : float
+            The amount of token_in to sell.
 
         Returns
         -------
         float
             The price_impact (decimals) for given trade.
+        
+        Note
+        ----
+        FIXME should never be negative.
+        FIXME this is completely broken for WBTC
+        FIXME the curve doesn't fit certain illiquid pairs very well.
         """
-        # return -0.003
-        return amt_in * self.coefs[i][j] + self.intercepts[i][j]
+        impact = amt_in * self.m + self.b
+        if impact < 0:
+            logging.warning(f"Price impact for {self.token_in} -> {self.token_out} is negative: {impact}!")
+        elif impact > 1:
+            logging.warning(f"Price impact for {self.token_in} -> {self.token_out} is over 100%: {impact}!")
+        return min(max(impact, 0), 1)

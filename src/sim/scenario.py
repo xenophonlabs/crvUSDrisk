@@ -1,14 +1,21 @@
-class Scenario:
-    __slots__ = (
-        "name",
-        "description",
-        "T",  # Number of steps
-        "dt",  # Length of each step in seconds
-    )
+import json
+import logging
+from dataclasses import dataclass
 
-    def __init__(self, metadata: dict):
+
+@dataclass
+class Scenario:
+    def __init__(self, fn: str):
         """
         Generate the scenario from the stress
         test scenario config file.
         """
-        pass
+
+        with open(fn, "r") as f:
+            logging.info(f"Reading price config from {fn}.")
+            config = json.load(f)
+
+        self.name = config["name"]
+        self.description = config["description"]
+        self.N = config["N"]
+        self.price_config = config["price_config"]

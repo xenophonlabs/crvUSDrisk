@@ -34,10 +34,11 @@ STABLES = [USDC, USDT, USDP, TUSD]
 COLLATERAL = [WETH, WBTC]  # , SFRXETH, TBTC, WSTETH]
 COINS = STABLES + COLLATERAL
 
-# Roughly: min trade should be around $1000, max trade is around $100M
-# We set the floor at $1000 to prevent the router from looking for profitable
-# arbitrages on small trades in random protocols, which screws up the impact calc.
-# TODO make these dynamic?
+# TODO the min and max trade sizes should be directional
+# meaning we need a min and max for each pair, not each token.
+# This is because the regression gets completely fucked by
+# the residuals on the very high slippage trades.
+# TODO this should also be dynamic
 ALL = {
     "USDC": {
         "address": USDC,
@@ -75,7 +76,7 @@ ALL = {
         "min_trade_size": 0.5,
         "max_trade_size": 50000,
     },
-    "sfrxETH": {
+    "SFRXETH": {
         "address": SFRXETH,
         "decimals": 18,
         "min_trade_size": 0.5,
@@ -83,7 +84,7 @@ ALL = {
     },
     "WBTC": {
         "address": WBTC,
-        "decimals": 18,
+        "decimals": 8,
         "min_trade_size": 0.03,
         "max_trade_size": 3000,
     },
@@ -94,6 +95,9 @@ ALL = {
         "max_trade_size": 3000,
     },
 }
+
+ADDRESS_TO_SYMBOL = {v["address"]: k for k, v in ALL.items()}
+SYMBOL_TO_ADDRESS = {k: v["address"] for k, v in ALL.items()}
 
 COINGECKO_IDS = {
     USDC: "usd-coin",
@@ -106,6 +110,7 @@ COINGECKO_IDS = {
 
 STABLE_CG_IDS = [COINGECKO_IDS[coin] for coin in STABLES]
 
+# TODO should we specify the protocol?
 protocols = [
     # {
     #     "id": "UNISWAP_V1",
