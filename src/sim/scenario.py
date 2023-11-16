@@ -2,9 +2,9 @@ import json
 import logging
 from dataclasses import dataclass
 
+
 @dataclass
 class Scenario:
-
     def __init__(self, fn: str):
         """
         Generate the scenario from the stress

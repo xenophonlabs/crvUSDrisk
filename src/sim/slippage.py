@@ -3,18 +3,58 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from src.modules.market import ExternalMarket
-from src.utils.plotting import plot_predictions, plot_price_impact_prediction_error
+from src.plotting import plot_predictions, plot_price_impact_prediction_error
 
-def price_impact_from_quotes(quotes: pd.DataFrame)-> List[float]:
-    best_price = quotes["price"].max() # price = out/in
-    return best_price - quotes["price"] / best_price
+
+def add_price_impact(quotes: pd.DataFrame) -> pd.DataFrame:
+    quotes = quotes.copy()
+    best_price = quotes["price"].max()  # price = out/in
+    quotes["price_impact"] = (best_price - quotes["price"]) / best_price
+    return quotes
+
+
+def regress(df, x_vars, y_var, v=False):
+    """
+    Perform a simple OLS regression of the form:
+
+        y = c dot x + b
+
+    where c is a vector of coefficients, x is a
+    vector of input variables, and b is the intercept.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Trades
+    x_vars : List[str]
+        Input variables
+    y_var : str
+        Output variable
+    v : Optional[bool]
+        Whether to print OLS results.
+
+    Returns
+    -------
+    OLSResults
+        The results object for the statsmodels OLS
+        method. Contains params and rsquared value.
+    """
+    X = sm.add_constant(df[x_vars])
+    y = df[y_var]
+    model = sm.OLS(y, X).fit()
+    if v:
+        print(model.summary())
+    return model
+
 
 # === ARCHIVED === #
 # We used to analyze uniswap trades here to examine slippage.
 # We now use the output from our 1inch API calls.
 
+
 def process_trades(df: pd.DataFrame, decimals: List[int]) -> List[pd.DataFrame]:
     """
+    Deprecated.
     Process trade data for a given market.
 
     Parameters
@@ -69,41 +109,8 @@ def process_trades(df: pd.DataFrame, decimals: List[int]) -> List[pd.DataFrame]:
     return df[df["amount0_adjusted"] > 0], df[df["amount0_adjusted"] < 0]
 
 
-def regress(df, x_vars, y_var, v=False):
-    """
-    Perform a simple OLS regression of the form:
-
-        y = c dot x + b
-
-    where c is a vector of coefficients, x is a
-    vector of input variables, and b is the intercept.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Trades
-    x_vars : List[str]
-        Input variables
-    y_var : str
-        Output variable
-    v : Optional[bool]
-        Whether to print OLS results.
-
-    Returns
-    -------
-    OLSResults
-        The results object for the statsmodels OLS
-        method. Contains params and rsquared value.
-    """
-    X = sm.add_constant(df[x_vars])
-    y = df[y_var]
-    model = sm.OLS(y, X).fit()
-    if v:
-        print(model.summary())
-    return model
-
-
 def analyze(fn, decimals, plot=False, return_dfs=False):
+    """Deprecated."""
     with open(fn, "r") as f:
         df = pd.read_csv(f)
 

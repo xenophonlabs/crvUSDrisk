@@ -34,6 +34,7 @@ def generate(config: str):
     # Generate modules
     return scenario, pricepaths
 
+
 def simulate(config: str):
     """
     Simulate a stress test scenario.
@@ -52,6 +53,7 @@ def simulate(config: str):
     inputs, modules, agents = generate(config)
     metrics = MetricsProcessor()
     return metrics
+
 
 # def sim(
 #     T,  # number of time periods, eg 1 year

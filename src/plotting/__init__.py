@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import imageio
 from PIL import Image
-from .utils import get_crvUSD_index
+from ..utils import get_crvUSD_index
+from ..modules.market import ExternalMarket
 
 FPS = 3
 
@@ -407,40 +408,40 @@ def plot_borrowers(borrowers, price, fn=None):
     return f
 
 
-def plot_predictions(df0, df1, fn=None):
-    f, axs = plt.subplots(1, 2, figsize=(10, 5))
+# def plot_predictions(df0, df1, fn=None):
+#     f, axs = plt.subplots(1, 2, figsize=(10, 5))
 
-    axs[0].scatter(
-        df0["amount0_adjusted"],
-        -df0["amount1_adjusted"],
-        label="True",
-        c="indianred",
-        s=1,
-    )
-    axs[0].scatter(
-        df0["amount0_adjusted"], -df0["predicted"], label="Pred", c="royalblue", s=1
-    )
-    axs[0].set_xlabel("Token In")
-    axs[0].set_ylabel("Token Out")
+#     axs[0].scatter(
+#         df0["amount0_adjusted"],
+#         -df0["amount1_adjusted"],
+#         label="True",
+#         c="indianred",
+#         s=1,
+#     )
+#     axs[0].scatter(
+#         df0["amount0_adjusted"], -df0["predicted"], label="Pred", c="royalblue", s=1
+#     )
+#     axs[0].set_xlabel("Token In")
+#     axs[0].set_ylabel("Token Out")
 
-    axs[1].scatter(
-        df1["amount1_adjusted"], -df1["amount0_adjusted"], c="indianred", s=1
-    )
-    axs[1].scatter(df1["amount1_adjusted"], -df1["predicted"], c="royalblue", s=1)
-    axs[1].set_xlabel("Token In")
-    axs[1].set_ylabel("Token Out")
+#     axs[1].scatter(
+#         df1["amount1_adjusted"], -df1["amount0_adjusted"], c="indianred", s=1
+#     )
+#     axs[1].scatter(df1["amount1_adjusted"], -df1["predicted"], c="royalblue", s=1)
+#     axs[1].set_xlabel("Token In")
+#     axs[1].set_ylabel("Token Out")
 
-    f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=2)
-    f.tight_layout()
+#     f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=2)
+#     f.tight_layout()
 
-    axs[0].set_title("Predicted vs Actual Token Out")
-    axs[1].set_title("Predicted vs Actual Token Out")
+#     axs[0].set_title("Predicted vs Actual Token Out")
+#     axs[1].set_title("Predicted vs Actual Token Out")
 
-    if fn:
-        plt.savefig(fn, dpi=300)
-        plt.close()  # don't show
+#     if fn:
+#         plt.savefig(fn, dpi=300)
+#         plt.close()  # don't show
 
-    return f
+#     return f
 
 
 def plot_price_impact_prediction_error(df, amt_col, fn=None):
@@ -508,100 +509,6 @@ def plot_prices(df, df2=None, fn=None):
     return f
 
 
-# def plot_price_impact(df, name, col_in, cmap='viridis', fn=None):
-
-#     ols = regress(df, x_vars=[col_in], y_var=["price_impact"])
-
-#     f, ax = plt.subplots(figsize=(8,5))
-#     ax.scatter(df["trade_size_x"], df["price_impact"]*100, c=df["rolling_volatility"], s=10, cmap=cmap)
-#     f.colorbar(plt.cm.ScalarMappable(cmap=cmap), ax=ax, label="Normalized Rolling Volatility")
-
-#     b, m = ols.params
-#     x = np.linspace(0, df['trade_size_x'].max())
-#     y = (m*x + b)*100
-#     ax.plot(x, y, c='indianred', linestyle='--', lw=1)
-
-#     ax.set_ylabel('Price Impact %')
-#     ax.set_xlabel('Trade Size (ETH)')
-#     ax.set_title(f'Price Impact on {name}')
-
-#     f.tight_layout()
-
-#     if fn:
-#         plt.savefig(fn, bbox_inches="tight", dpi=300)
-#         plt.close()
-
-#     return f
-
-
-def plot_gbms(T, dt, assets, title="Geometric Brownian Motion"):
-    # Set the style parameters similar to your ETH/BTC graph
-    plt.rcParams["font.family"] = "serif"
-    plt.rcParams["font.size"] = 10
-    plt.rcParams["axes.spines.top"] = False
-    plt.rcParams["axes.spines.right"] = True  # Enable right spine for secondary y-axis
-    plt.rcParams["grid.color"] = "grey"
-    plt.rcParams["grid.linestyle"] = "--"
-    plt.rcParams["grid.linewidth"] = 0.5
-
-    # Create the figure and primary axis objects
-    fig, ax_left = plt.subplots(figsize=(12, 6))
-    ax_right = ax_left.twinx()  # Secondary y-axis for the right side
-
-    # Initialize right axis usage flag
-    right_axis_used = False
-
-    # Plot each asset in the assets list
-    for index, asset in enumerate(assets):
-        if asset["plot_left"] == "False":
-            # Plot on the left axis
-            ax_left.plot(
-                asset["S"], label=f'{asset["name"]}', color=f"C{index}"
-            )  # Use a consistent color cycle
-            ax_left.set_ylabel("Asset Price", color=f"C{index}")
-            ax_left.tick_params(axis="y", labelcolor=f"C{index}")
-        else:
-            # Plot on the right axis
-            ax_right.plot(
-                asset["S"], label=f'{asset["name"]}', color=f"C{index}"
-            )  # Use a consistent color cycle
-            ax_right.set_ylabel("Asset Price", color=f"C{index}")
-            ax_right.tick_params(axis="y", labelcolor=f"C{index}")
-            right_axis_used = True
-
-    # Set ticks and format dates on the x-axis if needed
-    # Assuming that 'T' is total time and 'dt' is the time step
-    # total_hours = int(T * 365 * 24)
-    # time_steps = np.arange(0, total_hours + 1, 1)  # Every hour
-    # ticks_per_day = 24
-    # day_interval = ticks_per_day / dt  # Number of ticks per day
-    # tick_labels = [f"Day {int(i/ticks_per_day)}" for i in range(0, total_hours + 1, int(day_interval))]
-    # ax_left.set_xticks(range(0, total_hours + 1, int(day_interval)))
-    # ax_left.set_xticklabels(tick_labels, rotation=45)
-
-    # Add labels and title
-    ax_left.set_xlabel("Time Steps")
-    ax_left.set_title(title)
-
-    # Enable the grid
-    ax_left.grid(True)
-
-    # Add a combined legend for both axes if the right axis is used, else just add for the left
-    if right_axis_used:
-        lines, labels = ax_left.get_legend_handles_labels()
-        lines2, labels2 = ax_right.get_legend_handles_labels()
-        ax_left.legend(lines + lines2, labels + labels2)
-    else:
-        ax_left.legend()
-
-    # Adjust the subplot to fit the figure area
-    plt.tight_layout()
-
-    # Show the plot
-    plt.show()
-    return 0
-
-
 def plot_jumps(df, recovery_threshold, fn=None):
     f, ax = plt.subplots(figsize=(8, 5))
 
@@ -663,16 +570,98 @@ def plot_price_impact_1inch(res, in_token, out_token, fn: str = None):
     return f
 
 
-def plot_price_1inch(res, in_token, out_token, fn: str = None):
-    prices = [r.price for r in res]
-    in_amounts = [r.in_amount / (10**r.in_decimals) for r in res]
-
+def plot_price_impact(df, in_token, out_token, fn: str = None):
     f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(in_amounts, prices, s=10, c="royalblue")
+    ax.scatter(df["in_amount"], df["price_impact"], s=10, c="royalblue")
+    ax.set_xscale("log")
+    ax.set_title(f"Price Impact for Swapping {in_token} into {out_token}")
+    ax.set_ylabel("Price Impact (%)")
+    ax.set_xlabel(f"Trade Size ({in_token})")
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_price_1inch(df, in_token, out_token, fn: str = None):
+    f, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(df["in_amount"], df["price"], s=10, c="royalblue")
     ax.set_xscale("log")
     ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
     ax.set_ylabel("Exchange Rate (out/in)")
     ax.set_xlabel(f"Trade Size ({in_token})")
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_regression(
+    df: pd.DataFrame,
+    in_token: str,
+    out_token: str,
+    market: ExternalMarket,
+    min_x: float,
+    max_x: float,
+    fn: str = None,
+    scale: str = "log"
+):
+    x = np.geomspace(min_x, max_x, 100)
+    y = [market.price_impact(i)*100 for i in x]
+
+    f, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(
+        df["in_amount"], df["price_impact"]*100, c="royalblue", s=10, label="1inch Quotes"
+    )
+    ax.plot(x, y, label="Regression", c="indianred", lw=1)
+    ax.set_xscale(scale)
+    ax.legend()
+    ax.set_xlabel(f"Amount in ({in_token})")
+    ax.set_ylabel("Price Impact %")
+    ax.set_title(f"{in_token} -> {out_token} Price Impact")
+
+    f.tight_layout()
+
+    if fn:
+        plt.savefig(fn, bbox_inches="tight", dpi=300)
+        plt.close()  # don't show
+
+    return f
+
+
+def plot_predictions(
+    df: pd.DataFrame,
+    in_token: str,
+    out_token: str,
+    market: ExternalMarket,
+    min_x: float,
+    max_x: float,
+    fn: str = None,
+    scale: str = "log"
+):
+    price = df["price"].max()
+
+    x = np.geomspace(min_x, max_x, 100)
+    y = [market.trade(i, price) for i in x]
+
+    f, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(
+        df["in_amount"], df["out_amount"], c="royalblue", s=10, label="1inch Quotes"
+    )
+    ax.plot(x, y, label="Regression", c="indianred", lw=1)
+    ax.set_xscale(scale)
+    ax.legend()
+    ax.set_xlabel(f"Amount in ({in_token})")
+    ax.set_ylabel(f"Amount out ({out_token})")
+    ax.set_title(f"{in_token} -> {out_token} Quotes")
 
     f.tight_layout()
 

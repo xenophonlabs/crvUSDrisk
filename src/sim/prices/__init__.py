@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from typing import List
 from datetime import datetime
 from ...configs.config import STABLE_CG_IDS
-from ...utils.plotting import plot_prices
+from ...plotting import plot_prices
 from ...network.coingecko import get_prices_df, address_from_coin_id, get_current_prices
 
 # TODO structure this code/directory better jfc
@@ -384,7 +384,9 @@ def gen_gbm(mu, sigma, dt, S0, N, dW=None):
     return S
 
 
-def gen_cor_prices(coins: List[str], T: float, dt: float, S0s: dict, cov: pd.DataFrame, params: dict):
+def gen_cor_prices(
+    coins: List[str], T: float, dt: float, S0s: dict, cov: pd.DataFrame, params: dict
+):
     """
     Generate a matrix of correlated GBMs using
     Cholesky decomposition.

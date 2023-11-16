@@ -3,7 +3,7 @@ from curvesim.pool import SimCurvePool
 from typing import List
 from scipy.optimize import minimize_scalar
 from dataclasses import dataclass
-from ..utils.utils import get_crvUSD_index
+from ..utils import get_crvUSD_index
 
 PRECISION = 1e18
 
@@ -110,7 +110,9 @@ class Arbitrageur:
         assert len(pools) == 2, NotImplementedError("Can't arb more than two pools.")
 
         # Call search on all combinations of pools
-        trade = self.search(pools, prices) # <- this already tells you the most profitable trade for pools A <-> B
+        trade = self.search(
+            pools, prices
+        )  # <- this already tells you the most profitable trade for pools A <-> B
 
         count = 0
         profit = 0
