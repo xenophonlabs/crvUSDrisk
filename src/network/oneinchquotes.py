@@ -4,7 +4,7 @@ import requests as req
 from typing import List
 from datetime import datetime
 from itertools import permutations
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from src.types import QuoteResponse
 
@@ -84,7 +84,7 @@ class OneInchQuotes:
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=1, max=5),
-        retry=retry_if_exception(is_rate_limit_error),
+        retry=retry_if_exception_type(req.HTTPError),
     )
     def quote(self, in_token: str, out_token: str, in_amount: int) -> QuoteResponse:
         """Get a quote from 1inch API. Retry if rate limit error."""
