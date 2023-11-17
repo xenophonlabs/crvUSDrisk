@@ -4,7 +4,12 @@ import requests as req
 from typing import List
 from datetime import datetime
 from itertools import permutations
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from src.types import QuoteResponse
 

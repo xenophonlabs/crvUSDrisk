@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import imageio
 from PIL import Image
 from ..utils import get_crvUSD_index
@@ -588,14 +589,22 @@ def plot_price_impact(df, in_token, out_token, fn: str = None):
 
 
 def plot_price_1inch(df, in_token, out_token, fn: str = None):
+    dt = pd.to_datetime(df["timestamp"], unit="s")
+
     f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(df["in_amount"], df["price"], s=10, c="royalblue")
+
+    scatter = ax.scatter(df["in_amount"], df["price"], s=10, c=dt, cmap="viridis")
+
     ax.set_xscale("log")
     ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
     ax.set_ylabel("Exchange Rate (out/in)")
     ax.set_xlabel(f"Trade Size ({in_token})")
 
-    f.tight_layout()
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.set_label("Date")
+
+    # f.tight_layout()
 
     if fn:
         plt.savefig(fn, bbox_inches="tight", dpi=300)
@@ -612,14 +621,19 @@ def plot_regression(
     min_x: float,
     max_x: float,
     fn: str = None,
-    scale: str = "log"
+    scale: str = "log",
 ):
+    dt = pd.to_datetime(df["timestamp"], unit="s")
     x = np.geomspace(min_x, max_x, 100)
-    y = [market.price_impact(i)*100 for i in x]
+    y = [market.price_impact(i) * 100 for i in x]
 
     f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(
-        df["in_amount"], df["price_impact"]*100, c="royalblue", s=10, label="1inch Quotes"
+    scatter = ax.scatter(
+        df["in_amount"],
+        df["price_impact"] * 100,
+        c=dt,
+        s=10,
+        label="1inch Quotes",
     )
     ax.plot(x, y, label="Regression", c="indianred", lw=1)
     ax.set_xscale(scale)
@@ -627,6 +641,10 @@ def plot_regression(
     ax.set_xlabel(f"Amount in ({in_token})")
     ax.set_ylabel("Price Impact %")
     ax.set_title(f"{in_token} -> {out_token} Price Impact")
+
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.set_label("Date")
 
     f.tight_layout()
 
@@ -645,16 +663,17 @@ def plot_predictions(
     min_x: float,
     max_x: float,
     fn: str = None,
-    scale: str = "log"
+    scale: str = "log",
 ):
+    dt = pd.to_datetime(df["timestamp"], unit="s")
     price = df["price"].max()
 
     x = np.geomspace(min_x, max_x, 100)
     y = [market.trade(i, price) for i in x]
 
     f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(
-        df["in_amount"], df["out_amount"], c="royalblue", s=10, label="1inch Quotes"
+    scatter = ax.scatter(
+        df["in_amount"], df["out_amount"], c=st, s=10, label="1inch Quotes"
     )
     ax.plot(x, y, label="Regression", c="indianred", lw=1)
     ax.set_xscale(scale)
@@ -662,6 +681,10 @@ def plot_predictions(
     ax.set_xlabel(f"Amount in ({in_token})")
     ax.set_ylabel(f"Amount out ({out_token})")
     ax.set_title(f"{in_token} -> {out_token} Quotes")
+
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.set_label("Date")
 
     f.tight_layout()
 

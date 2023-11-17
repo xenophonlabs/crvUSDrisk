@@ -1,5 +1,6 @@
 import logging
 
+
 class ExternalMarket:
     """
     A representation of external liquidity venues
@@ -79,7 +80,7 @@ class ExternalMarket:
         -------
         float
             The price_impact (decimals) for given trade.
-        
+
         Note
         ----
         FIXME should never be negative.
@@ -88,7 +89,11 @@ class ExternalMarket:
         """
         impact = amt_in * self.m + self.b
         if impact < 0:
-            logging.warning(f"Price impact for {self.token_in} -> {self.token_out} is negative: {impact}!")
+            logging.warning(
+                f"Price impact for {self.token_in} -> {self.token_out} is negative: {impact}!"
+            )
         elif impact > 1:
-            logging.warning(f"Price impact for {self.token_in} -> {self.token_out} is over 100%: {impact}!")
+            logging.warning(
+                f"Price impact for {self.token_in} -> {self.token_out} is over 100%: {impact}!"
+            )
         return min(max(impact, 0), 1)

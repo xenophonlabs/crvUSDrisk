@@ -93,3 +93,76 @@ class DataHandler:
                 raise e
 
         self.session.commit()
+
+    def fix_quote_decimals(
+        self, quotes: pd.DataFrame, tokens: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Convert quote amounts to human-readable format."""
+        df = (
+            pd.merge(quotes, tokens, left_on="src", right_on="id")
+            .drop(["id", "symbol"], axis=1)
+            .rename(columns={"decimals": "src_decimals"})
+        )
+        df = (
+            pd.merge(df, tokens, left_on="dst", right_on="id")
+            .drop(["id", "symbol"], axis=1)
+            .rename(columns={"decimals": "dst_decimals"})
+        )
+        df["in_amount"] /= 10 ** df["src_decimals"]
+        df["out_amount"] /= 10 ** df["dst_decimals"]
+        return df
+
+    def get_tokens(self, cols: List[str] = ["id", "symbol", "decimals"]) -> dict:
+        """Get tokens from database."""
+        query = self.session.query(*[getattr(Token, col) for col in cols])
+        results = query.all()
+        if not len(results):
+            return pd.DataFrame()
+        return pd.DataFrame.from_dict(results)
+
+    def get_quotes(
+        self,
+        pair: tuple = None,
+        start: int = None,
+        end: int = None,
+        cols: List[str] = [
+            "src",
+            "dst",
+            "in_amount",
+            "out_amount",
+            "price",
+            "timestamp",
+        ],
+        h: bool = False,
+    ) -> pd.DataFrame:
+        """
+        Get 1inch quotes from database. Filter
+        query by the input parameters.
+
+        Parameters
+        ----------
+        pair: tuple
+            src, dst
+        start: int
+            The start timestamp to filter by.
+        end: int
+            The end timestamp to filter by.
+        cols : List[str]
+            The columns to return.
+        h: bool
+            Whether to return human readable amounts.
+        """
+        query = self.session.query(*[getattr(Quote, col) for col in cols])
+        if pair:
+            query = query.filter(Quote.src == pair[0], Quote.dst == pair[1])
+        if start:
+            query = query.filter(Quote.timestamp >= start)
+        if end:
+            query = query.filter(Quote.timestamp < end)
+        results = query.all()
+        if not len(results):
+            return pd.DataFrame()
+        results = pd.DataFrame.from_dict(results)
+        if h:
+            results = self.fix_quote_decimals(results, self.get_tokens())
+        return results
