@@ -4,7 +4,7 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.dialects.postgresql import insert
 import pandas as pd
 from .models import Base, Token, Quote
-from typing import Union, List, Dict
+from typing import List
 
 from ..configs import config
 
@@ -18,6 +18,12 @@ class DataHandler:
 
     def close(self):
         self.session.remove()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     def create_database(self):
         """Create tables if they don't exist"""
@@ -94,10 +100,21 @@ class DataHandler:
 
         self.session.commit()
 
-    def fix_quote_decimals(
+    def process_quotes(
         self, quotes: pd.DataFrame, tokens: pd.DataFrame
     ) -> pd.DataFrame:
-        """Convert quote amounts to human-readable format."""
+        """
+        Do the following:
+            1. Convert amounts to human readable format.
+            2. Create datetime index (floored to hours).
+            3. Add reference prices for each block of quotes:
+                a. Quotes are fetched every hour.
+                b. The reference price is the best price for
+                that block.
+            4. Add price impact as the pct difference
+            between the reference price and the quoted price.
+        """
+        # Fix decimals
         df = (
             pd.merge(quotes, tokens, left_on="src", right_on="id")
             .drop(["id", "symbol"], axis=1)
@@ -108,8 +125,34 @@ class DataHandler:
             .drop(["id", "symbol"], axis=1)
             .rename(columns={"decimals": "dst_decimals"})
         )
-        df["in_amount"] /= 10 ** df["src_decimals"]
-        df["out_amount"] /= 10 ** df["dst_decimals"]
+        df["in_amount"] = (df["in_amount"] / 10 ** df["src_decimals"]).astype(float)
+        df["out_amount"] = (df["out_amount"] / 10 ** df["dst_decimals"]).astype(float)
+
+        # Create datetime index floored to hours.
+        df["hour"] = pd.to_datetime(df["timestamp"], unit="s").dt.floor("h")
+
+        # Add reference price
+        # TODO improve the way we get reference price.
+        grouped = (
+            df.groupby(["hour", "src", "dst"])
+            .agg(reference_price=("price", "max"))
+            .reset_index()
+        )
+        df = pd.merge(
+            df,
+            grouped,
+            left_on=["hour", "src", "dst"],
+            right_on=["hour", "src", "dst"],
+        )
+
+        # Add price impact
+        df["price_impact"] = (df["reference_price"] - df["price"]) / df[
+            "reference_price"
+        ]
+
+        df.set_index(["src", "dst"], inplace=True)
+        df.sort_index(inplace=True)
+
         return df
 
     def get_tokens(self, cols: List[str] = ["id", "symbol", "decimals"]) -> dict:
@@ -133,24 +176,11 @@ class DataHandler:
             "price",
             "timestamp",
         ],
-        h: bool = False,
+        process: bool = False,
     ) -> pd.DataFrame:
         """
         Get 1inch quotes from database. Filter
         query by the input parameters.
-
-        Parameters
-        ----------
-        pair: tuple
-            src, dst
-        start: int
-            The start timestamp to filter by.
-        end: int
-            The end timestamp to filter by.
-        cols : List[str]
-            The columns to return.
-        h: bool
-            Whether to return human readable amounts.
         """
         query = self.session.query(*[getattr(Quote, col) for col in cols])
         if pair:
@@ -163,6 +193,6 @@ class DataHandler:
         if not len(results):
             return pd.DataFrame()
         results = pd.DataFrame.from_dict(results)
-        if h:
-            results = self.fix_quote_decimals(results, self.get_tokens())
+        if process:
+            results = self.process_quotes(results, self.get_tokens())
         return results

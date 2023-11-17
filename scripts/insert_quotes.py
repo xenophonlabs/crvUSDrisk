@@ -1,7 +1,6 @@
 import os
 
 # import logging
-import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -16,16 +15,11 @@ assert INCH_API_KEY, "Missing API Key in .env"
 # TODO implement logging
 # logging.basicConfig(filename="./logs/quotes.log", level=logging.INFO, format='%(asctime)s %(message)s')
 
-# Temp for testing
-# dh = DataHandler()
-# df = pd.read_csv("./data/1inch/quotes.csv")
-# df["src"] = df["src"].apply(lambda x: x.lower())
-# df["dst"] = df["dst"].apply(lambda x: x.lower())
-# dh.insert_quotes(df)
-
-# Set up a cron job that runs every hour
 # TODO make more granular, need lower API rate limits
 # currently 1RPS means it takes ~30 min to query 72 pairs 20 times each
+
+# TODO start querying other token pairs for markets
+# we might want to include in the future.
 
 
 def main():
@@ -35,9 +29,7 @@ def main():
     )
     quoter = OneInchQuotes(INCH_API_KEY, ALL, calls=20)
     payload = quoter.all_quotes(list(ALL.keys()))
-    # TODO temporarily caching into a csv
-    # remove this
-    df = quoter.to_df(payload, fn=f"./data/1inch/{dt}.csv")
+    df = quoter.to_df(payload)
     dh = DataHandler()
     print("Inserting...")
     dh.insert_quotes(df)

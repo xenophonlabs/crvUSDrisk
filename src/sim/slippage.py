@@ -6,13 +6,6 @@ from src.modules.market import ExternalMarket
 from src.plotting import plot_predictions, plot_price_impact_prediction_error
 
 
-def add_price_impact(quotes: pd.DataFrame) -> pd.DataFrame:
-    quotes = quotes.copy()
-    best_price = quotes["price"].max()  # price = out/in
-    quotes["price_impact"] = (best_price - quotes["price"]) / best_price
-    return quotes
-
-
 def regress(df, x_vars, y_var, v=False):
     """
     Perform a simple OLS regression of the form:

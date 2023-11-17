@@ -1,6 +1,5 @@
 from metricsprocessor import MetricsProcessor
 from scenario import Scenario
-from prices import PricePaths
 
 
 def generate(config: str):
@@ -30,9 +29,14 @@ def generate(config: str):
         the initial price?
     """
     scenario = Scenario(config)
-    pricepaths = PricePaths(scenario.price_config, scenario.N)
+
+    # Generate inputs
+    pricepaths = scenario.generate_pricepaths()
+
     # Generate modules
-    return scenario, pricepaths
+    markets = scenario.generate_markets()
+
+    return scenario, pricepaths, markets
 
 
 def simulate(config: str):

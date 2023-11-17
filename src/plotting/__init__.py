@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import imageio
+import warnings
 from PIL import Image
 from ..utils import get_crvUSD_index
 from ..modules.market import ExternalMarket
+
+# FIXME remove this
+warnings.simplefilter("ignore", UserWarning)
 
 FPS = 3
 
@@ -589,7 +592,7 @@ def plot_price_impact(df, in_token, out_token, fn: str = None):
 
 
 def plot_price_1inch(df, in_token, out_token, fn: str = None):
-    dt = pd.to_datetime(df["timestamp"], unit="s")
+    dt = pd.to_datetime(df["hour"], unit="s")
 
     f, ax = plt.subplots(figsize=(10, 5))
 
@@ -604,7 +607,7 @@ def plot_price_1inch(df, in_token, out_token, fn: str = None):
     cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
     cbar.set_label("Date")
 
-    # f.tight_layout()
+    f.tight_layout()
 
     if fn:
         plt.savefig(fn, bbox_inches="tight", dpi=300)
@@ -618,14 +621,12 @@ def plot_regression(
     in_token: str,
     out_token: str,
     market: ExternalMarket,
-    min_x: float,
-    max_x: float,
     fn: str = None,
     scale: str = "log",
 ):
     dt = pd.to_datetime(df["timestamp"], unit="s")
-    x = np.geomspace(min_x, max_x, 100)
-    y = [market.price_impact(i) * 100 for i in x]
+    x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
+    y = market.price_impact(x) * 100
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(
@@ -635,7 +636,7 @@ def plot_regression(
         s=10,
         label="1inch Quotes",
     )
-    ax.plot(x, y, label="Regression", c="indianred", lw=1)
+    ax.plot(x, y, label="Prediction", c="indianred", lw=1)
     ax.set_xscale(scale)
     ax.legend()
     ax.set_xlabel(f"Amount in ({in_token})")
@@ -660,22 +661,20 @@ def plot_predictions(
     in_token: str,
     out_token: str,
     market: ExternalMarket,
-    min_x: float,
-    max_x: float,
     fn: str = None,
     scale: str = "log",
 ):
     dt = pd.to_datetime(df["timestamp"], unit="s")
     price = df["price"].max()
 
-    x = np.geomspace(min_x, max_x, 100)
+    x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
     y = [market.trade(i, price) for i in x]
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(
-        df["in_amount"], df["out_amount"], c=st, s=10, label="1inch Quotes"
+        df["in_amount"], df["out_amount"], c=dt, s=10, label="1inch Quotes"
     )
-    ax.plot(x, y, label="Regression", c="indianred", lw=1)
+    ax.plot(x, y, label="Prediction", c="indianred", lw=1)
     ax.set_xscale(scale)
     ax.legend()
     ax.set_xlabel(f"Amount in ({in_token})")

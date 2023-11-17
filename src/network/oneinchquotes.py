@@ -115,14 +115,15 @@ class OneInchQuotes:
         """
         calls = calls if calls else self.calls  # default to self.calls
         in_token, out_token = pair
-        in_amounts = (
-            np.geomspace(
-                self.config[in_token]["min_trade_size"],
-                self.config[in_token]["max_trade_size"],
-                calls,
-            )
-            * 10 ** self.config[in_token]["decimals"]
+        in_amounts = np.geomspace(
+            self.config[in_token]["min_trade_size"],
+            self.config[in_token]["max_trade_size"],
+            calls,
         )
+        # add some noise to get a more complete distribution
+        noise = 1 + np.random.uniform(-0.5, 0.5, calls)
+        in_amounts *= noise
+        in_amounts *= 10 ** self.config[in_token]["decimals"]
         in_amounts = [int(i) for i in in_amounts]
         responses = []
         for in_amount in in_amounts:
