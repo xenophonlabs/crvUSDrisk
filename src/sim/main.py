@@ -34,7 +34,19 @@ def generate(config: str):
     pricepaths = scenario.generate_pricepaths()
 
     # Generate modules
-    markets = scenario.generate_markets()
+    markets = scenario.generate_markets() # External markets
+
+    scenario.generate_crvusd_modules()
+    
+    """
+    aggregator
+    controllers <- many
+    llammas <- many
+    mpolicies <- many
+    oracles <- many
+    pegkeepers <- many
+    controller_factory
+    """
 
     return scenario, pricepaths, markets
 

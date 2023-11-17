@@ -5,9 +5,10 @@ from typing import List, Any
 import matplotlib.pyplot as plt
 import copy
 import numpy as np
+from .agent import Agent
 
 
-class Liquidator:
+class Liquidator(Agent):
     """
     Liquidator either hard or soft liquidates LLAMMA positions.
     TODO ensure pnl from hard and soft liquidations is in USD (NOT crvUSD) units!

@@ -1,35 +1,14 @@
 from ..modules.pegkeeper import PegKeeper
-from curvesim.pool import SimCurvePool
 from typing import List
 from scipy.optimize import minimize_scalar
-from dataclasses import dataclass
 from ..utils import get_crvUSD_index
+from ..types import Trade
+from .agent import Agent
 
 PRECISION = 1e18
 
 
-@dataclass
-class Trade:
-    """
-    Trade class stores an arbitrage trade like:
-
-    1. Sell `size` of stablecoin1 and buy crvUSD from `pool1`
-    2. Sell crvUSD and buy stablecoin2 from `pool2`
-
-    where the market price of stablecoin1/stablecoin2 is `p`.
-    """
-
-    size: int
-    profit: float
-    pool1: SimCurvePool  # Pool to buy crvUSD from
-    pool2: SimCurvePool  # Pool to sell crvUSD to
-    p: float  # Market price of stablecoins (e.g. USDC/USDT)
-
-    def unpack(self):
-        return self.size, self.pool1, self.pool2, self.p
-
-
-class Arbitrageur:
+class Arbitrageur(Agent):
     """
     Arbitrageur either calls update() on the Peg Keeper
     or arbitrages (swaps) StableSwap pools.

@@ -1,10 +1,10 @@
 from collections import defaultdict
 from .oracle import Oracle
-from ..utils.plotting import plot_reserves
 
 EPSILON = 1e-18  # to avoid division by 0
 DEAD_SHARES = 1e-15  # to init shares in a band
 
+# NOTE soon to be deprecated by crvusdsim?
 
 class Swap:
     __slots__ = (
@@ -385,6 +385,8 @@ class LLAMMA:
         ultimately be ported over into a testing file, maybe we use
         boa to compare vyper with python implementations, or maybe we just use
         crvusdsim by 0xreviews.
+        
+        TODO move this to a testing file. 
         """
         SQRT_BAND_RATIO = (self.A / (self.A - 1)) ** 0.5
 
@@ -598,12 +600,3 @@ class LLAMMA:
         @notice wrapper to get _y0 for input band
         """
         return self._y0(self.bands_x[n], self.bands_y[n], self.p_o, self.p_o_up(n))
-
-    # === Plotting Functions === #
-
-    def _plot_reserves(self, fn=None):
-        """
-        @notice Plot reserves in each band
-        NOTE: for now, assume collateral price is = oracle price, and crvUSD price = $1
-        """
-        plot_reserves(self, fn=fn)
