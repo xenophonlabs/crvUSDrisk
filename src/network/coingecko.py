@@ -1,6 +1,7 @@
 import requests as req
 import pandas as pd
 import logging
+import logging
 from datetime import datetime
 from typing import List
 from curvesim.network.coingecko import coin_ids_from_addresses_sync
@@ -152,6 +153,7 @@ def address_from_coin_id(coin_id, chain="ethereum"):
     if chain == "ethereum" and coin_id in KNOWN_IDS_MAP:
         return KNOWN_IDS_MAP[coin_id]
 
+    logging.info(f"Fetching {coin_id} address from Coingecko API.")
     url = COINGECKO_URL + f"coins/{coin_id}"
     params = {
         "localization": "false",

@@ -34,10 +34,10 @@ def generate(config: str):
     pricepaths = scenario.generate_pricepaths()
 
     # Generate modules
-    markets = scenario.generate_markets() # External markets
+    markets = scenario.generate_markets()  # External markets
 
     scenario.generate_crvusd_modules()
-    
+
     """
     aggregator
     controllers <- many
@@ -68,6 +68,18 @@ def simulate(config: str):
     """
     inputs, modules, agents = generate(config)
     metrics = MetricsProcessor()
+
+    # For step in timesteps:
+    # Get new prices
+    # Update oracle / other timestamp based properties
+    # in modules
+    #
+
+    # Notes
+    # - Try tighter granularity on simulation, e.g. 1 minute?
+    # - See how dependent the results are on this param.
+    # -
+
     return metrics
 
 

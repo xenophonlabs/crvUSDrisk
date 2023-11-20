@@ -1,8 +1,9 @@
-import ccxt as ccxt
-from datetime import datetime, timezone
-import pandas as pd
-from ..exceptions import ccxtInvalidSymbolException
 import math
+import logging
+import ccxt as ccxt
+import pandas as pd
+from datetime import datetime, timezone
+from ..exceptions import ccxtInvalidSymbolException
 
 
 class CCXTDataFetcher:
@@ -77,13 +78,13 @@ class CCXTDataFetcher:
         if isinstance(since, str):
             since = exchange.parse8601(since)
 
-        print(
+        logging.info(
             f"\nQuerying {symbol} trades from Coinbase Pro between {self.to_strftime(start_time)} and {self.to_strftime(since)}.\n"
         )
 
         total = int(start_time.timestamp() * 1000) - since
         bars = [x for x in range(101)]
-        print(f"Progress: {bars.pop(0)}%", end="\r")
+        logging.info(f"Progress: {bars.pop(0)}%", end="\r")
 
         param_key = ""
         param_value = ""
@@ -108,8 +109,9 @@ class CCXTDataFetcher:
                     progress = round((1 - (last_trade_ts - since) / total) * 100)
                     if len(bars) and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        print(f"Progress: {progress}%", end="\r")
+                        logging.info(f"Progress: {progress}%", end="\r")
                 except ccxt.RateLimitExceeded:
+                    logging.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
                 except Exception:
                     raise
@@ -118,7 +120,7 @@ class CCXTDataFetcher:
 
         end_time = datetime.now(tz=timezone.utc)
 
-        print(f"\nFinished. Time taken: {end_time - start_time}\n")
+        logging.info(f"\nFinished. Time taken: {end_time - start_time}\n")
 
         return CCXTDataFetcher.trades_to_df(trades)
 
@@ -154,13 +156,13 @@ class CCXTDataFetcher:
         cur = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
         end = min(end, cur) if end else cur
 
-        print(
+        logging.info(
             f"\nQuerying {symbol} trades from Binance between {self.to_strftime(since)} and {self.to_strftime(end)}.\n"
         )
 
         total = end - since
         bars = [x for x in range(101)]
-        print(f"Progress: {bars.pop(0)}%", end="\r")
+        logging.info(f"Progress: {bars.pop(0)}%", end="\r")
         trades = []
         if symbol in exchange.markets:
             while since < end:
@@ -174,8 +176,9 @@ class CCXTDataFetcher:
                     progress = round((1 - (end - since) / total) * 100)
                     if len(bars) and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        print(f"Progress: {progress}%", end="\r")
+                        logging.info(f"Progress: {progress}%", end="\r")
                 except ccxt.RateLimitExceeded:
+                    logging.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
                 except Exception:
                     raise
@@ -184,14 +187,12 @@ class CCXTDataFetcher:
 
         end_time = datetime.now(tz=timezone.utc)
 
-        print(f"\n\nFinished. Time taken: {end_time - start_time}\n")
+        logging.info(f"\n\nFinished. Time taken: {end_time - start_time}\n")
 
         return CCXTDataFetcher.trades_to_df(trades)
 
     def trades_to_df(trades: list) -> pd.DataFrame:
         df = pd.DataFrame(trades)
-        print(df)
-        # df.drop(["info"], axis=1, inplace=True)
         df.set_index("datetime", inplace=True)
         df.sort_index(inplace=True)
         return df

@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import numpy as np
 import requests as req
@@ -143,7 +144,7 @@ class OneInchQuotes:
         n = len(pairs)
         responses = []
         for i, pair in enumerate(pairs):
-            print(f"Fetching: {pair}... {i+1}/{n}")
+            logging.info(f"Fetching: {pair}... {i+1}/{n}")
             responses.append(self.quotes_for_pair(pair, calls=calls))
         return responses
 

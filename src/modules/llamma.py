@@ -6,6 +6,7 @@ DEAD_SHARES = 1e-15  # to init shares in a band
 
 # NOTE soon to be deprecated by crvusdsim?
 
+
 class Swap:
     __slots__ = (
         "in_amount",
@@ -385,8 +386,8 @@ class LLAMMA:
         ultimately be ported over into a testing file, maybe we use
         boa to compare vyper with python implementations, or maybe we just use
         crvusdsim by 0xreviews.
-        
-        TODO move this to a testing file. 
+
+        TODO move this to a testing file.
         """
         SQRT_BAND_RATIO = (self.A / (self.A - 1)) ** 0.5
 
