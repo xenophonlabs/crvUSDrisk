@@ -7,6 +7,11 @@ from collections import defaultdict
 from ..modules.market import ExternalMarket
 from ..db.datahandler import DataHandler
 
+from ..agents.arbitrageur import Arbitrageur
+from ..agents.liquidator import Liquidator  
+from ..agents.borrower import Borrower
+from ..agents.liquidity_provider import LiquidityProvider
+
 
 @dataclass
 class Scenario:
@@ -29,7 +34,7 @@ class Scenario:
 
     def generate_markets(self):
         """
-        Generate the markets for the scenario.
+        Generate the external markets for the scenario.
 
         TODO put the parameters for the quotes
         queries and market k_scale, etc. in config.
@@ -55,3 +60,10 @@ class Scenario:
         Generate the pricepaths for the scenario.
         """
         return PricePaths(self.price_config, self.N)
+
+    def generate_agents(self):
+        """
+        Generate the agents for the scenario.
+        """
+        arbitrageur = Arbitrageur(0)
+        liquidator = Liquidator(0)

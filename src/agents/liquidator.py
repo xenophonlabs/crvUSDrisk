@@ -5,8 +5,9 @@ from typing import List, Any
 import matplotlib.pyplot as plt
 import copy
 import numpy as np
+import logging
 from .agent import Agent
-
+from ..modules.market import ExternalMarket
 
 class Liquidator(Agent):
     """
@@ -20,14 +21,9 @@ class Liquidator(Agent):
         "liquidation_count",
         "arbitrage_pnl",
         "arbitrage_count",
-        "verbose",  # print statements
     )
 
-    def __init__(
-        self,
-        tolerance: float,
-        verbose: bool = False,
-    ) -> None:
+    def __init__(self, tolerance: float):
         assert tolerance >= 0
 
         self.tolerance = tolerance
@@ -35,9 +31,6 @@ class Liquidator(Agent):
         self.liquidation_count = 0
         self.arbitrage_pnl = 0
         self.arbitrage_count = 0
-        self.verbose = verbose
-
-    # === Hard Liquidations === #
 
     def maybe_liquidate(
         self,
@@ -50,8 +43,7 @@ class Liquidator(Agent):
         """
         This is the hard liquidation. Liquidator will compute
         the pnl from the liquidation, accounting for external
-        slippage. We assume their quote asset is USDC which
-        they obtain from the ETH/USDC pool on Uniswap.
+        slippage. 
 
         Parameters
         ----------
@@ -59,12 +51,6 @@ class Liquidator(Agent):
             Controller object
         position : Position
             Position object to liquidate
-        ext_stable_liquidity : float
-            External stablecoin liquidity (e.g. USDC in ETH/USDC pool)
-        ext_collat_liquidity : float
-            External collateral liquidity (e.g. ETH in ETH/USDC pool)
-        ext_swap_fee : float
-            External swap fee
 
         Returns
         -------
@@ -86,7 +72,10 @@ class Liquidator(Agent):
         user = position.user
         health = position.health
 
-        x_pnl, y_pnl = controller.check_liquidate(user, 1)
+        # TODO this should use the crvUSDsim module
+        # they have a "tokens_to_liquidate" method that is
+        # similar to this. It 
+        x_pnl, y_pnl = controller.check_liquidate(user, 1) 
 
         # Sell y_pnl collateral for USD
         y_pnl = external_swap(
@@ -96,10 +85,10 @@ class Liquidator(Agent):
         if pnl > self.tolerance:
             # TODO need to account for gas
             controller.liquidate(user, 1)
-            self.print(f"Liquidated user {user} with pnl {pnl}.")
+            logging.info(f"Liquidated user {user} with pnl {pnl}.")
             return pnl
         else:
-            self.print(f"Missed liquidation for user {user} with health {health}.")
+            logging.info(f"Missed liquidation for user {user} with health {health}.")
             return 0
 
     def perform_liquidations(
@@ -129,6 +118,8 @@ class Liquidator(Agent):
             PnL in USDC units from Liquidations.
         underwater_debt : float
             Total crvUSD debt of underwater positions.
+            
+        TODO liquidations should be ordered by profitability
         """
         to_liquidate = controller.users_to_liquidate()
 
@@ -160,6 +151,8 @@ class Liquidator(Agent):
         return total_pnl, underwater_debt
 
     # === Soft Liquidations === #
+    # DEPRECATED/ARCHIVED. TODO remove this
+    # This logic is absorbed by the arbitrageur agent!
 
     def arbitrage(
         self,
@@ -205,7 +198,7 @@ class Liquidator(Agent):
         amt_in, _, pump = Liquidator.calc_arb_amounts(amm, p_opt)
 
         if amt_in > 1e-6 and pnl > self.tolerance:
-            self.print(f"Performed arbitrage, profit: {round(pnl)} USD")
+            logging.info(f"Performed arbitrage, profit: {round(pnl)} USD")
             amm.swap(amt_in, not pump)
             self.arbitrage_pnl += pnl
             self.arbitrage_count += 1
@@ -436,7 +429,3 @@ class Liquidator(Agent):
             assert abs(swap_out - amt_out) < 1e-6, AssertionError(
                 "Arb optimization failed to match LLAMMA."
             )  # FIXME sometimes you just can't reach the target price
-
-    def print(self, txt):
-        if self.verbose:
-            print(txt)

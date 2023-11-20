@@ -6,11 +6,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List
 from datetime import datetime
+from dataclasses import dataclass
 from ...configs.config import STABLE_CG_IDS
 from ...plotting import plot_prices
 from ...network.coingecko import get_prices_df, address_from_coin_id, get_current_prices
 
 # TODO structure this code/directory better jfc
+
+
+@dataclass
+class PriceSample:
+    timestamp: int
+    prices: dict
 
 
 class PricePaths:
@@ -29,6 +36,8 @@ class PricePaths:
             Path to price config file.
         N : int
             Number of timesteps.
+
+        TODO integrate with curvesim PriceSampler?
         """
 
         with open(fn, "r") as f:
@@ -39,6 +48,7 @@ class PricePaths:
         self.params = config["params"]
         self.cov = pd.DataFrame.from_dict(config["cov"])
         self.freq = config["freq"]
+        self.gran = gran(self.freq)  # in seconds
         self.coin_ids = list(self.params.keys())
         self.coins = [address_from_coin_id(coin_id) for coin_id in self.coin_ids]
         self.S0s = get_current_prices(self.coin_ids)
@@ -46,8 +56,24 @@ class PricePaths:
         self.dt = 1 / self.annual_factor
         self.T = self.N * self.dt
         self.S = gen_cor_prices(
-            self.coin_ids, self.T, self.dt, self.S0s, self.cov, self.params
+            self.coin_ids,
+            self.T,
+            self.dt,
+            self.S0s,
+            self.cov,
+            self.params,
+            timestamps=True,
+            gran=self.gran,
         )
+
+    def __iter__(self):
+        """
+        Yields
+        ------
+        :class: `PriceSample`
+        """
+        for ts, prices in self.S.iterrows():
+            yield PriceSample(ts, prices.to_dict())
 
 
 def gen_price_config(
@@ -135,12 +161,22 @@ def gen_price_config(
 ### ========== Analyze Historical Prices ========== ###
 
 
-def factor(freq: str) -> float:
+def factor(freq: str) -> int:
     """Annualizing factor."""
     if freq == "1d":
         return 365
     elif freq == "1h":
         return 365 * 24
+    else:
+        raise ValueError(f"Invalid frequency: {freq}")
+
+
+def gran(freq: str) -> int:
+    """Granularity in seconds"""
+    if freq == "1d":
+        return 60 * 60 * 24
+    elif freq == "1h":
+        return 60 * 60
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
@@ -385,7 +421,14 @@ def gen_gbm(mu, sigma, dt, S0, N, dW=None):
 
 
 def gen_cor_prices(
-    coins: List[str], T: float, dt: float, S0s: dict, cov: pd.DataFrame, params: dict
+    coins: List[str],
+    T: float,
+    dt: float,
+    S0s: dict,
+    cov: pd.DataFrame,
+    params: dict,
+    timestamps: bool = False,
+    gran: int = None,
 ):
     """
     Generate a matrix of correlated GBMs using
@@ -405,6 +448,10 @@ def gen_cor_prices(
         Covariance matrix, computed on log returns.
     params : dict
         Dictionary of parameters for each asset.
+    timestamps : bool
+        Add timestamps to df index.
+    gran : int
+        Timestamp granularity
 
     Returns
     -------
@@ -421,7 +468,6 @@ def gen_cor_prices(
 
     # Generate uncorrelated Brownian motions
     dW = gen_dW(dt, (N, n))
-    print(coins)
 
     # Apply Cholesky decomposition to get correlated Brownian motions
     cov = cov[coins]  # Ensure correct ordering
@@ -443,7 +489,15 @@ def gen_cor_prices(
             mu, sigma = params[asset]["mu"], params[asset]["sigma"]
             S[:, i] = gen_gbm(mu, sigma, dt, S0s[asset], N, dW_correlated[:, i])
 
-    return pd.DataFrame(S, columns=coins)
+    coin_ids = [address_from_coin_id(c) for c in coins]
+    df = pd.DataFrame(S, columns=coin_ids)
+
+    if timestamps:
+        assert gran
+        now = int(datetime.now().timestamp())
+        df.index = list(range(now, now + N * gran, gran))
+
+    return df
 
 
 ### ========== Outdated ========== ###

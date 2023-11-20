@@ -1,5 +1,6 @@
 from ..modules.pegkeeper import PegKeeper
 from typing import List
+import logging
 from scipy.optimize import minimize_scalar
 from ..utils import get_crvUSD_index
 from ..types import Trade
@@ -11,7 +12,13 @@ PRECISION = 1e18
 class Arbitrageur(Agent):
     """
     Arbitrageur either calls update() on the Peg Keeper
-    or arbitrages (swaps) StableSwap pools.
+    or arbitrages (swaps) all Curve pools, including:
+        - StableSwap pools
+        - TriCrypto-ng pools
+        - LLAMMAs.
+    TODO need to investigate which pools to include in arbitrage
+    search (e.g. TriCRV, other crvUSD pools, etc..). Otherwise, we
+    are artificially constraining the available crvUSD liquidity.
     """
 
     __slots__ = (
@@ -20,14 +27,9 @@ class Arbitrageur(Agent):
         "update_count",
         "arbitrage_pnl",
         "arbitrage_count",
-        "verbose",  # print statements
     )
 
-    def __init__(
-        self,
-        tolerance: float,
-        verbose: bool = False,
-    ) -> None:
+    def __init__(self, tolerance: float):
         assert tolerance >= 0
 
         self.tolerance = tolerance
@@ -35,7 +37,6 @@ class Arbitrageur(Agent):
         self.update_count = 0
         self.arbitrage_pnl = 0
         self.arbitrage_count = 0
-        self.verbose = verbose
 
     def update(self, pks: List[PegKeeper], ts: int):
         """
@@ -58,7 +59,7 @@ class Arbitrageur(Agent):
             if pk.estimate_caller_profit(ts) > self.tolerance:
                 pnl += pk.update(ts)
                 count += 1
-                self.print(f"Updating {pk.name} Peg Keeper with pnl {round(pnl)}.")
+                logging.info(f"Updating {pk.name} Peg Keeper with pnl {round(pnl)}.")
         self.update_pnl += pnl
         self.update_count += count
         return pnl, count
@@ -99,7 +100,7 @@ class Arbitrageur(Agent):
         if trade.profit > self.tolerance:
             profit = self.trade(trade)  # Perform the trade
             assert profit > self.tolerance, RuntimeError("Trade unprofitable.")
-            self.print(f"Arbitrage trade with profit {round(profit)}.")
+            logging.info(f"Arbitrage trade with profit {round(profit)}.")
             count += 1
 
         self.arbitrage_pnl += profit
@@ -151,11 +152,8 @@ class Arbitrageur(Agent):
 
         Note
         ----
-        TODO need to investigate how these arbs actually happen. What
-        other pools do arbitrageurs integrate with? Example: TriCRV.
-        NOTE assuming that arbitrageurs don't have crvUSD inventory.
-        FIXME move to utils?
-        FIXME convert to
+        We are assuming that arbitrageurs don't have crvUSD inventory.
+        TODO handle >2 pools.
         """
         amt_in = int(amt_in * PRECISION)  # convert to 1e18 units
 
@@ -187,17 +185,16 @@ class Arbitrageur(Agent):
     @staticmethod
     def search(pools, prices):
         """
-        Find the optimal liquidity-constrained arbitrage.
+        Find the optimal liquidity-constrained cyclic arbitrages.
 
-        Note
-        ----
-        TODO might ultimately want to integrate
-        with curvesim, using the PriceSampler and creating
-        a new LiquidityLimitedArbitrage pipeline.
+        TODO handle >2 pools, including LLAMMAs. Must output a
+        queue of trades to perform.
         """
         assert (
             len(pools) == len(prices) == 2
         )  # FIXME need to handle >2 pools, but maybe not here.
+
+        logging.info("Searching for arbitrage opportunities.")
 
         # Assume we always want to sell the "cheap" token
         # because we assume the pool is mispriced.
@@ -236,6 +233,8 @@ class Arbitrageur(Agent):
             Arbitrageur.neg_profit, args=args, bounds=(0, high), method="bounded"
         )
         if res.success:
+            n = 1  # TODO should be # of trades to perform
+            logging.info(f"Identified {n} arbitrage opportunities.")
             amt_in = int(res.x * PRECISION)
             profit = -res.fun
             trade = Trade(amt_in, profit, *args)
@@ -245,14 +244,12 @@ class Arbitrageur(Agent):
                 res.message
             )  # Could make a minimization failed error class
 
-    def trade(self, trade: Trade, use_snapshot_context=False, extra_verbose=False):
+    def trade(self, trade: Trade, use_snapshot_context=False):
         """
         Perform trade.
-        """
-        v = self.verbose  # FIXME hack because this prints too much
-        if not extra_verbose:
-            self.verbose = False
 
+        TODO trade needs to handle >2 hops.
+        """
         amt_in, pool1, pool2, p = trade.unpack()
 
         final_coin_in = pool1.metadata["coins"]["names"][get_crvUSD_index(pool1) ^ 1]
@@ -261,7 +258,7 @@ class Arbitrageur(Agent):
         # Sell stablecoin1 and buy crvUSD from pool1
         coin_in = pool1.metadata["coins"]["names"][get_crvUSD_index(pool1) ^ 1]
         coin_out = pool1.metadata["coins"]["names"][get_crvUSD_index(pool1)]
-        self.print(
+        logging.info(
             f"Swapping {round(amt_in / PRECISION)} {coin_in} in pool {pool1.metadata['name']}."
         )
         if use_snapshot_context:
@@ -269,14 +266,14 @@ class Arbitrageur(Agent):
                 amt_mid, _ = pool1.trade(coin_in, coin_out, int(amt_in))
         else:
             amt_mid, _ = pool1.trade(coin_in, coin_out, int(amt_in))
-        self.print(
+        logging.info(
             f"Received {round(amt_mid / PRECISION)} {coin_out} from pool {pool1.metadata['name']}."
         )
 
         # Sell crvUSD and buy stablecoin2 from pool2
         coin_in = pool2.metadata["coins"]["names"][get_crvUSD_index(pool2)]
         coin_out = pool2.metadata["coins"]["names"][get_crvUSD_index(pool2) ^ 1]
-        self.print(
+        logging.info(
             f"Swapping {round(amt_mid / PRECISION)} {coin_in} in pool {pool2.metadata['name']}."
         )
         if use_snapshot_context:
@@ -284,22 +281,16 @@ class Arbitrageur(Agent):
                 amt_out, _ = pool2.trade(coin_in, coin_out, int(amt_mid))
         else:
             amt_out, _ = pool2.trade(coin_in, coin_out, int(amt_mid))
-        self.print(
+        logging.info(
             f"Received {round(amt_out / PRECISION)} {coin_out} from pool {pool2.metadata['name']}."
         )
 
         _profit = amt_out - amt_in * p
-        self.print(
+        logging.info(
             f"Profit: {round(_profit / PRECISION)} {coin_out} at market price: {round(p, 4)} {final_coin_in}/{final_coin_out}."
         )
 
-        self.verbose = v
-
         return _profit / PRECISION
-
-    def print(self, txt):
-        if self.verbose:
-            print(txt)
 
     # NOTE old arbitrageur code, not useful (for now).
     # def get_trade(pool: SimCurvePool, p_tgt: float):
