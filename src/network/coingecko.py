@@ -1,7 +1,6 @@
 import requests as req
 import pandas as pd
 import logging
-import logging
 from datetime import datetime
 from typing import List
 from curvesim.network.coingecko import coin_ids_from_addresses_sync

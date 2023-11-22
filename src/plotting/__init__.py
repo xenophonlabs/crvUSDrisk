@@ -623,6 +623,7 @@ def plot_regression(
     market: ExternalMarket,
     fn: str = None,
     scale: str = "log",
+    xlim: float = None,
 ):
     dt = pd.to_datetime(df["timestamp"], unit="s")
     x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
@@ -647,6 +648,10 @@ def plot_regression(
     cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
     cbar.set_label("Date")
 
+    if xlim:
+        ax.set_xlim(0, xlim)
+        ax.set_ylim(0, df[df["in_amount"] < xlim]["price_impact"].max() * 100)
+
     f.tight_layout()
 
     if fn:
@@ -663,18 +668,18 @@ def plot_predictions(
     market: ExternalMarket,
     fn: str = None,
     scale: str = "log",
+    xlim: float = None,
 ):
     dt = pd.to_datetime(df["timestamp"], unit="s")
-    price = df["price"].max()
 
-    x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
-    y = [market.trade(i, price) for i in x]
+    X = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
+    y = [market.trade(0, 1, x) for x in X]
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(
         df["in_amount"], df["out_amount"], c=dt, s=10, label="1inch Quotes"
     )
-    ax.plot(x, y, label="Prediction", c="indianred", lw=1)
+    ax.plot(X, y, label="Prediction", c="indianred", lw=1)
     ax.set_xscale(scale)
     ax.legend()
     ax.set_xlabel(f"Amount in ({in_token})")
@@ -684,6 +689,10 @@ def plot_predictions(
     cbar = plt.colorbar(scatter, ax=ax)
     cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
     cbar.set_label("Date")
+
+    if xlim:
+        ax.set_xlim(0, xlim)
+        ax.set_ylim(0, df[df["in_amount"] < xlim]["out_amount"].max())
 
     f.tight_layout()
 

@@ -70,11 +70,15 @@ def simulate(config: str):
     scenario, pricepaths, markets, modules, agents = generate(config)
     metrics = MetricsProcessor()
 
+    # TODO unpack agents and modules
+
     for ts, prices in pricepaths:
         # Update oracles. TODO Need to actually implement the oracle
         collateral_address = llamma.metadata.collateral_address
         _p = prices[collateral_address]  # collateral/USD price
         _p_precise = int(_p * 10**18)
+
+        # TODO update External Market price
 
         llamma.price_oracle_contract.set_price(_p_precise)
         llamma.prepare_for_trades(ts)  # this also updates oracle timestamps
@@ -88,10 +92,14 @@ def simulate(config: str):
         # TODO add borrower action
         # TODO add liquidity provider action
         arbitrageur.do()  # arbitrages pools, liquidates positions, and updates peg keepers
+        liquidator.do()
+        borrower.do()  # TODO implement
+        liquidity_provider.do()  # TODO implement
 
         # Post processing (metrics)
-        state_log.update(price_sample=sample, trade_data=trade_data)
-        pass
+        metrics.update()  # TODO what should the args be?
+
+    metrics.process()  # TODO implement
 
     # Notes
     # - Try tighter granularity on simulation, e.g. 1 minute?

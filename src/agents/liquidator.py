@@ -1,49 +1,123 @@
-from ..modules.controller import Controller, Position
-from ..modules.llamma import LLAMMA
-from ..utils import external_swap
-from typing import List, Any
-import matplotlib.pyplot as plt
-import copy
-import numpy as np
+from typing import List
+from scipy.optimize import root_scalar
 import logging
 from .agent import Agent
 from ..modules.market import ExternalMarket
+from ..types.cycle import Swap, Liquidation, Cycle
+from crvusdsim.pool.crvusd.controller import Position
+from crvusdsim.pool.sim_interface import SimController
+from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
+from ..utils import get_crvUSD_index
+from dataclasses import dataclass
+
+
+@dataclass
+class Path:
+    basis_token: str # TODO use Token class or something
+    crvusd_pool: SimCurveStableSwapPool
+    collat_pool: ExternalMarket
+
 
 class Liquidator(Agent):
     """
-    Liquidator either hard or soft liquidates LLAMMA positions.
-    TODO ensure pnl from hard and soft liquidations is in USD (NOT crvUSD) units!
+    Liquidator performs hard liquidations on LLAMMAs.
     """
 
-    __slots__ = (
-        "tolerance",  # min profit required to liquidate (could be returns)
-        "liquidation_pnl",
-        "liquidation_count",
-        "arbitrage_pnl",
-        "arbitrage_count",
-    )
+    liquidation_profit: float = 0
+    liquidation_count: float = 0
+    arbitrage_profit: float = 0
+    arbitrage_count: float = 0
 
-    def __init__(self, tolerance: float):
+    basis_tokens: list = [
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",  # USDC
+        "0xdac17f958d2ee523a2206206994597c13d831ec7",  # USDT
+    ]
+
+    paths: List[Path] = []
+
+    def __init__(self, tolerance: float = 0):
         assert tolerance >= 0
-
         self.tolerance = tolerance
-        self.liquidation_pnl = 0
-        self.liquidation_count = 0
-        self.arbitrage_pnl = 0
-        self.arbitrage_count = 0
+
+    def set_paths(
+        self,
+        controller: SimController,
+        crvUSD_pools: List[SimCurveStableSwapPool],
+        collat_pools: List[ExternalMarket],
+    ):
+        for basis_token in self.basis_tokens:
+            # Get basis_token/crvUSD pool
+            for pool in crvUSD_pools:
+                coins = [c.address for c in pool.coins]
+                if basis_token in coins:
+                    crvusd_pool = pool
+                    # FIXME assuming only one pool for each basis token
+                    break
+
+            # Get collateral/basis_token pool
+            collat_pool = collat_pools[controller.COLLATERAL_TOKEN.address][basis_token]
+            self.paths.append(Path(basis_token, crvusd_pool, collat_pool))
+
+    def perform_liquidations(
+        self,
+        controller: SimController,
+    ) -> List[float]:
+        """
+        Loops through all liquidatable users and liquidates if profitable.
+
+        Parameters
+        ----------
+        controller : Controller
+            Controller object.
+
+        Returns
+        -------
+        total_profit : float
+            Profit in USDC units from Liquidations.
+        underwater_debt : float
+            Total crvUSD debt of underwater positions.
+
+        TODO liquidations should be ordered by profitability
+        """
+        to_liquidate = controller.users_to_liquidate()
+
+        if len(to_liquidate) == 0:
+            return 0, 0
+
+        underwater_debt = 0
+        total_profit = 0
+
+        for position in to_liquidate:
+            profit = self.maybe_liquidate(position, controller)
+
+            if profit > self.tolerance:
+                total_profit += profit
+                self.liquidation_count += 1
+            else:
+                # Liquidation was missed
+                underwater_debt += position.debt
+
+        self.liquidation_profit += total_profit
+
+        return total_profit, underwater_debt
 
     def maybe_liquidate(
         self,
-        controller: Controller,
         position: Position,
-        ext_stable_liquidity: float,
-        ext_collat_liquidity: float,
-        ext_swap_fee: float,
+        controller: SimController,
     ) -> float:
         """
-        This is the hard liquidation. Liquidator will compute
-        the pnl from the liquidation, accounting for external
-        slippage. 
+        This is the hard liquidation:
+        1. Liquidator checks the crvUSD debt they'll have to repay.
+        2. For each basis token (e.g. USDC, USDT) they:
+            a. Compute how much of the basis token they must swap
+            to obtain the necessary crvUSD.
+            b. Compute how much of the basis token they receive
+            from selling the corresponding collateral.
+            c. Profit = b - a
+        3. They take the most profitable route. If this profit > 0,
+        they perform the liquidations.
+        or USDT) that gives them the most profit, if this profit > 0.
 
         Parameters
         ----------
@@ -55,377 +129,91 @@ class Liquidator(Agent):
         Returns
         -------
         float
-            pnl in USDC units
+            profit in basis token units
 
         Note
         ----
-        Ultimately we want to simulate pnl from the following path (using ETH as example):
-        1. Flashswap ETH -> USDC
-        2. Swap USDC -> crvUSD
-        3. Liquidate (repay crvUSD debt) and receive ETH
-        4. Repay flashswap (i.e. sell ETH)
-        5. Swap remaining ETH for USDC.
-        6. Swap remaining crvUSD for USDC.
-        TODO incorporate crvUSD slippage
-        TODO could convert the external_swap functionality into an ExternalMarket class or something
+        TODO incorporate liquidations that source crvUSD partly from
+        USDC and partly from USDT.
+        TODO incorporate liquidations against other tokens (not just
+        USDC and USDT).
+        TODO use the ERC20 dataclass for all token objects in codebase
         """
         user = position.user
         health = position.health
 
-        # TODO this should use the crvUSDsim module
-        # they have a "tokens_to_liquidate" method that is
-        # similar to this. It 
-        x_pnl, y_pnl = controller.check_liquidate(user, 1) 
+        to_repay = controller.tokens_to_liquidate(user)
+        # TODO if to_repay == 0: perform liquidation.
+        _, y = controller.AMM.get_sum_xy(user)
 
-        # Sell y_pnl collateral for USD
-        y_pnl = external_swap(
-            ext_stable_liquidity, ext_collat_liquidity, y_pnl, ext_swap_fee, True
-        )  # p_mkt * (1-f(y_pnl, sigma)) * y_pnl <- USDC out
-        pnl = x_pnl + y_pnl
-        if pnl > self.tolerance:
-            # TODO need to account for gas
-            controller.liquidate(user, 1)
-            logging.info(f"Liquidated user {user} with pnl {pnl}.")
-            return pnl
+        result = {}
+        for path in self.paths:
+            crvusd_pool = path.crvusd_pool
+            collat_pool = path.collat_pool
+
+            # basis token -> crvUSD
+            j = get_crvUSD_index(crvusd_pool)
+            i = j ^ 1
+            amt_in = self.search(crvusd_pool, i, j, to_repay)
+            trade1 = Swap(crvusd_pool, i, j, amt_in)
+
+            # crvUSD -> collateral
+            trade2 = Liquidation(controller, user, to_repay)
+
+            # collateral -> basis token
+            amt_out = collat_pool.trade(0, 1, y)  # Expected amount out
+            trade3 = Swap(collat_pool, 0, 1, y)
+
+            expected_profit = amt_out - amt_in
+            cycle = Cycle([trade1, trade2, trade3], expected_profit=expected_profit)
+            result[path] = {"expected_profit": expected_profit, "cycle": cycle}
+
+        # TODO should profit be marked to dollars? currently in basis token
+        best = result[max(result, key=lambda k: result[k]["expected_profit"])]
+
+        if best.expected_profit > self.tolerance:
+            logging.info(
+                f"Liquidating user {user} with expected profit: {best.expected_profit}."
+            )
+            profit = best.cycle.execute()
+            return profit
         else:
             logging.info(f"Missed liquidation for user {user} with health {health}.")
             return 0
 
-    def perform_liquidations(
-        self,
-        controller: Controller,
-        ext_stable_liquidity: float,
-        ext_collat_liquidity: float,
-        ext_swap_fee: float,
-    ) -> List[float]:
+    def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
         """
-        Loops through all liquidatable users and liquidates if profitable.
+        Find the amt_in required to get the desired
+        amt_out from a swap.
 
-        Parameters
-        ----------
-        controller : Controller
-            Controller object.
-        ext_stable_liquidity : float
-            External stablecoin liquidity (e.g. USDC in ETH/USDC pool).
-        ext_collat_liquidity : float
-            External collateral liquidity (e.g. ETH in ETH/USDC pool).
-        ext_swap_fee : float
-            External swap fee.
-
-        Returns
-        -------
-        total_pnl : float
-            PnL in USDC units from Liquidations.
-        underwater_debt : float
-            Total crvUSD debt of underwater positions.
-            
-        TODO liquidations should be ordered by profitability
+        Currently only meant for USDC or USDT ->
+        crvUSD.
         """
-        to_liquidate = controller.users_to_liquidate()
 
-        if len(to_liquidate) == 0:
-            return 0, 0
+        assert isinstance(pool, SimCurveStableSwapPool)
 
-        underwater_debt = 0
-        total_pnl = 0
+        def loss(amt_in: float, pool: SimCurveStableSwapPool, i: int, j: int):
+            """
+            Loss function for optimization. Very simple:
+            we just want to minimize the diff between the
+            desired amt_out, and the actual amt_out.
+            """
+            with pool.use_snapshot_context():
+                amt_out_ = pool.trade(i, j, amt_in)
+            print(amt_in, amt_out, amt_out_)
+            return abs(amt_out - amt_out_)
 
-        for position in to_liquidate:
-            pnl = self.maybe_liquidate(
-                controller,
-                position,
-                ext_stable_liquidity,
-                ext_collat_liquidity,
-                ext_swap_fee,
-            )
-
-            if pnl > 0:
-                total_pnl += pnl
-                self.liquidation_count += 1
-
-            else:
-                # Liquidation was missed
-                underwater_debt += position.debt
-
-        self.liquidation_pnl += total_pnl
-
-        return total_pnl, underwater_debt
-
-    # === Soft Liquidations === #
-    # DEPRECATED/ARCHIVED. TODO remove this
-    # This logic is absorbed by the arbitrageur agent!
-
-    def arbitrage(
-        self,
-        amm: LLAMMA,
-        p_mkt: float,
-        ext_stable_liq: float,
-        ext_collat_liq: float,
-        ext_swap_fee: float,
-    ) -> float:
-        """
-        Calculate optimal arbitrage and perform it.
-        For p in range [p_amm, p_mkt] or [p_mkt, p_amm] we:
-            1. Calculate amt_in: the amount of token_in required
-            to move price to p.
-            2. Calculate amt_out: the amount of token_out received
-            from moving price to p.
-            3. Calculate pnl: the profit (in USDC) received from
-            swapping amt_out externally for a stablecoin (USDC or USDT).
-        We then return the price p that maximizes the profits from step 3.
-        Notice that step 3 incorporates market liquidity (e.g. Uniswap)
-
-        Parameters
-        ----------
-        amm : LLAMMA
-            LLAMMA object.
-        p_mkt : float
-            Market price.
-        ext_stable_liquidity : float
-            External stablecoin liquidity (e.g. USDC in ETH/USDC pool).
-        ext_collat_liquidity : float
-            External collateral liquidity (e.g. ETH in ETH/USDC pool).
-        ext_swap_fee : float
-            External swap fee.
-
-        Returns
-        -------
-        float
-            pnl in crvUSD units.
-        """
-        p_opt, pnl = Liquidator.get_optimal_arb(
-            amm, p_mkt, ext_stable_liq, ext_collat_liq, ext_swap_fee
+        high = pool.get_max_trade_size(i, j)
+        
+        res = root_scalar(
+            loss,
+            args=(pool, i, j),
+            bracket=(0, high),
+            xtol=1e-6,
+            method="brentq",
         )
-        amt_in, _, pump = Liquidator.calc_arb_amounts(amm, p_opt)
 
-        if amt_in > 1e-6 and pnl > self.tolerance:
-            logging.info(f"Performed arbitrage, profit: {round(pnl)} USD")
-            amm.swap(amt_in, not pump)
-            self.arbitrage_pnl += pnl
-            self.arbitrage_count += 1
-
-        return max(pnl, 0)
-
-    @staticmethod
-    def calc_arb_amounts(amm: LLAMMA, p: float) -> List[Any]:
-        """
-        Calculates the swap_in and swap_out for an arbitrageur
-        moving LLAMMA price to p.
-
-        Parameters
-        ----------
-        amm : LLAMMA
-            LLAMMA object.
-        p : float
-            New price to move AMM to.
-
-        Returns
-        -------
-        amt_in : float
-            Amount of token in to push price to p.
-        amt_out : float
-            Amount of token out when pushing price to p.
-        pump : bool
-            True if stablecoin is being sold to AMM, False otherwise.
-        """
-
-        if p == amm.p:
-            # Do nothing
-            return 0, 0, False
-
-        pump = (
-            True if p > amm.p else False
-        )  # pump == True means stablecoin being sold to the AMM
-
-        amt_x = 0
-        amt_y = 0
-
-        n = amm.active_band
-
-        for _ in range(amm.MAX_TICKS):
-            not_empty = amm.bands_x[n] > 0 or amm.bands_y[n] > 0
-
-            if p <= amm.p_c_up(n) and p >= amm.p_c_down(n):
-                if not_empty:
-                    new_x = max((amm.inv(n) * p) ** 0.5, amm.f(n)) - amm.f(n)
-                    new_y = max((amm.inv(n) / p) ** 0.5, amm.g(n)) - amm.g(n)
-                    delta_x = new_x - amm.bands_x[n]
-                    delta_y = new_y - amm.bands_y[n]
-                    if pump:
-                        delta_y *= -1
-                    else:
-                        delta_x *= -1
-                    amt_x += delta_x
-                    amt_y += delta_y
-                break
-            else:
-                # We clear this band, so the user either gets all collateral or all the stablecoin in the band
-                if pump:
-                    if not_empty:
-                        amt_x += amm.inv(n) / amm.g(n) - amm.f(n) - amm.bands_x[n]
-                        amt_y += amm.bands_y[n]
-                    n += 1
-                else:
-                    if not_empty:
-                        amt_x += amm.bands_x[n]
-                        amt_y += amm.inv(n) / amm.f(n) - amm.g(n) - amm.bands_y[n]
-                    n -= 1
-
-        if pump:
-            # we are going left <- selling stablecoin to AMM
-            amt_in = amt_x / (1 - amm.fee)
-            amt_out = amt_y
+        if res.success:
+            return res.root
         else:
-            # we are going right -> selling collateral to AMM
-            amt_in = amt_y / (1 - amm.fee)
-            amt_out = amt_x
-
-        return amt_in, amt_out, pump
-
-    @staticmethod
-    def arb_profits(
-        amm: LLAMMA,
-        p_new: float,
-        ext_stable_liquidity,
-        ext_collat_liquidity,
-        ext_swap_fee,
-    ) -> float:
-        """
-        Calculate arbitrage profits from moving AMM price to p_new, accounting
-        for external slippage.
-
-        Parameters
-        ----------
-        amm : LLAMMA
-            LLAMMA object
-        p_new : float
-            Price to move AMM to
-        ext_stable_liquidity : float
-            External stablecoin liquidity (e.g. USDC in ETH/USDC pool)
-        ext_collat_liquidity : float
-            External collateral liquidity (e.g. ETH in ETH/USDC pool)
-        ext_swap_fee : float
-            External swap fee
-
-        Returns
-        -------
-        float
-            pnl in crvUSD units
-        """
-        amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm, p_new)
-        if amt_in <= 1e-6 or amt_out <= 1e-6:  # FIXME handle floating point fuck ups
-            return 0
-
-        Liquidator.test_arb(amm, p_new)  # not necessary
-
-        amt_out = external_swap(
-            ext_stable_liquidity, ext_collat_liquidity, amt_out, ext_swap_fee, pump
-        )
-        pnl = amt_out - amt_in
-
-        # TODO Ensure arb profits in USD units
-        if pump:
-            # we are selling stablecoin to AMM, pnl in units of stablecoin
-            pnl *= 1
-        else:
-            ext_p = ext_stable_liquidity / ext_collat_liquidity
-            pnl *= ext_p  # convert collateral units to crvUSD units
-
-        return pnl
-
-    @staticmethod
-    def get_optimal_arb(
-        amm: LLAMMA,
-        p_mkt: float,
-        ext_stable_liquidity: float,
-        ext_collat_liquidity: float,
-        ext_swap_fee: float,
-        plot: bool = False,
-    ) -> tuple[float, float]:
-        """
-        Search for optimal arbitrage price and pnl.
-
-        Parameters
-        ----------
-        amm : LLAMMA
-            LLAMMA object
-        p_mkt : float
-            Market price
-        ext_stable_liquidity : float
-            External stablecoin liquidity (e.g. USDC in ETH/USDC pool)
-        ext_collat_liquidity : float
-            External collateral liquidity (e.g. ETH in ETH/USDC pool)
-        ext_swap_fee : float
-            External swap fee
-        plot : bool, optional
-            Whether to plot the profit curve, by default False.
-
-        Returns
-        -------
-        float
-            Optimal price to move AMM to
-        float
-            PnL for performing optimal arbitrage
-
-        Note
-        ----
-        TODO If this needs to be faster we can:
-        1. Implement a better search algo
-        2. Derive the optimal p_new analytically <- this is hard
-        """
-        # Expanding the interval with 0.9 and 1.1 for plotting
-        p_low = min(amm.p, p_mkt) * 0.9
-        p_high = max(amm.p, p_mkt) * 1.1
-
-        ps = np.linspace(p_low, p_high, 100)
-
-        profits = [
-            Liquidator.arb_profits(
-                amm, p, ext_stable_liquidity, ext_collat_liquidity, ext_swap_fee
-            )
-            for p in ps
-        ]
-
-        max_profits = max(profits)
-        idx = profits.index(max_profits)
-
-        if plot:
-            plt.plot(ps, profits)
-            plt.axvline(ps[idx], color="black", linestyle="--")
-
-        if max_profits == 0:
-            return amm.p, 0  # Don't do anything
-
-        return ps[idx], max_profits
-
-    def test_arb(amm: LLAMMA, p_new):
-        """
-        Ensures the stateless `calc_arb_amounts` function matches
-        the stateful `swap` function in LLAMMA.
-
-        Parameters
-        ----------
-        amm : LLAMMA
-            LLAMMA object
-        p_new : float
-            New price to move AMM to
-
-        Raises
-        ------
-        AssertionError
-            If the swap amounts do not match
-
-        Note
-        ----
-        TODO Would be cool to implement this using a snapshot
-        context manager like in `curvesim`. E.g., something like:
-        with amm.use_snapshot_context():
-            amm.swap(...)
-            assert ...
-        """
-        amm_cp = copy.deepcopy(amm)
-        amt_in, amt_out, pump = Liquidator.calc_arb_amounts(amm_cp, p_new)
-        if amt_in != 0 and amt_out != 0:
-            _, swap_out = amm_cp.swap(amt_in, not pump)
-            assert abs(swap_out - amt_out) < 1e-6, AssertionError(
-                "Arb optimization failed to match LLAMMA."
-            )  # FIXME sometimes you just can't reach the target price
+            raise RuntimeError(res.message)

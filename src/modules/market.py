@@ -20,6 +20,12 @@ class ExternalMarket:
         self.token_in = token_in
         self.token_out = token_out
         self.k_scale = k_scale
+        self.coin_addresses = [token_in, token_out]
+        self.coin_decimals = [0, 0]  # TODO is there a better way to handle this?
+        self.price = None
+
+    def update_price(self, price: float):
+        self.price = price
 
     def fit(self, df):
         """
@@ -35,7 +41,7 @@ class ExternalMarket:
 
         self.model = model
 
-    def trade(self, amt_in, price):
+    def trade(self, i: int, j: int, amt_in: float) -> float:
         """
         Execute a trade on the external market using
         the current price.
@@ -44,9 +50,6 @@ class ExternalMarket:
         ----------
         amt_in : float
             The amount of token_in to sell.
-        price : float
-            The external market price for exchanging
-            token i for token j.
 
         Returns
         -------
@@ -58,7 +61,8 @@ class ExternalMarket:
         The market's fee should already be incorporated into the
         price impact estimation.
         """
-        return amt_in * price * (1 - self.price_impact(amt_in))
+        assert self.price, "Price not set for External Market."
+        return amt_in * self.price * (1 - self.price_impact(amt_in))
 
     def price_impact(self, amt_in: Union[List[List[float]], List[float], float]):
         """
@@ -73,6 +77,11 @@ class ExternalMarket:
         -------
         float
             The price_impact (decimals) for given trade.
+
+        TODO this should account for trades that happened "recently".
+        Maybe there's a "half-life" at which liquidity replenishes. Mean
+        reverting process: learn the speed of mean-reversion (which is
+        basically a half-life measure). Implement this on the "price" attr.
         """
         if isinstance(amt_in, float):
             amt_in = np.array(amt_in).reshape(-1, 1)
@@ -91,58 +100,3 @@ class ExternalMarket:
                 f"Price impact for {self.token_in} -> {self.token_out} is over 100%: {impact}!"
             )
         return np.clip(impact, 0, 1)
-
-    # ARCHIVED. TODO remove
-    # def __init__(self, token_in: str, token_out: str, m: float, b: float):
-    #     """
-    #     Initialize market with OLS params:
-
-    #     price_impact = m * trade_size + b
-
-    #     Parameters
-    #     ----------
-    #     token_in = str
-    #         The token to sell (address).
-    #     token_out = str
-    #         The token to buy (address).
-    #     m : float
-    #         The slope of the OLS regression.
-    #     b : float
-    #         The intercept of the OLS regression.
-
-    #     Note
-    #     ----
-    #     Eventually include a multi-variate
-    #     regression on volatility as well.
-    #     """
-    #     self.token_in = token_in
-    #     self.token_out = token_out
-    #     self.m = m
-    #     self.b = b
-
-    # def price_impact(self, amt_in):
-    #     """
-    #     We model price impact as a linear regression
-    #     with trade size. The coefficients of the linear
-    #     regression are passed into the constructor.
-
-    #     Parameters
-    #     ----------
-    #     amt_in : float
-    #         The amount of token_in to sell.
-
-    #     Returns
-    #     -------
-    #     float
-    #         The price_impact (decimals) for given trade.
-    #     """
-    #     impact = amt_in * self.m + self.b
-    #     if impact < 0:
-    #         logging.warning(
-    #             f"Price impact for {self.token_in} -> {self.token_out} is negative: {impact}!"
-    #         )
-    #     elif impact > 1:
-    #         logging.warning(
-    #             f"Price impact for {self.token_in} -> {self.token_out} is over 100%: {impact}!"
-    #         )
-    #     return min(max(impact, 0), 1)

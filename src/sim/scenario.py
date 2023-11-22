@@ -1,16 +1,14 @@
 import json
 import logging
 from dataclasses import dataclass
-from prices import PricePaths
 from itertools import permutations
 from collections import defaultdict
+from .prices import PricePaths
 from ..modules.market import ExternalMarket
 from ..db.datahandler import DataHandler
 
 from ..agents.arbitrageur import Arbitrageur
-from ..agents.liquidator import Liquidator  
-from ..agents.borrower import Borrower
-from ..agents.liquidity_provider import LiquidityProvider
+from ..agents.liquidator import Liquidator
 
 
 @dataclass
@@ -30,7 +28,7 @@ class Scenario:
         self.N = config["N"]
         self.price_config = config["price_config"]
         self.coins = config["coins"]
-        self.pairs = list(permutations(self.coins))
+        self.pairs = list(permutations(self.coins, 2))
 
     def generate_markets(self):
         """
@@ -39,7 +37,7 @@ class Scenario:
         TODO put the parameters for the quotes
         queries and market k_scale, etc. in config.
         """
-        with DataHandler as datahandler:
+        with DataHandler() as datahandler:
             logging.info("Fetching 1inch quotes.")
             quotes = datahandler.get_quotes(process=True)
             logging.info(f"We have {quotes.shape[0]} quotes.")
