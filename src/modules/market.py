@@ -16,12 +16,20 @@ class ExternalMarket:
     the market price.
     """
 
-    def __init__(self, token_in: str, token_out: str, k_scale=1.25):
+    def __init__(
+        self,
+        token_in: str,
+        token_out: str,
+        decimals_in: int,
+        decimals_out: int,
+        k_scale=1.25,
+    ):
+        # TODO need a better way to inherit decimals
         self.token_in = token_in
         self.token_out = token_out
         self.k_scale = k_scale
         self.coin_addresses = [token_in, token_out]
-        self.coin_decimals = [0, 0]  # TODO is there a better way to handle this?
+        self.coin_decimals = [decimals_in, decimals_out]
         self.price = None
 
     def update_price(self, price: float):

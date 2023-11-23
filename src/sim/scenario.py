@@ -6,7 +6,7 @@ from collections import defaultdict
 from .prices import PricePaths
 from ..modules.market import ExternalMarket
 from ..db.datahandler import DataHandler
-
+from ..utils import get_decimals_from_config
 from ..agents.arbitrageur import Arbitrageur
 from ..agents.liquidator import Liquidator
 
@@ -47,17 +47,24 @@ class Scenario:
         for pair in self.pairs:
             in_token, out_token = pair
             quotes_ = quotes.loc[pair]
-            market = ExternalMarket(in_token, out_token, 1.25)
+            market = ExternalMarket(
+                in_token,
+                out_token,
+                get_decimals_from_config(in_token),
+                get_decimals_from_config(out_token),
+                1.25,
+            )
             market.fit(quotes_)
             markets[in_token][out_token] = market
 
         return markets
 
-    def generate_pricepaths(self):
+    def generate_pricepaths(self, fn=None):
         """
         Generate the pricepaths for the scenario.
         """
-        return PricePaths(self.price_config, self.N)
+        fn = fn if fn else self.price_config  # override
+        return PricePaths(fn, self.N)
 
     def generate_agents(self):
         """

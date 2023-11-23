@@ -1,12 +1,15 @@
 from typing import List, Union
 from dataclasses import dataclass
 from ..modules.market import ExternalMarket
+from crvusdsim.pool.crvusd.controller import Position
 from curvesim.pool.sim_interface import SimCurvePool
 from crvusdsim.pool.sim_interface import SimLLAMMAPool, SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
 import logging
 from abc import ABC
+
+TOLERANCE = 1e-6
 
 
 @dataclass
@@ -32,7 +35,6 @@ class Swap(Trade):
     i: int
     j: int
     amt: Union[int, float]
-    price: float = (None,)  # price for External Market
 
     def get_address(self, index: int):
         if isinstance(self.pool, SimCurveStableSwapPool):
@@ -40,27 +42,26 @@ class Swap(Trade):
         return self.pool.coin_addresses[index]
 
     def get_decimals(self, index: int):
-        if isinstance(self.pool, SimCurveStableSwapPool):
-            return self.pool.coins[index].decimals
-        elif isinstance(self.pool, ExternalMarket):
-            return 0  # TODO is there a better way to handle this?
+        # if isinstance(self.pool, SimCurveStableSwapPool):
+        #     return self.pool.coins[index].decimals
         return self.pool.coin_decimals[index]
 
-    def do(self, precision=True):
+    def do(self):
         pool = self.pool
-        amt_out = pool.trade(self.i, self.j, self.amt)
-        decimals = pool.coin_decimals[self.j]  # 0 for External Mkt
 
-        if not precision:
-            amt_out /= 10**decimals
+        amt_in = self.amt
+        if isinstance(pool, ExternalMarket):
+            # TODO find a better way to handle decimals
+            amt_in /= 10 ** self.get_decimals(self.i)
 
+        amt_out = pool.trade(self.i, self.j, amt_in)
         return amt_out
 
 
 @dataclass
 class Liquidation(Trade):
     controller: SimController
-    user: str
+    position: Position
     amt: int  # to repay
     frac: float = 10**18
     i: int = 0  # repay stablecoin
@@ -68,30 +69,25 @@ class Liquidation(Trade):
 
     def get_address(self, index: int):
         if index == 0:
-            return self.pool.STABLECOIN.address
+            return self.controller.STABLECOIN.address
         else:
-            return self.pool.COLLATERAL_TOKEN.address
+            return self.controller.COLLATERAL_TOKEN.address
 
     def get_decimals(self, index: int):
         if index == 0:
-            return self.pool.STABLECOIN.decimals
+            return self.controller.STABLECOIN.decimals
         else:
-            return self.pool.COLLATERAL_TOKEN.decimals
+            return self.controller.COLLATERAL_TOKEN.decimals
 
-    def do(self, precision=True) -> int:
+    def do(self) -> int:
         """Perform liquidation."""
         # Check change in balance
         bal = self.controller.COLLATERAL_TOKEN.balanceOf[DEFAULT_LIQUIDATOR]
-        self.controller.liquidate(DEFAULT_LIQUIDATOR, self.user, 0)
+        self.controller.liquidate_sim(self.position)
         new_bal = self.controller.COLLATERAL_TOKEN.balanceOf[DEFAULT_LIQUIDATOR]
 
         amt_out = new_bal - bal
         assert amt_out > 0
-
-        if not precision:
-            decimals = self.controller.COLLATERAL_PRECISION
-            amt_out /= 10**decimals
-
         return amt_out
 
 
@@ -121,19 +117,23 @@ class Cycle:
         for i, trade in enumerate(self.trades):
             logging.info(f"Executing trade {trade}.")
             if i != self.n - 1:
-                amt_out = trade.do(precision=False)
+                amt_out = trade.do()
                 # check that the amt_out from trade[i] == amt_in for trade[i+1]
                 assert (
-                    abs(amt_out - self.trades[i + 1].amt) < 1e-6
-                ), f"Trade {i} output {amt_out} != Trade {i+1} input {self.trades[i+1].amt}."
+                    abs(amt_out - self.trades[i + 1].amt) / 1e18
+                    < TOLERANCE  # TODO precision for ext mkt
+                ), f"Trade {i+1} output {amt_out} != Trade {i+2} input {self.trades[i+1].amt}."
             else:
                 # Fix decimals to compute profit
-                amt_out = trade.do(precision=True)
+                amt_out = trade.do()
 
         profit = amt_out - amt_in
-        if abs(profit - self.expected_profit) > 1e-6:
+        if abs(profit - self.expected_profit) / 1e18 > TOLERANCE:
             logging.warning(
                 f"Expected profit {self.expected_profit} != actual profit {profit}."
             )
 
         return profit
+
+    def __repr__(self):
+        return f"Cycle(Trades: {self.trades}, Expected Profit: {self.expected_profit})"

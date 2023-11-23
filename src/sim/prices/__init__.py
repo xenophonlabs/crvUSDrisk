@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from typing import List
 from datetime import datetime
 from dataclasses import dataclass
+from itertools import permutations
+from collections import defaultdict
 from ...configs.config import STABLE_CG_IDS
 from ...plotting import plot_prices
 from ...network.coingecko import get_prices_df, address_from_coin_id, get_current_prices
@@ -16,8 +18,17 @@ from ...network.coingecko import get_prices_df, address_from_coin_id, get_curren
 
 @dataclass
 class PriceSample:
-    timestamp: int
-    prices: dict
+    def __init__(self, ts, _prices):
+        self.ts = ts
+        self._prices = _prices
+        pairs = list(permutations(_prices.keys(), 2))
+        self.prices = defaultdict(dict)
+        for pair in pairs:
+            in_token, out_token = pair
+            self.prices[in_token][out_token] = _prices[in_token] / _prices[out_token]
+
+    def __repr__(self):
+        return f"PriceSample({self.ts}, {self._prices})"
 
 
 class PricePaths:
@@ -74,6 +85,11 @@ class PricePaths:
         """
         for ts, prices in self.S.iterrows():
             yield PriceSample(ts, prices.to_dict())
+
+    def __getitem__(self, i):
+        ts = self.S.index[i]
+        prices = self.S.iloc[i]
+        return PriceSample(ts, prices.to_dict())
 
 
 def gen_price_config(

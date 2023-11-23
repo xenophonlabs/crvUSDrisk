@@ -1,6 +1,7 @@
 from typing import List
 from scipy.optimize import root_scalar
 import logging
+import math
 from .agent import Agent
 from ..modules.market import ExternalMarket
 from ..types.cycle import Swap, Liquidation, Cycle
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Path:
-    basis_token: str # TODO use Token class or something
+    basis_token: str  # TODO use Token class or something
     crvusd_pool: SimCurveStableSwapPool
     collat_pool: ExternalMarket
 
@@ -45,6 +46,7 @@ class Liquidator(Agent):
         crvUSD_pools: List[SimCurveStableSwapPool],
         collat_pools: List[ExternalMarket],
     ):
+        self.paths = []
         for basis_token in self.basis_tokens:
             # Get basis_token/crvUSD pool
             for pool in crvUSD_pools:
@@ -80,6 +82,8 @@ class Liquidator(Agent):
         TODO liquidations should be ordered by profitability
         """
         to_liquidate = controller.users_to_liquidate()
+        
+        logging.info(f"There are {len(to_liquidate)} users to liquidate.")
 
         if len(to_liquidate) == 0:
             return 0, 0
@@ -90,6 +94,7 @@ class Liquidator(Agent):
         for position in to_liquidate:
             profit = self.maybe_liquidate(position, controller)
 
+            # TODO move this to maybe_liquidate
             if profit > self.tolerance:
                 total_profit += profit
                 self.liquidation_count += 1
@@ -142,11 +147,16 @@ class Liquidator(Agent):
         user = position.user
         health = position.health
 
-        to_repay = controller.tokens_to_liquidate(user)
+        # TODO int casting should occur in controller
+        to_repay = int(controller.tokens_to_liquidate(user))
         # TODO if to_repay == 0: perform liquidation.
         _, y = controller.AMM.get_sum_xy(user)
+        y = int(y)
 
-        result = {}
+        best = None
+        best_expected_profit = -math.inf
+
+        assert self.paths, "Liquidator paths not set."
         for path in self.paths:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
@@ -158,27 +168,31 @@ class Liquidator(Agent):
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
             # crvUSD -> collateral
-            trade2 = Liquidation(controller, user, to_repay)
+            trade2 = Liquidation(controller, position, to_repay)
 
             # collateral -> basis token
-            amt_out = collat_pool.trade(0, 1, y)  # Expected amount out
+            amt_out = collat_pool.trade(0, 1, y / 1e18)  # TODO decimals
             trade3 = Swap(collat_pool, 0, 1, y)
 
-            expected_profit = amt_out - amt_in
+            # TODO the decimals are completely wrong
+            amt_in_ = trade1.amt / 10 ** trade1.get_decimals(i)
+            expected_profit = amt_out - amt_in_
+
             cycle = Cycle([trade1, trade2, trade3], expected_profit=expected_profit)
-            result[path] = {"expected_profit": expected_profit, "cycle": cycle}
 
-        # TODO should profit be marked to dollars? currently in basis token
-        best = result[max(result, key=lambda k: result[k]["expected_profit"])]
+            if not best or expected_profit > best_expected_profit:
+                best = cycle
+                best_expected_profit = expected_profit
 
-        if best.expected_profit > self.tolerance:
+        if best_expected_profit > self.tolerance:
             logging.info(
-                f"Liquidating user {user} with expected profit: {best.expected_profit}."
+                f"Liquidating user {user} with expected profit: {best_expected_profit}."
             )
-            profit = best.cycle.execute()
+            profit = best.execute()
+            logging.info(f"Liquidated user {user} with profit: {profit}.")
             return profit
         else:
-            logging.info(f"Missed liquidation for user {user} with health {health}.")
+            logging.info(f"Missed liquidation for user {user}. Health: {health}. Expected profit: {best_expected_profit}.")
             return 0
 
     def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
@@ -190,21 +204,23 @@ class Liquidator(Agent):
         crvUSD.
         """
 
+        amt_out = float(amt_out)  # For scipy
+
         assert isinstance(pool, SimCurveStableSwapPool)
 
-        def loss(amt_in: float, pool: SimCurveStableSwapPool, i: int, j: int):
+        def loss(amt_in: int, pool: SimCurveStableSwapPool, i: int, j: int):
             """
             Loss function for optimization. Very simple:
             we just want to minimize the diff between the
             desired amt_out, and the actual amt_out.
             """
+            amt_in = int(amt_in)
             with pool.use_snapshot_context():
                 amt_out_ = pool.trade(i, j, amt_in)
-            print(amt_in, amt_out, amt_out_)
-            return abs(amt_out - amt_out_)
+            return amt_out - amt_out_
 
         high = pool.get_max_trade_size(i, j)
-        
+
         res = root_scalar(
             loss,
             args=(pool, i, j),
@@ -213,7 +229,7 @@ class Liquidator(Agent):
             method="brentq",
         )
 
-        if res.success:
-            return res.root
+        if res.converged:
+            return int(res.root)
         else:
             raise RuntimeError(res.message)
