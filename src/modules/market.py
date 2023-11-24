@@ -20,8 +20,8 @@ class ExternalMarket:
         self,
         token_in: str,
         token_out: str,
-        decimals_in: int=18,
-        decimals_out: int=18,
+        decimals_in: int = 18,
+        decimals_out: int = 18,
         k_scale=1.25,
     ):
         # TODO token_in/out should be Token objs

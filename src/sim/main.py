@@ -72,32 +72,36 @@ def simulate(config: str):
 
     # TODO unpack agents and modules
 
-    for ts, prices in pricepaths:
+    collateral_address = llamma.metadata["collateral_address"]
+    collateral_precision = llamma.metadata["collateral_precision"]
+
+    for ts, sample in pricepaths:
+        cp = (
+            sample._prices[collateral_address] * collateral_precision
+        )  # collateral/USD price
+
         # Update oracles. TODO Need to actually implement the oracle
-        collateral_address = llamma.metadata.collateral_address
-        _p = prices[collateral_address]  # collateral/USD price
-        _p_precise = int(_p * 10**18)
-
-        # TODO update External Market price
-
-        llamma.price_oracle_contract.set_price(_p_precise)
+        llamma.price_oracle_contract.set_price(cp)
         llamma.prepare_for_trades(ts)  # this also updates oracle timestamps
         controller.prepare_for_trades(ts)
+
+        # Update external market prices
+        scenario.update_market_prices(markets, sample.prices)
+
         # TODO prepare aggregator for trades? <- update timestamps
         # TODO prepare pegkeeper for trades? <- update timestamps
         # TODO prepare stableswap pools for trades? <- update timestamps
         # TODO prepare tricryptoo pools for trades? <- update timestamps
 
         # Agent actions
-        # TODO add borrower action
-        # TODO add liquidity provider action
-        arbitrageur.do()  # arbitrages pools, liquidates positions, and updates peg keepers
-        liquidator.do()
+        arbitrageur.do()  # TODO implement
+        updater.do()  # TODO implement an agent that just updates the PKs
+        _ = liquidator.perform_liquidations(controller)
         borrower.do()  # TODO implement
         liquidity_provider.do()  # TODO implement
 
         # Post processing (metrics)
-        metrics.update()  # TODO what should the args be?
+        metrics.update(modules, agents)  # TODO implement
 
     metrics.process()  # TODO implement
 
@@ -108,8 +112,6 @@ def simulate(config: str):
 
     return metrics
 
-
-def main():
     pass
 
 

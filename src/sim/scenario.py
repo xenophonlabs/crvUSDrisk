@@ -72,3 +72,13 @@ class Scenario:
         """
         arbitrageur = Arbitrageur(0)
         liquidator = Liquidator(0)
+        # TODO set liquidator paths
+
+    @staticmethod
+    def update_market_prices(markets, sample):
+        """
+        Update the market prices for the scenario.
+        """
+        for in_token in markets:
+            for out_token in markets[in_token]:
+                markets[in_token][out_token].update_price(sample[in_token][out_token])

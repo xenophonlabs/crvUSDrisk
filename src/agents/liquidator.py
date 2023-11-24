@@ -82,7 +82,7 @@ class Liquidator(Agent):
         TODO liquidations should be ordered by profitability
         """
         to_liquidate = controller.users_to_liquidate()
-        
+
         logging.info(f"There are {len(to_liquidate)} users to liquidate.")
 
         if len(to_liquidate) == 0:
@@ -192,7 +192,9 @@ class Liquidator(Agent):
             logging.info(f"Liquidated user {user} with profit: {profit}.")
             return profit
         else:
-            logging.info(f"Missed liquidation for user {user}. Health: {health}. Expected profit: {best_expected_profit}.")
+            logging.info(
+                f"Missed liquidation for user {user}. Health: {health}. Expected profit: {best_expected_profit}."
+            )
             return 0
 
     def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
