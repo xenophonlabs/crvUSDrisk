@@ -20,11 +20,13 @@ class ExternalMarket:
         self,
         token_in: str,
         token_out: str,
-        decimals_in: int,
-        decimals_out: int,
+        decimals_in: int=18,
+        decimals_out: int=18,
         k_scale=1.25,
     ):
-        # TODO need a better way to inherit decimals
+        # TODO token_in/out should be Token objs
+        # so we don't have to keep passing decimals/names/addresses
+        # as args into funcs.
         self.token_in = token_in
         self.token_out = token_out
         self.k_scale = k_scale
