@@ -1,5 +1,3 @@
-from ..modules.pegkeeper import PegKeeper
-from typing import List
 import logging
 from scipy.optimize import minimize_scalar
 from ..utils import get_crvUSD_index
@@ -11,58 +9,22 @@ PRECISION = 1e18
 
 class Arbitrageur(Agent):
     """
-    Arbitrageur either calls update() on the Peg Keeper
-    or arbitrages (swaps) all Curve pools, including:
+    Arbitrageur performs cyclic arbitrages between the following
+    Curve pools:
         - StableSwap pools
-        - TriCrypto-ng pools
+        - TriCrypto-ng pools TODO
         - LLAMMAs.
     TODO need to investigate which pools to include in arbitrage
     search (e.g. TriCRV, other crvUSD pools, etc..). Otherwise, we
     are artificially constraining the available crvUSD liquidity.
     """
 
-    __slots__ = (
-        "tolerance",  # min profit required to act
-        "update_pnl",
-        "update_count",
-        "arbitrage_pnl",
-        "arbitrage_count",
-    )
-
-    def __init__(self, tolerance: float):
+    def __init__(self, tolerance: float = 0):
         assert tolerance >= 0
 
         self.tolerance = tolerance
-        self.update_pnl = 0
-        self.update_count = 0
-        self.arbitrage_pnl = 0
-        self.arbitrage_count = 0
-
-    def update(self, pks: List[PegKeeper], ts: int):
-        """
-        Checks if any PegKeeper is profitable to update.
-
-        Parameters
-        ----------
-        pks : List[PegKeeper]
-            List of PegKeeper objects to check.
-        ts : int
-            Timestamp of update.
-
-        Returns
-        -------
-
-        """
-        pnl = 0
-        count = 0
-        for pk in pks:
-            if pk.estimate_caller_profit(ts) > self.tolerance:
-                pnl += pk.update(ts)
-                count += 1
-                logging.info(f"Updating {pk.name} Peg Keeper with pnl {round(pnl)}.")
-        self.update_pnl += pnl
-        self.update_count += count
-        return pnl, count
+        self._profit = 0
+        self._count = 0
 
     def arbitrage(self, pools, prices):
         """
@@ -103,8 +65,8 @@ class Arbitrageur(Agent):
             logging.info(f"Arbitrage trade with profit {round(profit)}.")
             count += 1
 
-        self.arbitrage_pnl += profit
-        self.arbitrage_count += count
+        self._profit += profit
+        self._count += count
 
         return profit, count
 
@@ -291,73 +253,3 @@ class Arbitrageur(Agent):
         )
 
         return _profit / PRECISION
-
-    # NOTE old arbitrageur code, not useful (for now).
-    # def get_trade(pool: SimCurvePool, p_tgt: float):
-    #     """
-    #     Get the trade required to move pool to target price.
-    #     Inspired by (and copied from) curvesim's `get_arb_trades`.
-
-    #     Parameters
-    #     ----------
-    #     pool : SimCurvePool
-    #         The pool to trade on.
-    #     p_tgt : float
-    #         The target price.
-
-    #     Returns
-    #     -------
-    #     Trade
-    #         The trade required to move the pool to the target price.
-
-    #     Note
-    #     ----
-    #     p_tgt assumed to be stablecoin/crvUSD
-    #     """
-
-    #     def post_trade_price_error(dx, coin_in, coin_out, price_target):
-    #         with pool.use_snapshot_context():
-    #             dx = int(dx)
-    #             if dx > 0:
-    #                 pool.trade(coin_in, coin_out, dx)
-    #             price = pool.price(coin_in, coin_out, use_fee=True)
-    #         return price - price_target
-
-    #     if pool.price(I, I^1) > p_tgt:
-    #         price = p_tgt
-    #         coin_in, coin_out = I, I^1
-    #     elif pool.price(I^1, I) - 1 / p_tgt > 0:
-    #         price = 1 / p_tgt
-    #         coin_in, coin_out = I^1, I
-    #     else:
-    #         return Trade(0, (I, I^1), p_tgt)
-
-    #     # Estimate trade size required to push price to target
-    #     # using Scipy's root_scalar().
-    #     res = root_scalar(
-    #         post_trade_price_error,
-    #         args=(coin_in, coin_out, price),
-    #         bracket=(0, pool.get_max_trade_size(coin_in, coin_out)),
-    #         xtol=1e-12,
-    #         method="brentq",
-    #     )
-
-    #     return Trade(int(res.root), (coin_in, coin_out), price)
-
-    # def test_get_trade(pool):
-    #     """
-    #     Test that the trade returned by `get_trade` moves the pool
-    #     to the desired price.
-    #     """
-    #     def _test_get_trade(pool, p_tgt):
-    #         coin_in, coin_out, dx = get_trade(pool, p_tgt).unpack()
-    #         with pool.use_snapshot_context():
-    #             dx = int(dx)
-    #             if dx > 0:
-    #                 pool.trade(coin_in, coin_out, dx)
-    #                 p = pool.price(coin_in, coin_out, use_fee=True)
-    #                 if coin_in != I:
-    #                     p = 1 / p
-    #                 assert abs(p - p_tgt) < 1e-6
-    #     for x in np.linspace(1.5, 2, 100):
-    #         _test_get_trade(pool, x)

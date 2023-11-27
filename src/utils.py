@@ -15,4 +15,5 @@ def get_crvUSD_index(pool):
     """
     Return index of crvUSD in pool.
     """
-    return pool.coin_names.index("crvUSD")
+    symbols = [c.symbol for c in pool.coins]
+    return symbols.index("crvUSD")

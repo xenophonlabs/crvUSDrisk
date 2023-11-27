@@ -24,11 +24,6 @@ class Liquidator(Agent):
     Liquidator performs hard liquidations on LLAMMAs.
     """
 
-    liquidation_profit: float = 0
-    liquidation_count: float = 0
-    arbitrage_profit: float = 0
-    arbitrage_count: float = 0
-
     basis_tokens: list = [
         "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",  # USDC
         "0xdac17f958d2ee523a2206206994597c13d831ec7",  # USDT
@@ -39,6 +34,8 @@ class Liquidator(Agent):
     def __init__(self, tolerance: float = 0):
         assert tolerance >= 0
         self.tolerance = tolerance
+        self._profit = 0
+        self._count = 0
 
     def set_paths(
         self,
@@ -97,12 +94,12 @@ class Liquidator(Agent):
             # TODO move this to maybe_liquidate
             if profit > self.tolerance:
                 total_profit += profit
-                self.liquidation_count += 1
+                self._count += 1
             else:
                 # Liquidation was missed
                 underwater_debt += position.debt
 
-        self.liquidation_profit += total_profit
+        self._profit += total_profit
 
         return total_profit, underwater_debt
 

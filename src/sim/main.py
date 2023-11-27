@@ -112,6 +112,8 @@ def simulate(config: str):
 
     return metrics
 
+
+def main():
     pass
 
 
