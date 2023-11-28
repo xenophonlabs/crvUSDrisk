@@ -29,6 +29,9 @@ class ExternalMarket:
         # TODO token_in/out should be Token objs
         # so we don't have to keep passing decimals/names/addresses
         # as args into funcs.
+        # TODO markets should be compatible in decimals
+        # with the actual pools. This means we should 
+        # correct our training data to use the actual decimals.
         self.token_in = token_in
         self.token_out = token_out
         self.k_scale = k_scale

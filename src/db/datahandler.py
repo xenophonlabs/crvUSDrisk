@@ -125,6 +125,8 @@ class DataHandler:
             .drop(["id", "symbol"], axis=1)
             .rename(columns={"decimals": "dst_decimals"})
         )
+        # TODO don't adjust for decimals and train EM 
+        # on raw amounts
         df["in_amount"] = (df["in_amount"] / 10 ** df["src_decimals"]).astype(float)
         df["out_amount"] = (df["out_amount"] / 10 ** df["dst_decimals"]).astype(float)
 

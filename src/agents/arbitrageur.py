@@ -59,6 +59,10 @@ class Arbitrageur(Agent):
         count = 0
 
         while True:
+            # TODO this returns the profit in the units of 
+            # the basis token (first token in, last token out).
+            # We should (1) require that the basis token be USDC, USDT, WETH,
+            # and (2) mark this profit to current USD?
             best = self.find_best_arbitrage(cycles)
 
             if best and best.expected_profit > self.tolerance:

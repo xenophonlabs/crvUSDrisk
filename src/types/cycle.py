@@ -2,9 +2,9 @@ import logging
 from typing import List, Union
 from scipy.optimize import minimize_scalar
 from .trade import Swap, Liquidation
+from ..modules import ExternalMarket
 
 TOLERANCE = 1e-6
-
 
 class Cycle:
     def __init__(
@@ -27,23 +27,20 @@ class Cycle:
     def execute(self) -> float:
         """Execute trades."""
         trade = self.trades[0]
-        amt_in = trade.amt / 10 ** trade.get_decimals(trade.i)
+        amt_in = trade.amt
 
         for i, trade in enumerate(self.trades):
             logging.info(f"Executing trade {trade}.")
             if i != self.n - 1:
-                amt_out = trade.do()
-                # check that the amt_out from trade[i] == amt_in for trade[i+1]
+                amt_out, decimals = trade.do()
                 assert (
-                    abs(amt_out - self.trades[i + 1].amt) / 1e18
-                    < TOLERANCE  # TODO precision for ext mkt
+                    abs(amt_out - self.trades[i + 1].amt) / 10**decimals < TOLERANCE
                 ), f"Trade {i+1} output {amt_out} != Trade {i+2} input {self.trades[i+1].amt}."
             else:
-                # Fix decimals to compute profit
-                amt_out = trade.do()
+                amt_out, decimals = trade.do()
 
-        profit = amt_out - amt_in
-        if abs(profit - self.expected_profit) / 1e18 > TOLERANCE:
+        profit = (amt_out - amt_in) / 10**decimals
+        if abs(profit - self.expected_profit) > TOLERANCE:
             logging.warning(
                 f"Expected profit {self.expected_profit} != actual profit {profit}."
             )
@@ -54,9 +51,9 @@ class Cycle:
         """
         Optimize the amt_in for the first trade in the cycle.
         """
-        # TODO maybe the move is to have a use_snapshot_context type thing for
-        # the cycle. Then we can string the Swaps together using the snapshot
-        # context and verify the profit. We can then just use scipy minimize_scalar.
+        assert all(
+            isinstance(trade, Swap) for trade in self.trades
+        ), NotImplementedError("Can only optimize swap cycles.")
         trade = self.trades[0]
         high = trade.pool.get_max_trade_size(self.trade.i, self.trade.j)
 
@@ -87,9 +84,18 @@ class Cycle:
         expected_profit : float
             The expected profit of the cycle.
         """
-        # NOTE ensure we are using the snapshot context
-        # NOTE ensure we are using the correct decimals
-        pass
+        # TODO add a unit test to ensure snapshot context is used correctly
+
+        trade = self.trades[0]
+        trade.amt = amt_in
+
+        for i, trade in enumerate(self.trades):
+            amt, decimals = trade.do(use_snapshot_context=True)
+            if i != self.n - 1:
+                self.trades[i + 1].amt = amt
+
+        self.expected_profit = (amt - amt_in) / 10**decimals
+        return self.expected_profit
 
     def __repr__(self):
         return f"Cycle(Trades: {self.trades}, Expected Profit: {self.expected_profit})"

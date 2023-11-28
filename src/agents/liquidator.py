@@ -177,12 +177,10 @@ class Liquidator(Agent):
             trade2 = Liquidation(controller, position, to_repay)
 
             # collateral -> basis token
-            amt_out = collat_pool.trade(0, 1, y / 1e18)  # TODO decimals
             trade3 = Swap(collat_pool, 0, 1, y)
+            amt_out, decimals = trade3.do(use_snapshot_context=True)
 
-            # TODO the decimals are completely wrong
-            amt_in_ = trade1.amt / 10 ** trade1.get_decimals(i)
-            expected_profit = amt_out - amt_in_
+            expected_profit = (amt_out - amt_in) / 10**decimals
 
             cycle = Cycle([trade1, trade2, trade3], expected_profit=expected_profit)
 
