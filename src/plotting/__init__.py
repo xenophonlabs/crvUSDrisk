@@ -5,7 +5,7 @@ import imageio
 import warnings
 from PIL import Image
 from ..utils import get_crvUSD_index
-from ..modules.market import ExternalMarket
+from ..modules import ExternalMarket
 
 # FIXME remove this
 warnings.simplefilter("ignore", UserWarning)

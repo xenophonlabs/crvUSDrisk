@@ -2,6 +2,7 @@ import logging
 from sklearn.neighbors import KNeighborsRegressor
 import numpy as np
 from typing import Union, List
+from ..configs.config import ADDRESS_TO_SYMBOL
 
 
 class ExternalMarket:
@@ -24,6 +25,7 @@ class ExternalMarket:
         decimals_out: int = 18,
         k_scale=1.25,
     ):
+        # TODO markets should not be directional.
         # TODO token_in/out should be Token objs
         # so we don't have to keep passing decimals/names/addresses
         # as args into funcs.
@@ -32,7 +34,16 @@ class ExternalMarket:
         self.k_scale = k_scale
         self.coin_addresses = [token_in, token_out]
         self.coin_decimals = [decimals_in, decimals_out]
+        self.coin_symbols = [ADDRESS_TO_SYMBOL[addr] for addr in self.coin_addresses]
         self.price = None
+
+    @property
+    def name(self):
+        # TODO token_in/out should be Token objs, then use symbol instead of addr
+        return f"External Market: {ADDRESS_TO_SYMBOL[self.token_in]} -> {ADDRESS_TO_SYMBOL[self.token_out]}"
+
+    def __repr__(self):
+        return self.name
 
     def update_price(self, price: float):
         self.price = price

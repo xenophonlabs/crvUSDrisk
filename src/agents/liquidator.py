@@ -3,7 +3,7 @@ from scipy.optimize import root_scalar
 import logging
 import math
 from .agent import Agent
-from ..modules.market import ExternalMarket
+from ..modules import ExternalMarket
 from ..types.cycle import Swap, Liquidation, Cycle
 from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
@@ -43,6 +43,13 @@ class Liquidator(Agent):
         crvUSD_pools: List[SimCurveStableSwapPool],
         collat_pools: List[ExternalMarket],
     ):
+        """
+        Set the paths for liquidations. Currently:
+        1. Purchase crvUSD from basis_token/crvUSD pools.
+        2. Liquidate the user in the Controller.
+        3. Sell collateral for basis_token in collateral/basis_token
+        External markets.
+        """
         self.paths = []
         for basis_token in self.basis_tokens:
             # Get basis_token/crvUSD pool
@@ -158,6 +165,8 @@ class Liquidator(Agent):
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
 
+            # TODO Abstract this into the `Cycle.optimize` function
+
             # basis token -> crvUSD
             j = get_crvUSD_index(crvusd_pool)
             i = j ^ 1
@@ -201,6 +210,8 @@ class Liquidator(Agent):
 
         Currently only meant for USDC or USDT ->
         crvUSD.
+
+        TODO move this to SimCurveStableSwapPool
         """
 
         amt_out = float(amt_out)  # For scipy

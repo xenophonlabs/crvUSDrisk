@@ -2,7 +2,7 @@ from typing import List
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from src.modules.market import ExternalMarket
+from src.modules import ExternalMarket
 from src.plotting import plot_predictions, plot_price_impact_prediction_error
 
 

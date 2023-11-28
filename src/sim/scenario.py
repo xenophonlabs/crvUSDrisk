@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import permutations
 from collections import defaultdict
 from .prices import PricePaths
-from ..modules.market import ExternalMarket
+from ..modules import ExternalMarket
 from ..db.datahandler import DataHandler
 from ..utils import get_decimals_from_config
 from ..agents.arbitrageur import Arbitrageur
