@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import argparse
 import os
-from src.network.ccxtdatafetcher import CCXTDataFetcher
+from src.network.ccxt import CCXTDataFetcher
 from datetime import datetime
 
 load_dotenv()

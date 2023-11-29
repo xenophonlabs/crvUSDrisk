@@ -5,12 +5,11 @@ from sqlalchemy.dialects.postgresql import insert
 import pandas as pd
 from .models import Base, Token, Quote
 from typing import List
-
-from ..configs import config
+from ..configs import URI, TOKEN_DTOs
 
 
 class DataHandler:
-    def __init__(self, uri=config.URI):
+    def __init__(self, uri=URI):
         self.uri = uri
         self.engine = create_engine(uri)
         self.session_factory = sessionmaker(bind=self.engine)
@@ -36,8 +35,8 @@ class DataHandler:
     def insert_tokens(self):
         """Create the tokens table based on the config."""
         tokens = [
-            {"id": v["address"], "symbol": k, "decimals": v["decimals"]}
-            for k, v in config.ALL.items()
+            {"id": v["address"], "symbol": v["symbol"], "decimals": v["decimals"]}
+            for v in TOKEN_DTOs.values()
         ]
         for token in tokens:
             self.session.add(Token(**token))
@@ -100,35 +99,20 @@ class DataHandler:
 
         self.session.commit()
 
-    def process_quotes(
-        self, quotes: pd.DataFrame, tokens: pd.DataFrame
-    ) -> pd.DataFrame:
+    def process_quotes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Do the following:
-            1. Convert amounts to human readable format.
-            2. Create datetime index (floored to hours).
-            3. Add reference prices for each block of quotes:
+        Performs the following processing steps:
+            1. Create datetime index (floored to hours).
+            2. Add reference prices for each block of quotes:
                 a. Quotes are fetched every hour.
                 b. The reference price is the best price for
                 that block.
-            4. Add price impact as the pct difference
+            3. Add price impact as the pct difference
             between the reference price and the quoted price.
         """
-        # Fix decimals
-        df = (
-            pd.merge(quotes, tokens, left_on="src", right_on="id")
-            .drop(["id", "symbol"], axis=1)
-            .rename(columns={"decimals": "src_decimals"})
-        )
-        df = (
-            pd.merge(df, tokens, left_on="dst", right_on="id")
-            .drop(["id", "symbol"], axis=1)
-            .rename(columns={"decimals": "dst_decimals"})
-        )
-        # TODO don't adjust for decimals and train EM
-        # on raw amounts
-        df["in_amount"] = (df["in_amount"] / 10 ** df["src_decimals"]).astype(float)
-        df["out_amount"] = (df["out_amount"] / 10 ** df["dst_decimals"]).astype(float)
+        # TODO float ok instead of int?
+        df["in_amount"] = df["in_amount"].astype(float)
+        df["out_amount"] = df["out_amount"].astype(float)
 
         # Create datetime index floored to hours.
         df["hour"] = pd.to_datetime(df["timestamp"], unit="s").dt.floor("h")
@@ -196,5 +180,5 @@ class DataHandler:
             return pd.DataFrame()
         results = pd.DataFrame.from_dict(results)
         if process:
-            results = self.process_quotes(results, self.get_tokens())
+            results = self.process_quotes(results)
         return results

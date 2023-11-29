@@ -1,18 +1,19 @@
+import json
 import logging
 import pandas as pd
 import numpy as np
 import requests as req
-from typing import List
+from typing import List, Dict
 from datetime import datetime
 from itertools import permutations
+from dataclasses import dataclass
 from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
 )
-
-from src.types import QuoteResponse
+from src.data_transfer_objects import TokenDTO
 
 MAX_RETRIES = 3
 
@@ -22,16 +23,66 @@ def is_rate_limit_error(e):
     return isinstance(e, req.exceptions.HTTPError) and e.response.status_code == 429
 
 
+@dataclass
+class QuoteResponse:
+    src: str
+    dst: str
+    in_amount: int
+    out_amount: int
+    gas: int
+    timestamp: int
+    in_decimals: int
+    out_decimals: int
+    price: float
+    protocols: list
+
+    def __init__(self, res: dict, in_amount: int, timestamp: int):
+        self.src = res["fromToken"]["address"]
+        self.dst = res["toToken"]["address"]
+        self.in_amount = int(in_amount)
+        self.out_amount = int(res["toAmount"])
+        self.gas = int(res["gas"])
+        self.timestamp = timestamp
+        self.in_decimals = res["fromToken"]["decimals"]
+        self.out_decimals = res["toToken"]["decimals"]
+        self.price = (self.out_amount / 10**self.out_decimals) / (
+            self.in_amount / 10**self.in_decimals
+        )
+        self.protocols = res["protocols"]
+        # Cost of buying 1 unit of dst token using src token
+
+    def to_df(self) -> pd.DataFrame:
+        """
+        Note
+        ----
+        Dumps protocols field into a JSON string. Is there
+        a better approach?
+        """
+        return pd.DataFrame(
+            [
+                {
+                    "src": self.src,
+                    "dst": self.dst,
+                    "in_amount": self.in_amount,
+                    "out_amount": self.out_amount,
+                    "gas": self.gas,
+                    "price": self.price,
+                    "protocols": json.dumps(self.protocols),
+                    "timestamp": self.timestamp,
+                }
+            ]
+        )
+
+
 class OneInchQuotes:
     """
-    Get quotes from 1inch for specified token pairs and construct slippage
+    Get quotes from 1inch for specified token pairs and construct price impact
     curves.
 
     Partly inspired by
     https://github.com/RichardAtCT/1inch_wrapper/blob/master/oneinch_py/main.py.
 
     NOTE this uses the legacy 1inch API! Could update with new Fusion API.
-    TODO add logging
     """
 
     version = "v5.2"
@@ -52,23 +103,21 @@ class OneInchQuotes:
     }
 
     def __init__(
-        self, api_key: str, config: dict, chain: str = "ethereum", calls: int = 10
+        self,
+        api_key: str,
+        config: Dict[str, TokenDTO],
+        chain: str = "ethereum",
+        calls: int = 20,
     ):
         """
         Note
         ----
-        The config file should be a dictionary with the following structure:
-        config[token] = {
-            "address": str,
-            "decimals": int,
-            "min_trade_size": float, # this is the minimum trade size to quote for
-            "max_trade_size": float, # this is the maximum trade size to quote for
-        }
-        They token key can be the address itself, or a natural language name like USDC.
+        The config file should be a dictionary of TokenDTO objects
+        The token key can be the address itself, or a natural language name like USDC.
         """
         self.chain_id = self.chains[chain]
         self.api_key = api_key
-        self.calls = calls  # default number of calls to construct cure
+        self.calls = calls  # default number of calls to construct curve
         self.config = config
 
     @property
@@ -117,20 +166,20 @@ class OneInchQuotes:
         calls = calls if calls else self.calls  # default to self.calls
         in_token, out_token = pair
         in_amounts = np.geomspace(
-            self.config[in_token]["min_trade_size"],
-            self.config[in_token]["max_trade_size"],
+            self.config[in_token].min_trade_size,
+            self.config[in_token].max_trade_size,
             calls,
         )
         # add some noise to get a more complete distribution
         noise = 1 + np.random.uniform(-0.5, 0.5, calls)
         in_amounts *= noise
-        in_amounts *= 10 ** self.config[in_token]["decimals"]
+        in_amounts *= 10 ** self.config[in_token].decimals
         in_amounts = [int(i) for i in in_amounts]
         responses = []
         for in_amount in in_amounts:
             res = self.quote(
-                self.config[in_token]["address"],
-                self.config[out_token]["address"],
+                self.config[in_token].address,
+                self.config[out_token].address,
                 in_amount,
             )
             responses.append(res)

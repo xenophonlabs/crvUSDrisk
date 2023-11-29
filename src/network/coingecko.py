@@ -10,7 +10,7 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
-from ..configs.config import COINGECKO_URL
+from ..configs import COINGECKO_URL
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("urllib3").propagate = False
@@ -23,6 +23,9 @@ KNOWN_IDS_MAP = {
     "true-usd": "0x0000000000085d4780b73119b644ae5ecd22b376",
     "weth": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
     "wrapped-bitcoin": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+    "wrapped-steth": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+    "staked-frax-ether": "0xac3e018457b222d93114458476f3e3416abbe38f",
+    "tbtc": "0x18084fba666a33d37592fa2633fd49a74dd93a88",
 }
 
 

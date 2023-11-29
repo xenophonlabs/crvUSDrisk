@@ -22,7 +22,7 @@ class Cycle:
                 next_trade = trades[0]
             token_out = trade.get_address(trade.j).lower()
             token_in = next_trade.get_address(next_trade.i).lower()
-            assert token_in == token_out, "Trades do not form a cycle."
+            assert token_in == token_out, (token_in, token_out)# "Trades do not form a cycle."
 
     def execute(self) -> float:
         """Execute trades."""
@@ -51,9 +51,10 @@ class Cycle:
         """
         Optimize the amt_in for the first trade in the cycle.
         """
-        # assert all(
-        #     isinstance(trade, Swap) for trade in self.trades
-        # ), NotImplementedError("Can only optimize swap cycles.")
+        assert all(
+            isinstance(trade, Swap) for trade in self.trades
+        ), NotImplementedError("Can only optimize swap cycles.")
+
         trade = self.trades[0]
         high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
 

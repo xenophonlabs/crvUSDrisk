@@ -1,20 +1,21 @@
-from typing import List
-from scipy.optimize import root_scalar
-import logging
 import math
-from .agent import Agent
-from ..modules import ExternalMarket
-from ..types.cycle import Swap, Liquidation, Cycle
+import logging
+from typing import List, Dict
+from dataclasses import dataclass
+from scipy.optimize import root_scalar
 from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
+from .agent import Agent
+from ..modules import ExternalMarket
+from ..trades.cycle import Swap, Liquidation, Cycle
 from ..utils import get_crvUSD_index
-from dataclasses import dataclass
+from ..configs import TOKEN_DTOs
 
 
 @dataclass
 class Path:
-    basis_token: str  # TODO use Token class or something
+    basis_token: str  # address
     crvusd_pool: SimCurveStableSwapPool
     collat_pool: ExternalMarket
 
@@ -25,8 +26,8 @@ class Liquidator(Agent):
     """
 
     basis_tokens: list = [
-        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",  # USDC
-        "0xdac17f958d2ee523a2206206994597c13d831ec7",  # USDT
+        TOKEN_DTOs["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],  # USDC
+        TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
     ]
 
     paths: List[Path] = []
@@ -41,7 +42,7 @@ class Liquidator(Agent):
         self,
         controller: SimController,
         crvUSD_pools: List[SimCurveStableSwapPool],
-        collat_pools: List[ExternalMarket],
+        collat_pools: Dict[tuple, ExternalMarket],
     ):
         """
         Set the paths for liquidations. Currently:
@@ -50,18 +51,21 @@ class Liquidator(Agent):
         3. Sell collateral for basis_token in collateral/basis_token
         External markets.
         """
+        collateral = TOKEN_DTOs[controller.COLLATERAL_TOKEN.address]
+
         self.paths = []
         for basis_token in self.basis_tokens:
+            pair = tuple(sorted([basis_token, collateral]))
             # Get basis_token/crvUSD pool
             for pool in crvUSD_pools:
                 coins = [c.address for c in pool.coins]
-                if basis_token in coins:
+                if basis_token.address in coins:
                     crvusd_pool = pool
-                    # FIXME assuming only one pool for each basis token
+                    # TODO assuming only one pool for each basis token
                     break
 
             # Get collateral/basis_token pool
-            collat_pool = collat_pools[controller.COLLATERAL_TOKEN.address][basis_token]
+            collat_pool = collat_pools[pair]
             self.paths.append(Path(basis_token, crvusd_pool, collat_pool))
 
     def perform_liquidations(
@@ -98,7 +102,6 @@ class Liquidator(Agent):
         for position in to_liquidate:
             profit = self.maybe_liquidate(position, controller)
 
-            # TODO move this to maybe_liquidate
             if profit > self.tolerance:
                 total_profit += profit
                 self._count += 1
@@ -153,19 +156,20 @@ class Liquidator(Agent):
 
         # TODO int casting should occur in controller
         to_repay = int(controller.tokens_to_liquidate(user))
-        # TODO if to_repay == 0: perform liquidation.
         _, y = controller.AMM.get_sum_xy(user)
         y = int(y)
 
         best = None
         best_expected_profit = -math.inf
+        
+        collateral = controller.COLLATERAL_TOKEN.address
 
         assert self.paths, "Liquidator paths not set."
         for path in self.paths:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
 
-            # TODO Abstract this into the `Cycle.optimize` function
+            # TODO Abstract this into the `Cycle.populate` function
 
             # basis token -> crvUSD
             j = get_crvUSD_index(crvusd_pool)
@@ -177,7 +181,9 @@ class Liquidator(Agent):
             trade2 = Liquidation(controller, position, to_repay)
 
             # collateral -> basis token
-            trade3 = Swap(collat_pool, 0, 1, y)
+            i = collat_pool.coin_addresses.index(collateral)
+            j = i^1
+            trade3 = Swap(collat_pool, i, j, y)
             amt_out, decimals = trade3.do(use_snapshot_context=True)
 
             expected_profit = (amt_out - amt_in) / 10**decimals

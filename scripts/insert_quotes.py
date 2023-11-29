@@ -5,8 +5,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from src.db.datahandler import DataHandler
-from src.network.oneinchquotes import OneInchQuotes
-from src.configs.config import ALL
+from src.network.oneinch import OneInchQuotes
+from src.configs import TOKEN_DTOs
 
 load_dotenv()
 INCH_API_KEY = os.getenv("1INCH_API_KEY")
@@ -31,8 +31,8 @@ def main():
     print(
         f"Fetching quotes on {datetime.fromtimestamp(dt).strftime('%m/%d/%Y, %H:%M:%S')} UTC"
     )
-    quoter = OneInchQuotes(INCH_API_KEY, ALL, calls=20)
-    payload = quoter.all_quotes(list(ALL.keys()))
+    quoter = OneInchQuotes(INCH_API_KEY, TOKEN_DTOs, calls=20)
+    payload = quoter.all_quotes(list(TOKEN_DTOs.keys()))
     df = quoter.to_df(payload)
     dh = DataHandler()
     print("Inserting...")

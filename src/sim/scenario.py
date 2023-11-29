@@ -1,12 +1,12 @@
 import json
 import logging
+from typing import Dict
 from dataclasses import dataclass
-from itertools import permutations
-from collections import defaultdict
-from .prices import PricePaths
+from itertools import combinations
+from ..prices import PricePaths, PriceSample
+from ..configs import TOKEN_DTOs
 from ..modules import ExternalMarket
 from ..db.datahandler import DataHandler
-from ..utils import get_decimals_from_config
 from ..agents.arbitrageur import Arbitrageur
 from ..agents.liquidator import Liquidator
 
@@ -27,10 +27,10 @@ class Scenario:
         self.description = config["description"]
         self.N = config["N"]
         self.price_config = config["price_config"]
-        self.coins = config["coins"]
-        self.pairs = list(permutations(self.coins, 2))
+        self.coins = [TOKEN_DTOs[a] for a in config["coins"]]
+        self.pairs = [tuple(sorted(pair)) for pair in combinations(self.coins, 2)]
 
-    def generate_markets(self):
+    def generate_markets(self) -> Dict[tuple, ExternalMarket]:
         """
         Generate the external markets for the scenario.
 
@@ -43,42 +43,36 @@ class Scenario:
             logging.info(f"We have {quotes.shape[0]} quotes.")
 
         logging.info("Fitting external markets against 1inch quotes.")
-        markets = defaultdict(dict)
+        markets = dict()
         for pair in self.pairs:
-            in_token, out_token = pair
-            quotes_ = quotes.loc[pair]
             market = ExternalMarket(
-                in_token,
-                out_token,
-                get_decimals_from_config(in_token),
-                get_decimals_from_config(out_token),
+                pair,
                 1.25,
             )
-            market.fit(quotes_)
-            markets[in_token][out_token] = market
-
+            market.fit(quotes)
+            markets[pair] = market
+        self.markets: Dict[tuple, ExternalMarket] = markets
         return markets
 
-    def generate_pricepaths(self, fn=None):
+    def generate_pricepaths(self, fn: str = None) -> PricePaths:
         """
         Generate the pricepaths for the scenario.
         """
         fn = fn if fn else self.price_config  # override
-        return PricePaths(fn, self.N)
+        self.pricepaths: PricePaths = PricePaths(fn, self.N)
+        return self.pricepaths
 
     def generate_agents(self):
         """
         Generate the agents for the scenario.
         """
-        arbitrageur = Arbitrageur(0)
-        liquidator = Liquidator(0)
+        self.arbitrageur: Arbitrageur = Arbitrageur(0)
+        self.liquidator: Liquidator = Liquidator(0)
         # TODO set liquidator paths
 
-    @staticmethod
-    def update_market_prices(markets, sample):
+    def update_market_prices(self, sample: PriceSample):
         """
         Update the market prices for the scenario.
         """
-        for in_token in markets:
-            for out_token in markets[in_token]:
-                markets[in_token][out_token].update_price(sample[in_token][out_token])
+        for pair in self.pairs:
+            self.markets[pair].update_price(sample.prices)

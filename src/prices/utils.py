@@ -6,90 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import List
 from datetime import datetime
-from dataclasses import dataclass
-from itertools import permutations
-from collections import defaultdict
-from ...configs.config import STABLE_CG_IDS
-from ...plotting import plot_prices
-from ...network.coingecko import get_prices_df, address_from_coin_id, get_current_prices
-
-# TODO structure this code/directory better jfc
-
-
-@dataclass
-class PriceSample:
-    def __init__(self, ts, _prices):
-        self.ts = ts
-        self._prices = _prices
-        pairs = list(permutations(_prices.keys(), 2))
-        self.prices = defaultdict(dict)
-        for pair in pairs:
-            in_token, out_token = pair
-            self.prices[in_token][out_token] = _prices[in_token] / _prices[out_token]
-
-    def __repr__(self):
-        return f"PriceSample({self.ts}, {self._prices})"
-
-
-class PricePaths:
-    """
-    Convenient class for storing params required
-    to generate prices.
-    """
-
-    def __init__(self, fn: str, N: int):
-        """
-        Generate price paths from config file.
-
-        Parameters
-        ----------
-        fn : str
-            Path to price config file.
-        N : int
-            Number of timesteps.
-
-        TODO integrate with curvesim PriceSampler?
-        """
-
-        with open(fn, "r") as f:
-            logging.info(f"Reading price config from {fn}.")
-            config = json.load(f)
-
-        self.N = N
-        self.params = config["params"]
-        self.cov = pd.DataFrame.from_dict(config["cov"])
-        self.freq = config["freq"]
-        self.gran = gran(self.freq)  # in seconds
-        self.coin_ids = list(self.params.keys())
-        self.coins = [address_from_coin_id(coin_id) for coin_id in self.coin_ids]
-        self.S0s = get_current_prices(self.coin_ids)
-        self.annual_factor = factor(self.freq)
-        self.dt = 1 / self.annual_factor
-        self.T = self.N * self.dt
-        self.S = gen_cor_prices(
-            self.coin_ids,
-            self.T,
-            self.dt,
-            self.S0s,
-            self.cov,
-            self.params,
-            timestamps=True,
-            gran=self.gran,
-        )
-
-    def __iter__(self):
-        """
-        Yields
-        ------
-        :class: `PriceSample`
-        """
-        for ts, prices in self.S.iterrows():
-            yield PriceSample(ts, prices.to_dict())
-
-    def __getitem__(self, i):
-        ts = self.S.index[i]
-        prices = self.S.iloc[i]
-        return PriceSample(ts, prices.to_dict())
+from ..configs import STABLE_CG_IDS
+from ..plotting import plot_prices
+from ..network.coingecko import get_prices_df, address_from_coin_id
 
 
 def gen_price_config(
@@ -493,18 +412,21 @@ def gen_cor_prices(
     # Initialize the price matrix and simulate the paths
     S = np.zeros((N, n))
 
-    for i, asset in enumerate(coins):
-        if asset in STABLE_CG_IDS:
+    # TODO convert all CG id references to ERC20 addresses
+    # and delete the STABLE_CG_IDS dict
+    for i, coin in enumerate(coins):
+        if coin in STABLE_CG_IDS:
             theta, mu, sigma = (
-                params[asset]["theta"],
-                params[asset]["mu"],
-                params[asset]["sigma"],
+                params[coin]["theta"],
+                params[coin]["mu"],
+                params[coin]["sigma"],
             )
-            S[:, i] = gen_ou(theta, mu, sigma, dt, S0s[asset], N)
+            S[:, i] = gen_ou(theta, mu, sigma, dt, S0s[coin], N)
         else:
-            mu, sigma = params[asset]["mu"], params[asset]["sigma"]
-            S[:, i] = gen_gbm(mu, sigma, dt, S0s[asset], N, dW_correlated[:, i])
+            mu, sigma = params[coin]["mu"], params[coin]["sigma"]
+            S[:, i] = gen_gbm(mu, sigma, dt, S0s[coin], N, dW_correlated[:, i])
 
+    # TODO add jumps
     coin_ids = [address_from_coin_id(c) for c in coins]
     df = pd.DataFrame(S, columns=coin_ids)
 

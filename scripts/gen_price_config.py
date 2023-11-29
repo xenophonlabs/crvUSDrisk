@@ -21,8 +21,8 @@ the last 60 days.
 import argparse
 import logging
 from datetime import datetime, timedelta
-from src.sim.prices import gen_price_config
-from src.configs.config import COINS
+from src.prices.utils import gen_price_config
+from src.configs import ADDRESSES
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,4 +41,4 @@ if __name__ == "__main__":
     start = int((datetime.now() - timedelta(days=60)).timestamp())
     fn = f"./src/configs/prices/{freq}_{start}_{end}.json"
 
-    gen_price_config(fn, COINS, start, end, freq=freq, plot=plot)
+    gen_price_config(fn, ADDRESSES, start, end, freq=freq, plot=plot)

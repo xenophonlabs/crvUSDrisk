@@ -618,31 +618,34 @@ def plot_price_1inch(df, in_token, out_token, fn: str = None):
 
 def plot_regression(
     df: pd.DataFrame,
-    in_token: str,
-    out_token: str,
+    i: int,
+    j: int,
     market: ExternalMarket,
     fn: str = None,
     scale: str = "log",
     xlim: float = None,
 ):
+    in_token = market.coins[i]
+    out_token = market.coins[j]
+
     dt = pd.to_datetime(df["timestamp"], unit="s")
-    x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
-    y = market.price_impact(x) * 100
+    X = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
+    y = market.price_impact(i, j, X) * 100
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(
-        df["in_amount"],
+        df["in_amount"] / 10**in_token.decimals,
         df["price_impact"] * 100,
         c=dt,
         s=10,
         label="1inch Quotes",
     )
-    ax.plot(x, y, label="Prediction", c="indianred", lw=1)
+    ax.plot(X / 10**in_token.decimals, y, label="Prediction", c="indianred", lw=1)
     ax.set_xscale(scale)
     ax.legend()
-    ax.set_xlabel(f"Amount in ({in_token})")
+    ax.set_xlabel(f"Amount in ({in_token.symbol})")
     ax.set_ylabel("Price Impact %")
-    ax.set_title(f"{in_token} -> {out_token} Price Impact")
+    ax.set_title(f"{in_token.symbol} -> {out_token.symbol} Price Impact")
 
     cbar = plt.colorbar(scatter, ax=ax)
     cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
@@ -663,28 +666,41 @@ def plot_regression(
 
 def plot_predictions(
     df: pd.DataFrame,
-    in_token: str,
-    out_token: str,
+    i: int,
+    j: int,
     market: ExternalMarket,
     fn: str = None,
     scale: str = "log",
     xlim: float = None,
 ):
+    in_token = market.coins[i]
+    out_token = market.coins[j]
+
     dt = pd.to_datetime(df["timestamp"], unit="s")
 
     X = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
-    y = [market.trade(0, 1, x) for x in X]
+    y = np.array([market.trade(i, j, x) for x in X])
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(
-        df["in_amount"], df["out_amount"], c=dt, s=10, label="1inch Quotes"
+        df["in_amount"] / 10**in_token.decimals,
+        df["out_amount"] / 10**out_token.decimals,
+        c=dt,
+        s=10,
+        label="1inch Quotes",
     )
-    ax.plot(X, y, label="Prediction", c="indianred", lw=1)
+    ax.plot(
+        X / 10**in_token.decimals,
+        y / 10**out_token.decimals,
+        label="Prediction",
+        c="indianred",
+        lw=1,
+    )
     ax.set_xscale(scale)
     ax.legend()
-    ax.set_xlabel(f"Amount in ({in_token})")
-    ax.set_ylabel(f"Amount out ({out_token})")
-    ax.set_title(f"{in_token} -> {out_token} Quotes")
+    ax.set_xlabel(f"Amount in ({in_token.symbol})")
+    ax.set_ylabel(f"Amount out ({out_token.symbol})")
+    ax.set_title(f"{in_token.symbol} -> {out_token.symbol} Quotes")
 
     cbar = plt.colorbar(scatter, ax=ax)
     cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))

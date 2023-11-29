@@ -1,7 +1,7 @@
 import logging
 from typing import List, Any, Tuple
-from src.types import Swap, Cycle
-from src.modules import ExternalMarket
+from ..trades import Swap, Cycle
+from ..modules import ExternalMarket
 
 # TODO add proper pool typing instead of Any
 

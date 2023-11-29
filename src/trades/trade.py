@@ -2,12 +2,12 @@ from abc import ABC
 from typing import Union
 from contextlib import nullcontext
 from dataclasses import dataclass
-from ..modules import ExternalMarket
 from crvusdsim.pool.crvusd.controller import Position
 from curvesim.pool.sim_interface import SimCurvePool
 from crvusdsim.pool.sim_interface import SimLLAMMAPool, SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
+from ..modules import ExternalMarket
 
 
 @dataclass
@@ -52,19 +52,11 @@ class Swap(Trade):
             else nullcontext()
         )
 
-        # TODO find a better way to handle EM decimals
-        # TODO don't adjust decimals in datahandler
-        if isinstance(pool, ExternalMarket):
-            amt_in /= 10 ** self.get_decimals(self.i)
-
         with context_manager:
             # TODO `trade` has different returns for different
             # pool types.
             # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
             amt_out = pool.trade(self.i, self.j, amt_in)
-
-        if isinstance(pool, ExternalMarket):
-            amt_out *= 10 ** self.get_decimals(self.j)
 
         return amt_out, self.get_decimals(self.j)
 
