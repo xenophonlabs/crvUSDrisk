@@ -58,6 +58,9 @@ class Swap(Trade):
             amt_in /= 10 ** self.get_decimals(self.i)
 
         with context_manager:
+            # TODO `trade` has different returns for different
+            # pool types.
+            # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
             amt_out = pool.trade(self.i, self.j, amt_in)
 
         if isinstance(pool, ExternalMarket):

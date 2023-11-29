@@ -6,6 +6,7 @@ from ..modules import ExternalMarket
 
 TOLERANCE = 1e-6
 
+
 class Cycle:
     def __init__(
         self, trades: List[Union[Swap, Liquidation]], expected_profit: float = None
@@ -51,21 +52,20 @@ class Cycle:
         """
         Optimize the amt_in for the first trade in the cycle.
         """
-        assert all(
-            isinstance(trade, Swap) for trade in self.trades
-        ), NotImplementedError("Can only optimize swap cycles.")
+        # assert all(
+        #     isinstance(trade, Swap) for trade in self.trades
+        # ), NotImplementedError("Can only optimize swap cycles.")
         trade = self.trades[0]
-        high = trade.pool.get_max_trade_size(self.trade.i, self.trade.j)
-
+        high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
+        
         res = minimize_scalar(
-            self.populate,
+            lambda x: -self.populate(x),
             args=(),
-            bracket=(0, high),
-            xtol=1e-6,
-            method="brentq",
+            bounds=(0, high),
+            method="bounded",
         )
 
-        if res.converged:
+        if res.success:
             self.populate(res.x)
         else:
             raise RuntimeError(res.message)
@@ -84,6 +84,7 @@ class Cycle:
         expected_profit : float
             The expected profit of the cycle.
         """
+        amt_in = int(amt_in)  # cast float to int
         # TODO add a unit test to ensure snapshot context is used correctly
 
         trade = self.trades[0]
@@ -95,7 +96,7 @@ class Cycle:
                 self.trades[i + 1].amt = amt
 
         self.expected_profit = (amt - amt_in) / 10**decimals
-        return self.expected_profit
+        return float(self.expected_profit)
 
     def __repr__(self):
         return f"Cycle(Trades: {self.trades}, Expected Profit: {self.expected_profit})"
