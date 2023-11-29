@@ -2,7 +2,6 @@ import logging
 from typing import List, Union
 from scipy.optimize import minimize_scalar
 from .trade import Swap, Liquidation
-from ..modules import ExternalMarket
 
 TOLERANCE = 1e-6
 
@@ -57,7 +56,7 @@ class Cycle:
         # ), NotImplementedError("Can only optimize swap cycles.")
         trade = self.trades[0]
         high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
-        
+
         res = minimize_scalar(
             lambda x: -self.populate(x),
             args=(),
@@ -70,7 +69,7 @@ class Cycle:
         else:
             raise RuntimeError(res.message)
 
-    def populate(self, amt_in):
+    def populate(self, amt_in: float) -> float:
         """
         Populate the amt_in to all trades in cycle, and the expected_profit.
 
@@ -95,8 +94,8 @@ class Cycle:
             if i != self.n - 1:
                 self.trades[i + 1].amt = amt
 
-        self.expected_profit = (amt - amt_in) / 10**decimals
-        return float(self.expected_profit)
+        self.expected_profit = float((amt - amt_in) / 10**decimals)
+        return self.expected_profit
 
     def __repr__(self):
         return f"Cycle(Trades: {self.trades}, Expected Profit: {self.expected_profit})"

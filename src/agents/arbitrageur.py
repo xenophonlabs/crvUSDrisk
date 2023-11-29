@@ -1,7 +1,4 @@
 import logging
-from scipy.optimize import minimize_scalar
-from ..utils import get_crvUSD_index
-from ..types import Trade
 from .agent import Agent
 
 PRECISION = 1e18
