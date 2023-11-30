@@ -21,7 +21,7 @@ class Arbitrageur(Agent):
 
     def __init__(self, tolerance: float = 1):
         # tolerance in units of USD
-        assert tolerance > 0 # default is one dollah
+        assert tolerance > 0  # default is one dollah
 
         self.tolerance: float = tolerance
         self._profit: float = 0
@@ -65,8 +65,12 @@ class Arbitrageur(Agent):
 
             if best_cycle and best_profit > self.tolerance:
                 # Dollarize profit
-                _profit = best_cycle.execute() * prices._prices[best_cycle.basis_address]
-                assert _profit == best_profit, RuntimeError("Expected profit != actual profit.")
+                _profit = (
+                    best_cycle.execute() * prices._prices[best_cycle.basis_address]
+                )
+                assert _profit == best_profit, RuntimeError(
+                    "Expected profit != actual profit."
+                )
                 profit += best_profit
                 count += 1
             else:
@@ -78,19 +82,21 @@ class Arbitrageur(Agent):
 
         return profit, count
 
-    def find_best_arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> Tuple[Cycle, float]:
+    def find_best_arbitrage(
+        self, cycles: List[Cycle], prices: PriceSample
+    ) -> Tuple[Cycle, float]:
         """
         Find the optimal liquidity-constrained cyclic arbitrages.
         Dollarize the profit by marking it to current USD market price.
         TODO does this dollarization make sense?
-        
+
         Parameters
         ----------
         cycles : List[Cycle]
             List of cycles. Cycles are an ordered list of `Trade`s.
         prices : PriceSample
             Current USD market prices for each coin.
-        
+
         Returns
         -------
         best_cycle : Cycle
@@ -104,7 +110,9 @@ class Arbitrageur(Agent):
         for cycle in cycles:
             cycle.optimize()
             # Dollarize the expected profit
-            expected_profit = cycle.expected_profit * prices._prices[cycle.basis_address]
+            expected_profit = (
+                cycle.expected_profit * prices._prices[cycle.basis_address]
+            )
             if expected_profit > best_profit:
                 best_profit = expected_profit
                 best_cycle = cycle

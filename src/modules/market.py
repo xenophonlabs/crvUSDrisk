@@ -25,7 +25,6 @@ class ExternalMarket:
     def __init__(
         self,
         coins: List[TokenDTO],
-        k_scale=1.25,
     ):
         n = len(coins)
         assert n == 2
@@ -33,9 +32,7 @@ class ExternalMarket:
         self.coins = coins
         self.pair_indices = list(permutations(range(n), 2))
         self.n = n
-        self.k_scale = k_scale
         self.prices = None
-        self.ks = defaultdict(dict)
         self.models = defaultdict(dict)
         # self.models[i][j] is the model for swapping i->j
 
@@ -94,8 +91,6 @@ class ExternalMarket:
         """
         for i, j in self.pair_indices:
             quotes_ = quotes.loc[(self.coin_addresses[i], self.coin_addresses[j])]
-
-            self.ks[i][j] = k = int(len(quotes_["hour"].unique()) * self.k_scale)
 
             X = quotes_["in_amount"].values.reshape(-1, 1)
             y = quotes_["price_impact"].values
