@@ -22,7 +22,10 @@ class Cycle:
                 next_trade = trades[0]
             token_out = trade.get_address(trade.j).lower()
             token_in = next_trade.get_address(next_trade.i).lower()
-            assert token_in == token_out, (token_in, token_out)# "Trades do not form a cycle."
+            assert token_in == token_out, (
+                token_in,
+                token_out,
+            )  # "Trades do not form a cycle."
 
     def execute(self) -> float:
         """Execute trades."""

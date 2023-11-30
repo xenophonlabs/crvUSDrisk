@@ -8,6 +8,7 @@ from collections import defaultdict
 from .utils import gen_cor_prices, gran, factor
 from ..network.coingecko import address_from_coin_id, get_current_prices
 
+
 def get_pairwise_prices(_prices):
     pairs = list(permutations(_prices.keys(), 2))
     prices = defaultdict(dict)
@@ -15,6 +16,7 @@ def get_pairwise_prices(_prices):
         in_token, out_token = pair
         prices[in_token][out_token] = _prices[in_token] / _prices[out_token]
     return prices
+
 
 @dataclass
 class PriceSample:
@@ -25,7 +27,7 @@ class PriceSample:
 
     def update(self, _prices: Dict[str, float]):
         """
-        Update USD prices for any subset of tokens. 
+        Update USD prices for any subset of tokens.
         Recalculate pairwise prices.
         """
         self._prices.update(_prices)

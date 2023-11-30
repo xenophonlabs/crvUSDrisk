@@ -145,7 +145,7 @@ class ExternalMarket:
         j : int
             The index of the token_out.
         size : Any
-            The amount of token_in to sell. Could be 
+            The amount of token_in to sell. Could be
 
         Returns
         -------

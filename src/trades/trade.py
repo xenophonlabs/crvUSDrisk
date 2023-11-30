@@ -1,3 +1,4 @@
+import logging
 from abc import ABC
 from typing import Union
 from contextlib import nullcontext
@@ -53,10 +54,21 @@ class Swap(Trade):
         )
 
         with context_manager:
-            # TODO `trade` has different returns for different
-            # pool types.
+            result = pool.trade(self.i, self.j, amt_in)
+
+        if isinstance(pool, (ExternalMarket, SimCurveStableSwapPool)):
+            amt_out = result
+        elif isinstance(pool, SimLLAMMAPool):
             # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
-            amt_out = pool.trade(self.i, self.j, amt_in)
+            in_amount_done, amt_out, _ = result
+            if in_amount_done != amt_in:
+                logging.warning(
+                    f"LLAMMA amt_in {amt_in} != in_amount_done {in_amount_done}."
+                )
+        elif isinstance(pool, SimCurvePool):
+            amt_out, _ = result
+        else:
+            raise NotImplementedError
 
         return amt_out, self.get_decimals(self.j)
 

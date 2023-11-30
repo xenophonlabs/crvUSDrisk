@@ -161,7 +161,7 @@ class Liquidator(Agent):
 
         best = None
         best_expected_profit = -math.inf
-        
+
         collateral = controller.COLLATERAL_TOKEN.address
 
         assert self.paths, "Liquidator paths not set."
@@ -182,7 +182,7 @@ class Liquidator(Agent):
 
             # collateral -> basis token
             i = collat_pool.coin_addresses.index(collateral)
-            j = i^1
+            j = i ^ 1
             trade3 = Swap(collat_pool, i, j, y)
             amt_out, decimals = trade3.do(use_snapshot_context=True)
 
