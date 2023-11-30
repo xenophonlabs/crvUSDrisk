@@ -1,6 +1,6 @@
-from ..modules.pegkeeper import PegKeeper
-from typing import List
 import logging
+from typing import List, Tuple
+from crvusdsim.pool import PegKeeper
 from .agent import Agent
 
 PRECISION = 1e18
@@ -18,7 +18,7 @@ class Keeper(Agent):
         self._profit = 0
         self._count = 0
 
-    def update(self, pks: List[PegKeeper], ts: int) -> tuple(float, int):
+    def update(self, pks: List[PegKeeper], ts: int) -> Tuple[float, int]:
         """
         Checks if any PegKeeper is profitable to update. Updates
         if profitable.

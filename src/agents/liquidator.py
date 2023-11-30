@@ -1,6 +1,6 @@
 import math
 import logging
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from dataclasses import dataclass
 from scipy.optimize import root_scalar
 from crvusdsim.pool.crvusd.controller import Position
@@ -35,8 +35,8 @@ class Liquidator(Agent):
     def __init__(self, tolerance: float = 0):
         assert tolerance >= 0
         self.tolerance = tolerance
-        self._profit = 0
-        self._count = 0
+        self._profit: float = 0.0
+        self._count: int = 0
 
     def set_paths(
         self,
@@ -71,7 +71,7 @@ class Liquidator(Agent):
     def perform_liquidations(
         self,
         controller: SimController,
-    ) -> List[float]:
+    ) -> Tuple[float, int]:
         """
         Loops through all liquidatable users and liquidates if profitable.
 
@@ -83,7 +83,7 @@ class Liquidator(Agent):
         Returns
         -------
         total_profit : float
-            Profit in USDC units from Liquidations.
+            Profit in USD units from Liquidations.
         underwater_debt : float
             Total crvUSD debt of underwater positions.
 
@@ -94,10 +94,10 @@ class Liquidator(Agent):
         logging.info(f"There are {len(to_liquidate)} users to liquidate.")
 
         if len(to_liquidate) == 0:
-            return 0, 0
+            return 0.0, 0
 
         underwater_debt = 0
-        total_profit = 0
+        total_profit = 0.0
 
         for position in to_liquidate:
             profit = self.maybe_liquidate(position, controller)
@@ -170,6 +170,7 @@ class Liquidator(Agent):
             collat_pool = path.collat_pool
 
             # TODO Abstract this into the `Cycle.populate` function
+            # TODO dollarize the profit based on current USD market prices
 
             # basis token -> crvUSD
             j = get_crvUSD_index(crvusd_pool)
@@ -194,7 +195,7 @@ class Liquidator(Agent):
                 best = cycle
                 best_expected_profit = expected_profit
 
-        if best_expected_profit > self.tolerance:
+        if best and best_expected_profit > self.tolerance:
             logging.info(
                 f"Liquidating user {user} with expected profit: {best_expected_profit}."
             )
@@ -205,7 +206,7 @@ class Liquidator(Agent):
             logging.info(
                 f"Missed liquidation for user {user}. Health: {health}. Expected profit: {best_expected_profit}."
             )
-            return 0
+            return 0.0
 
     def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
         """
@@ -218,7 +219,7 @@ class Liquidator(Agent):
         TODO move this to SimCurveStableSwapPool
         """
 
-        amt_out = float(amt_out)  # For scipy
+        amt_out_float = float(amt_out)  # For scipy
 
         assert isinstance(pool, SimCurveStableSwapPool)
 
@@ -231,7 +232,7 @@ class Liquidator(Agent):
             amt_in = int(amt_in)
             with pool.use_snapshot_context():
                 amt_out_ = pool.trade(i, j, amt_in)
-            return amt_out - amt_out_
+            return amt_out_float - amt_out_
 
         high = pool.get_max_trade_size(i, j)
 

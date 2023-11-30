@@ -6,6 +6,7 @@ class MetricsResult:
     def __init__(self):
         pass
 
+
 class MetricsProcessor:
     """
     Stores and massages metrics data
@@ -17,6 +18,6 @@ class MetricsProcessor:
 
     def update(self):
         pass
-    
+
     def process(self) -> MetricsResult:
         return MetricsResult()

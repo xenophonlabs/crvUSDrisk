@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import imageio
 import warnings
 from PIL import Image
+from typing import Optional
 from ..utils import get_crvUSD_index
 from ..modules import ExternalMarket
 
@@ -552,49 +553,12 @@ def plot_jumps(df, recovery_threshold, fn=None):
     return f
 
 
-def plot_price_impact_1inch(res, in_token, out_token, fn: str = None):
-    prices = [r.price for r in res]
-    base_price = max(prices)  # price = out/in
-    price_impact = [100 * (base_price - p) / base_price for p in prices]
-    in_amounts = [r.in_amount / (10**r.in_decimals) for r in res]
-
-    f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(in_amounts, price_impact, s=10, c="royalblue")
-    ax.set_xscale("log")
-    ax.set_title(f"Price Impact for Swapping {in_token} into {out_token}")
-    ax.set_ylabel("Price Impact (%)")
-    ax.set_xlabel(f"Trade Size ({in_token})")
-
-    f.tight_layout()
-
-    if fn:
-        plt.savefig(fn, bbox_inches="tight", dpi=300)
-        plt.close()  # don't show
-
-    return f
-
-
-def plot_price_impact(df, in_token, out_token, fn: str = None):
-    f, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(df["in_amount"], df["price_impact"], s=10, c="royalblue")
-    ax.set_xscale("log")
-    ax.set_title(f"Price Impact for Swapping {in_token} into {out_token}")
-    ax.set_ylabel("Price Impact (%)")
-    ax.set_xlabel(f"Trade Size ({in_token})")
-
-    f.tight_layout()
-
-    if fn:
-        plt.savefig(fn, bbox_inches="tight", dpi=300)
-        plt.close()  # don't show
-
-    return f
-
-
 S = 5
 
 
-def plot_price_1inch(df, in_token, out_token, fn: str = None):
+def plot_price_1inch(
+    df: pd.DataFrame, in_token: str, out_token: str, fn: Optional[str] = None
+) -> plt.Figure:
     dt = pd.to_datetime(df["hour"], unit="s")
 
     f, ax = plt.subplots(figsize=(10, 5))
@@ -624,10 +588,10 @@ def plot_regression(
     i: int,
     j: int,
     market: ExternalMarket,
-    fn: str = None,
+    fn: Optional[str] = None,
     scale: str = "log",
-    xlim: float = None,
-):
+    xlim: Optional[float] = None,
+) -> plt.Figure:
     in_token = market.coins[i]
     out_token = market.coins[j]
 
@@ -672,10 +636,10 @@ def plot_predictions(
     i: int,
     j: int,
     market: ExternalMarket,
-    fn: str = None,
+    fn: Optional[str] = None,
     scale: str = "log",
-    xlim: float = None,
-):
+    xlim: Optional[float] = None,
+) -> plt.Figure:
     in_token = market.coins[i]
     out_token = market.coins[j]
 

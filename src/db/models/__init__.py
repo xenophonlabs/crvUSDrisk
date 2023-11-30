@@ -1,3 +1,4 @@
+from typing import Type
 from sqlalchemy import (
     Column,
     Integer,
@@ -5,12 +6,17 @@ from sqlalchemy import (
     Float,
     String,
     ForeignKey,
+    Table,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.declarative import as_declarative
 
-Base = declarative_base()
+@as_declarative()
+class Base:
+    __tablename__: str
+    __table__: Table
 
+Entity = Type[Base]
 
 class Token(Base):
     __tablename__ = "tokens"

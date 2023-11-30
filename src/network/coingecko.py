@@ -2,7 +2,7 @@ import requests as req
 import pandas as pd
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from curvesim.network.coingecko import coin_ids_from_addresses_sync
 from tenacity import (
     retry,
@@ -37,16 +37,11 @@ MAX_RETRIES = 5
     wait=wait_exponential(multiplier=1, min=5, max=20),
     retry=retry_if_exception_type(req.HTTPError),
 )
-def _get(url: str, params: dict, key: str = None) -> List:
+def _get(url: str, params: dict) -> dict:
     """Get data from coingecko API."""
     res = req.get(url, params=params)
-    if res.status_code == 200:
-        res = res.json()
-        if key:
-            return res[key]
-        return res
-    else:
-        raise res.raise_for_status()  # retry if rate limit error
+    res.raise_for_status()  # retry if rate limit error
+    return res.json()
 
 
 def get_current_prices(coin_ids: List[str]) -> dict:
@@ -104,17 +99,19 @@ def get_historical_prices(coin_id: str, start: int, end: int) -> List:
     """
     url = COINGECKO_URL + f"coins/{coin_id}/market_chart/range"
     params = {"vs_currency": "usd", "from": start, "to": end}
-    return _get(url, params, "prices")
+    return _get(url, params)["prices"]
 
 
-def get_prices_df(coins: str, start: int, end: int, freq: str = "1d") -> pd.DataFrame:
+def get_prices_df(
+    coins: List[str], start: int, end: int, freq: str = "1d"
+) -> pd.DataFrame:
     """
     Get price data from coingecko API and convert
     into a formatted DataFrame.
 
     Parameters
     ----------
-    coin_id : str
+    coin_id : List[str]
         Coin id from coingecko API or Ethereum address.
     start : int
         Unix timestamp in milliseconds.
@@ -136,7 +133,7 @@ def get_prices_df(coins: str, start: int, end: int, freq: str = "1d") -> pd.Data
             coin = coin_ids_from_addresses_sync([coin], "mainnet")[0]
         prices = get_historical_prices(coin, start, end)
         cdf = pd.DataFrame(prices, columns=["timestamp", coin])
-        cdf.index = pd.to_datetime(cdf["timestamp"], unit="ms")
+        cdf.index = pd.Index(pd.to_datetime(cdf["timestamp"], unit="ms"))
         cdf.index.name = "datetime"
         cdf.drop(["timestamp"], axis=1, inplace=True)
         cdf = cdf.resample(freq).mean()
@@ -165,5 +162,5 @@ def address_from_coin_id(coin_id, chain="ethereum"):
         "developer_data": "false",
         "sparkline": "false",
     }
-    res = _get(url, params, key="platforms")
+    res = _get(url, params)["platforms"]
     return res[chain]

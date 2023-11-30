@@ -4,7 +4,7 @@ import logging
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from ..configs import STABLE_CG_IDS
 from ..plotting import plot_prices
@@ -76,11 +76,9 @@ def gen_price_config(
         json.dump(config, f)
 
     if plot:
-        start = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-        end = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
         coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()
         logging.info(
-            f"Plotting empirical and simulated prices from {start} to {end}.\n"
+            f"Plotting empirical and simulated prices from {datetime.fromtimestamp(start).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end).strftime('%Y-%m-%d')}.\n"
         )
         annual_factor = factor(freq)
         T = df.shape[0] / annual_factor
@@ -163,7 +161,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
 
         if col in STABLE_CG_IDS:
             # Estimate an OU Process
-            theta, mu, sigma = estimate_ou_parameters_MLE(df[col], dt)
+            theta, mu, sigma = estimate_ou_parameters_MLE(df[col].tolist(), dt)
             sigma *= np.sqrt(annual_factor)  # annualize
             params[col] = {"theta": theta, "mu": mu, "sigma": sigma, "type": "OU"}
         else:
@@ -177,8 +175,8 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
     # Calculate the covariance matrix of the log returns
     log_return_cols = [f"{col}_log_returns" for col in cols]
     cov = df[log_return_cols].cov() * annual_factor
-    cov.columns = cols
-    cov.index = cols
+    cov.columns = cols  # type: ignore
+    cov.index = cols  # type: ignore
 
     return params, cov
 
@@ -227,13 +225,13 @@ def log_likelihood(params, X, dt):
     return -log_likelihood  # Negative for minimization
 
 
-def estimate_ou_parameters_MLE(X: np.array, dt: float) -> tuple:
+def estimate_ou_parameters_MLE(X: List[float], dt: float) -> tuple:
     """
     Estimate the parameters of an OU process using MLE.
 
     Parameters
     ----------
-    X : np.array
+    X : List[float]
         Time series of observations
     dt : float
         Time step (annualized)
@@ -363,7 +361,7 @@ def gen_cor_prices(
     cov: pd.DataFrame,
     params: dict,
     timestamps: bool = False,
-    gran: int = None,
+    gran: Optional[int] = None,
 ):
     """
     Generate a matrix of correlated GBMs using
@@ -433,7 +431,7 @@ def gen_cor_prices(
     if timestamps:
         assert gran
         now = int(datetime.now().timestamp())
-        df.index = list(range(now, now + N * gran, gran))
+        df.index = pd.Index(list(range(now, now + N * gran, gran)))
 
     return df
 

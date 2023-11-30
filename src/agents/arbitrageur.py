@@ -1,5 +1,5 @@
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from .agent import Agent
 from ..trades import Cycle
 from ..prices import PriceSample
@@ -56,7 +56,7 @@ class Arbitrageur(Agent):
         TODO need to handle different cycle formats?
         TODO need to track pool-specific metrics
         """
-        profit = 0
+        profit = 0.0
         count = 0
 
         while True:
@@ -84,7 +84,7 @@ class Arbitrageur(Agent):
 
     def find_best_arbitrage(
         self, cycles: List[Cycle], prices: PriceSample
-    ) -> Tuple[Cycle, float]:
+    ) -> Tuple[Optional[Cycle], float]:
         """
         Find the optimal liquidity-constrained cyclic arbitrages.
         Dollarize the profit by marking it to current USD market price.
@@ -105,10 +105,11 @@ class Arbitrageur(Agent):
             The dollarized profit of the optimal cycle.
         """
         best_cycle = None
-        best_profit = 0
+        best_profit = 0.0
 
         for cycle in cycles:
             cycle.optimize()
+            assert cycle.expected_profit
             # Dollarize the expected profit
             expected_profit = (
                 cycle.expected_profit * prices._prices[cycle.basis_address]

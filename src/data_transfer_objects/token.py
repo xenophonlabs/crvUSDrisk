@@ -9,5 +9,5 @@ class TokenDTO:
     name: str
     symbol: str
     decimals: int
-    min_trade_size: int  # min amt_in for 1inch quotes
-    max_trade_size: int  # max amt_in for 1inch quotes
+    min_trade_size: float  # min amt_in for 1inch quotes
+    max_trade_size: float  # max amt_in for 1inch quotes

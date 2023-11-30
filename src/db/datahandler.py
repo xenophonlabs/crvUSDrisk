@@ -1,10 +1,10 @@
+import pandas as pd
+from typing import List, Optional, Type
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.dialects.postgresql import insert
-import pandas as pd
-from .models import Base, Token, Quote
-from typing import List
+from .models import Entity, Token, Quote
 from ..configs import URI, TOKEN_DTOs
 
 
@@ -51,7 +51,7 @@ class DataHandler:
     def insert_df(
         self,
         df: pd.DataFrame,
-        entity: object,
+        entity: Entity,
         replace: bool = False,
         index_elements: List[str] = [],
     ):
@@ -75,7 +75,7 @@ class DataHandler:
     def insert_list(
         self,
         lst: List[dict],
-        entity: object,
+        entity: Entity,
         replace: bool = False,
         index_elements: List[str] = [],
     ):
@@ -141,7 +141,9 @@ class DataHandler:
 
         return df
 
-    def get_tokens(self, cols: List[str] = ["id", "symbol", "decimals"]) -> dict:
+    def get_tokens(
+        self, cols: List[str] = ["id", "symbol", "decimals"]
+    ) -> pd.DataFrame:
         """Get tokens from database."""
         query = self.session.query(*[getattr(Token, col) for col in cols])
         results = query.all()
@@ -151,9 +153,9 @@ class DataHandler:
 
     def get_quotes(
         self,
-        pair: tuple = None,
-        start: int = None,
-        end: int = None,
+        pair: Optional[tuple] = None,
+        start: Optional[int] = None,
+        end: Optional[int] = None,
         cols: List[str] = [
             "src",
             "dst",

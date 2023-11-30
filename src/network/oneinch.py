@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 import numpy as np
 import requests as req
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 from itertools import permutations
 from dataclasses import dataclass
@@ -143,7 +143,7 @@ class OneInchQuotes:
     )
     def quote(self, in_token: str, out_token: str, in_amount: int) -> QuoteResponse:
         """Get a quote from 1inch API. Retry if rate limit error."""
-        params = {
+        params: Dict[str, Any] = {
             "src": in_token,
             "dst": out_token,
             "amount": str(in_amount),
@@ -152,13 +152,13 @@ class OneInchQuotes:
             "includeProtocols": True,
         }
         res = req.get(self.quote_url, params=params, headers=self.header)
+        res.raise_for_status()  # retry if rate limit error
         ts = int(datetime.now().timestamp())
-        if res.status_code == 200:
-            return QuoteResponse(res.json(), in_amount, ts)
-        else:
-            raise res.raise_for_status()  # retry if rate limit error
+        return QuoteResponse(res.json(), in_amount, ts)
 
-    def quotes_for_pair(self, pair: tuple, calls: int = None) -> List[QuoteResponse]:
+    def quotes_for_pair(
+        self, pair: tuple, calls: Optional[int] = None
+    ) -> List[QuoteResponse]:
         """
         Get quotes for a pair of tokens using the specified amount
         range in the config.
@@ -174,33 +174,31 @@ class OneInchQuotes:
         noise = 1 + np.random.uniform(-0.5, 0.5, calls)
         in_amounts *= noise
         in_amounts *= 10 ** self.config[in_token].decimals
-        in_amounts = [int(i) for i in in_amounts]
         responses = []
         for in_amount in in_amounts:
             res = self.quote(
                 self.config[in_token].address,
                 self.config[out_token].address,
-                in_amount,
+                int(in_amount),
             )
             responses.append(res)
         return responses
 
     def all_quotes(
-        self, tokens: List[str], calls: int = None
-    ) -> List[List[QuoteResponse]]:
+        self, tokens: List[str], calls: Optional[int] = None
+    ) -> List[QuoteResponse]:
         """Get the quotes for all pairs of the input tokens."""
         pairs = list(permutations(tokens, 2))
         n = len(pairs)
         responses = []
         for i, pair in enumerate(pairs):
             logging.info(f"Fetching: {pair}... {i+1}/{n}")
-            responses.append(self.quotes_for_pair(pair, calls=calls))
+            responses.extend(self.quotes_for_pair(pair, calls=calls))
         return responses
 
     def to_df(self, responses: List[QuoteResponse], fn=None) -> pd.DataFrame:
         """Dump quote responses into a pd.DataFrame"""
-        flat_responses = [item for row in responses for item in row]
-        df = pd.concat([res.to_df() for res in flat_responses])
+        df = pd.concat([res.to_df() for res in responses])
         if fn:
             df.to_csv(fn, index=False)
         return df

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from itertools import permutations
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional
 
 # from sklearn.neighbors import KNeighborsRegressor
 from sklearn.isotonic import IsotonicRegression
@@ -32,8 +32,8 @@ class ExternalMarket:
         self.coins = coins
         self.pair_indices = list(permutations(range(n), 2))
         self.n = n
-        self.prices = None
-        self.models = defaultdict(dict)
+        self.prices: Optional[Dict[int, Dict[int, float]]] = None
+        self.models: Dict[int, Dict[int, IsotonicRegression]] = defaultdict(dict)
         # self.models[i][j] is the model for swapping i->j
 
     @property
@@ -57,6 +57,8 @@ class ExternalMarket:
         return [c.decimals for c in self.coins]
 
     def price(self, i: int, j: int) -> float:
+        if not self.prices:
+            raise ValueError("Prices not set for External Market.")
         return self.prices[i][j]
 
     def update_price(self, prices: Dict[str, Dict[str, float]]):

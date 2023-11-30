@@ -1,6 +1,6 @@
 import logging
 from abc import ABC
-from typing import Union
+from typing import Optional, Tuple
 from contextlib import nullcontext
 from dataclasses import dataclass
 from crvusdsim.pool.crvusd.controller import Position
@@ -9,6 +9,7 @@ from crvusdsim.pool.sim_interface import SimLLAMMAPool, SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
 from ..modules import ExternalMarket
+from ..typing import SimPoolType
 
 
 @dataclass
@@ -25,15 +26,10 @@ class Trade(ABC):
 
 @dataclass
 class Swap(Trade):
-    pool: Union[
-        ExternalMarket,
-        SimCurvePool,
-        SimCurveStableSwapPool,
-        SimLLAMMAPool,
-    ]
+    pool: SimPoolType
     i: int
     j: int
-    amt: Union[int, float]
+    amt: Optional[int]
 
     def get_address(self, index: int):
         if isinstance(self.pool, SimCurveStableSwapPool):
@@ -43,7 +39,7 @@ class Swap(Trade):
     def get_decimals(self, index: int):
         return self.pool.coin_decimals[index]
 
-    def do(self, use_snapshot_context: bool = False) -> int:
+    def do(self, use_snapshot_context: bool = False) -> Tuple[int, int]:
         pool = self.pool
         amt_in = self.amt
 
@@ -97,7 +93,7 @@ class Liquidation(Trade):
         else:
             return self.controller.COLLATERAL_TOKEN.decimals
 
-    def do(self, use_snapshot_context=False) -> int:
+    def do(self, use_snapshot_context=False) -> Tuple[int, int]:
         """Perform liquidation."""
         context_manager = (
             self.controller.use_snapshot_context()

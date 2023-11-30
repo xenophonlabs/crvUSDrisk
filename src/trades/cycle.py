@@ -1,5 +1,5 @@
 import logging
-from typing import List, Union
+from typing import Optional, Sequence
 from scipy.optimize import minimize_scalar
 from .trade import Swap, Liquidation
 
@@ -8,12 +8,14 @@ TOLERANCE = 1e-6
 
 class Cycle:
     def __init__(
-        self, trades: List[Union[Swap, Liquidation]], expected_profit: float = None
+        self,
+        trades: Sequence[Swap | Liquidation],
+        expected_profit: Optional[float] = None,
     ):
         self.trades = trades
-        self.n = len(trades)
+        self.n: int = len(trades)
         self.expected_profit = expected_profit
-        self.basis_address = trades[0].get_address(trades[0].i)
+        self.basis_address: str = trades[0].get_address(trades[0].i)
 
         # check that this is a cycle
         for i, trade in enumerate(trades):
@@ -31,6 +33,9 @@ class Cycle:
     def execute(self) -> float:
         """Execute trades."""
         logging.info(f"Executing cycle {self}.")
+        for t in self.trades:
+            assert t.amt, "Must set amt for all trades in cycle before executing."
+
         trade = self.trades[0]
         amt_in = trade.amt
 

@@ -1,9 +1,9 @@
 import json
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from itertools import combinations
-from crvusdsim.pool import get
+from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
 from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
 from ..modules import ExternalMarket
@@ -34,8 +34,10 @@ class Scenario:
         self.N: int = config["N"]
         self.price_config: str = config["price_config"]
         self.coins: List[TokenDTO] = [TOKEN_DTOs[a] for a in config["coins"]]
-        self.pairs: List[Tuple[TokenDTO]] = [
-            tuple(sorted(pair)) for pair in combinations(self.coins, 2)
+        self.pairs: List[Tuple[TokenDTO, TokenDTO]] = [
+            (sorted_pair[0], sorted_pair[1])
+            for pair in combinations(self.coins, 2)
+            for sorted_pair in [sorted(pair)]
         ]
         self.generate()
 
@@ -59,16 +61,13 @@ class Scenario:
             logging.info(f"We have {quotes.shape[0]} quotes.")
 
         logging.info("Fitting external markets against 1inch quotes.")
-        self.markets: Dict[Tuple[TokenDTO], ExternalMarket] = dict()
+        self.markets: Dict[Tuple[TokenDTO, TokenDTO], ExternalMarket] = dict()
         for pair in self.pairs:
-            market = ExternalMarket(
-                pair,
-                1.25,
-            )
+            market = ExternalMarket(pair)
             market.fit(quotes)
             self.markets[pair] = market
 
-    def generate_pricepaths(self, fn: str = None):
+    def generate_pricepaths(self, fn: Optional[str] = None):
         """
         Generate the pricepaths for the scenario.
         """

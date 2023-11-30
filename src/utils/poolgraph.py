@@ -1,19 +1,17 @@
 import logging
-from typing import List, Any, Tuple
+from typing import List, Tuple, Set, Dict, Optional
+from ..typing import SimPoolType
 from ..trades import Swap, Cycle
 from ..modules import ExternalMarket
 
 # TODO add proper pool typing instead of Any
 
 
-def shared_address(p1: Any, p2: Any, used: set = set()) -> set:
+def shared_address(
+    p1: SimPoolType, p2: SimPoolType, used: Set[Optional[str]] = set()
+) -> Set[str]:
     """Check if two pools share coins by checking their addrs."""
     assert p1 != p2, ValueError("Cannot share coins with self.")
-
-    if isinstance(p1, ExternalMarket) and isinstance(p2, ExternalMarket):
-        # External markets are "directional", so they'll share both coins.
-        # TODO refactor them to make them undirected
-        return None, -1, -1
 
     c1 = [c.lower() for c in p1.coin_addresses]
     c2 = [c.lower() for c in p2.coin_addresses]
@@ -25,7 +23,7 @@ def shared_address(p1: Any, p2: Any, used: set = set()) -> set:
     return shared
 
 
-def get_shared_idxs(p1: Any, p2: Any) -> Tuple[int, int]:
+def get_shared_idxs(p1: SimPoolType, p2: SimPoolType) -> Tuple[int, int]:
     """Get the index of the shared coin in each pool."""
     shared = shared_address(p1, p2).pop()
 
@@ -37,14 +35,12 @@ def get_shared_idxs(p1: Any, p2: Any) -> Tuple[int, int]:
 
 
 class PoolGraph:
-    # TODO move this to its own file
-
-    def __init__(self, pools: List[Any]):
+    def __init__(self, pools: List[SimPoolType]):
         self.pools = pools
         self.graph = self.create_graph()
 
-    def create_graph(self) -> dict[Any, List[Any]]:
-        graph = {}
+    def create_graph(self) -> Dict[SimPoolType, List[SimPoolType]]:
+        graph: Dict[SimPoolType, List[SimPoolType]] = {}
         for pool in self.pools:
             assert len(pool.coin_addresses) == 2, NotImplementedError(
                 "Only 2-coin pools"
@@ -59,7 +55,7 @@ class PoolGraph:
         # TODO currently assumes only one shared coin between
         # any two pools.
         assert len(self.pools) >= n, ValueError("Not enough pools to form a cycle.")
-        cycles = []
+        cycles: List[Cycle] = []
         for pool in self.pools:
             self.dfs(pool, [pool], set(), cycles, n)
         valid = self.validate(cycles)
@@ -67,19 +63,25 @@ class PoolGraph:
         self.test_cycles(valid, n)  # TODO remove
         return valid
 
-    def can_traverse(self, curr: Any, nxt: Any, used: List[Any]) -> bool:
+    def can_traverse(
+        self, curr: SimPoolType, nxt: SimPoolType, used: Set[Optional[str]]
+    ) -> bool:
         if isinstance(curr, ExternalMarket) and isinstance(nxt, ExternalMarket):
             # Don't traverse between external markets
             return False
         return bool(shared_address(curr, nxt, used))
 
-    def update_used_coins(self, used: List[Any], curr: Any, nxt: Any):
+    def update_used_coins(
+        self, used: Set[Optional[str]], curr: SimPoolType, nxt: SimPoolType
+    ):
         used.update(shared_address(curr, nxt))
 
-    def revert_used_coins(self, used: List[Any], curr: Any, nxt: Any):
+    def revert_used_coins(
+        self, used: Set[Optional[str]], curr: SimPoolType, nxt: SimPoolType
+    ):
         used.difference_update(shared_address(curr, nxt))
 
-    def construct_cycle(self, path: List[Any], n: int) -> Cycle:
+    def construct_cycle(self, path: List[SimPoolType], n: int) -> Cycle:
         trades = []
         for i, pool in enumerate(path):
             nxt = path[(i + 1) % n]
@@ -88,7 +90,12 @@ class PoolGraph:
         return Cycle(trades)
 
     def dfs(
-        self, curr: Any, path: List[Any], used: List[Any], cycles: List[Cycle], n: int
+        self,
+        curr: SimPoolType,
+        path: List[SimPoolType],
+        used: Set[Optional[str]],
+        cycles: List[Cycle],
+        n: int,
     ):
         if len(path) == n:
             # Ensure cycle is closed
@@ -118,7 +125,11 @@ class PoolGraph:
         """
         valid = []
         for cycle in cycles:
-            pools = [t.pool for t in cycle.trades]
+            pools = []
+            for trade in cycle.trades:
+                if not isinstance(trade, Swap):
+                    raise NotImplementedError("Only Swap trades supported.")
+                pools.append(trade.pool)
             if not isinstance(pools[-1], ExternalMarket):
                 continue
             for pool in pools[:-1]:
@@ -127,14 +138,18 @@ class PoolGraph:
             valid.append(cycle)
         return valid
 
-    def test_cycles(self, cycles: List[Cycle], n):
+    def test_cycles(self, cycles: List[Cycle], n: int):
         # Testing
         # 1. Cycle correctness (incl. closure)
         # 2. Cycle length
         # 3. Unique coin usage
         # TODO move this to a unit test file
         for cycle in cycles:
-            pools = [t.pool for t in cycle.trades]
+            pools = []
+            for trade in cycle.trades:
+                if not isinstance(trade, Swap):
+                    raise NotImplementedError("Only Swap trades supported.")
+                pools.append(trade.pool)
             assert cycle.n == n, "Wrong length"
             used = shared_address(pools[0], pools[1])
             assert len(used) == 1

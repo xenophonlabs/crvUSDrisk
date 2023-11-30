@@ -1,6 +1,6 @@
 import math
 import logging
-import ccxt as ccxt
+import ccxt as ccxt  # type: ignore
 import pandas as pd
 from datetime import datetime, timezone
 from ..exceptions import ccxtInvalidSymbolException
@@ -191,6 +191,7 @@ class CCXTDataFetcher:
 
         return CCXTDataFetcher.trades_to_df(trades)
 
+    @staticmethod
     def trades_to_df(trades: list) -> pd.DataFrame:
         df = pd.DataFrame(trades)
         df.set_index("datetime", inplace=True)
@@ -201,5 +202,5 @@ class CCXTDataFetcher:
         df = pd.DataFrame(
             ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
         )
-        df.index = pd.to_datetime(df["timestamp"] / 1000, unit="s")
+        df.index = pd.Index(pd.to_datetime(df["timestamp"] / 1000, unit="s"))
         return df
