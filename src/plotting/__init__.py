@@ -591,12 +591,15 @@ def plot_price_impact(df, in_token, out_token, fn: str = None):
     return f
 
 
+S = 5
+
+
 def plot_price_1inch(df, in_token, out_token, fn: str = None):
     dt = pd.to_datetime(df["hour"], unit="s")
 
     f, ax = plt.subplots(figsize=(10, 5))
 
-    scatter = ax.scatter(df["in_amount"], df["price"], s=10, c=dt, cmap="viridis")
+    scatter = ax.scatter(df["in_amount"], df["price"], s=S, c=dt, cmap="viridis")
 
     ax.set_xscale("log")
     ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
@@ -637,7 +640,7 @@ def plot_regression(
         df["in_amount"] / 10**in_token.decimals,
         df["price_impact"] * 100,
         c=dt,
-        s=10,
+        s=S,
         label="1inch Quotes",
     )
     ax.plot(X / 10**in_token.decimals, y, label="Prediction", c="indianred", lw=1)
@@ -686,7 +689,7 @@ def plot_predictions(
         df["in_amount"] / 10**in_token.decimals,
         df["out_amount"] / 10**out_token.decimals,
         c=dt,
-        s=10,
+        s=S,
         label="1inch Quotes",
     )
     ax.plot(

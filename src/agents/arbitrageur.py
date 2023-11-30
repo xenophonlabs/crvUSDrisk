@@ -1,5 +1,8 @@
 import logging
+from typing import List, Tuple
 from .agent import Agent
+from ..trades import Cycle
+from ..prices import PriceSample
 
 PRECISION = 1e18
 
@@ -16,27 +19,29 @@ class Arbitrageur(Agent):
     are artificially constraining the available crvUSD liquidity.
     """
 
-    def __init__(self, tolerance: float = 0):
-        assert tolerance >= 0
+    def __init__(self, tolerance: float = 1):
+        # tolerance in units of USD
+        assert tolerance > 0 # default is one dollah
 
-        self.tolerance = tolerance
-        self._profit = 0
-        self._count = 0
+        self.tolerance: float = tolerance
+        self._profit: float = 0
+        self._count: int = 0
 
-    def arbitrage(self, cycles):
+    def arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> Tuple[float, int]:
         """
         Identify optimal arbitrages involving crvUSD of the form:
 
             crvUSD pool -> crvUSD pool -> External Market
 
-        LLAMMA Example: ETH/crvUSD -> USDC/crvUSD -> USDC/ETH
+        LLAMMA Example: WETH/crvUSD -> USDC/crvUSD -> USDC/WETH
         StableSwap Example: USDC/crvUSD -> USDT/crvUSD -> USDT/USDC
 
         Parameters
         ----------
-        cycles : List[List[Pool]
-            List of cycles, where each cycle is a list of pools. Pools
-            can be ExternalMarket, SimCurveStableSwapPool, or SimLLAMMAPool.
+        cycles : List[Cycle]
+            List of cycles. Cycles are an ordered list of `Trade`s.
+        prices : PriceSample
+            Current USD market prices for each coin.
 
         Returns
         -------
@@ -55,16 +60,14 @@ class Arbitrageur(Agent):
         count = 0
 
         while True:
-            # TODO this returns the profit in the units of
-            # the basis token (first token in, last token out).
-            # We should (1) require that the basis token be USDC, USDT, WETH,
-            # and (2) mark this profit to current USD?
-            best = self.find_best_arbitrage(cycles)
+            # TODO should we require that the basis token be USDC, USDT, WETH?
+            best_cycle, best_profit = self.find_best_arbitrage(cycles, prices)
 
-            if best and best.expected_profit > self.tolerance:
-                _profit = best.execute()
-                assert profit > self.tolerance, RuntimeError("Trade unprofitable.")
-                profit += _profit
+            if best_cycle and best_profit > self.tolerance:
+                # Dollarize profit
+                _profit = best_cycle.execute() * prices._prices[best_cycle.basis_address]
+                assert _profit == best_profit, RuntimeError("Expected profit != actual profit.")
+                profit += best_profit
                 count += 1
             else:
                 logging.info("No more profitable arbitrages.")
@@ -75,16 +78,35 @@ class Arbitrageur(Agent):
 
         return profit, count
 
-    def find_best_arbitrage(self, cycles):
-        """Find the optimal liquidity-constrained cyclic arbitrages."""
+    def find_best_arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> Tuple[Cycle, float]:
+        """
+        Find the optimal liquidity-constrained cyclic arbitrages.
+        Dollarize the profit by marking it to current USD market price.
+        TODO does this dollarization make sense?
+        
+        Parameters
+        ----------
+        cycles : List[Cycle]
+            List of cycles. Cycles are an ordered list of `Trade`s.
+        prices : PriceSample
+            Current USD market prices for each coin.
+        
+        Returns
+        -------
+        best_cycle : Cycle
+            The optimal cycle.
+        best_profit : float
+            The dollarized profit of the optimal cycle.
+        """
         best_cycle = None
         best_profit = 0
 
         for cycle in cycles:
-            # Populate cycle with the optimal amt_in, and calc expected profit
             cycle.optimize()
-            if cycle.expected_profit > best_profit:
-                best_profit = cycle.expected_profit
+            # Dollarize the expected profit
+            expected_profit = cycle.expected_profit * prices._prices[cycle.basis_address]
+            if expected_profit > best_profit:
+                best_profit = expected_profit
                 best_cycle = cycle
 
-        return best_cycle
+        return best_cycle, best_profit

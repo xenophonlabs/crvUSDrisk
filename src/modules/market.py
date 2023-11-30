@@ -4,15 +4,17 @@ import pandas as pd
 from collections import defaultdict
 from itertools import permutations
 from typing import Any, List, Dict
-from sklearn.neighbors import KNeighborsRegressor
+
+# from sklearn.neighbors import KNeighborsRegressor
+from sklearn.isotonic import IsotonicRegression
 from ..data_transfer_objects import TokenDTO
 
 
 class ExternalMarket:
     """
     A representation of external liquidity venues
-    for relevant tokens. These markets are directional
-    to account for asymmetric price impact.
+    for relevant tokens. These markets are statistical
+    models trained on 1inch quotes.
 
     Note
     ----
@@ -25,9 +27,6 @@ class ExternalMarket:
         coins: List[TokenDTO],
         k_scale=1.25,
     ):
-        # TODO markets should be compatible in decimals
-        # with the actual pools. This means we should
-        # correct our training data to use the actual decimals.
         n = len(coins)
         assert n == 2
 
@@ -101,11 +100,18 @@ class ExternalMarket:
             X = quotes_["in_amount"].values.reshape(-1, 1)
             y = quotes_["price_impact"].values
 
-            model = KNeighborsRegressor(n_neighbors=k, weights="distance")
+            # TODO KNN regression is too noisy. Delete
+            # model = KNeighborsRegressor(n_neighbors=k, weights="distance")
+            model = IsotonicRegression(
+                y_min=0, y_max=1, increasing=True, out_of_bounds="clip"
+            )
             model.fit(X, y)
             self.models[i][j] = model
 
     def trade(self, i: int, j: int, size: Any) -> Any:
+        # The line `model = IsotonicRegression(y_min=0, y_max=1, increasing=True,
+        # out_of_bounds="clip")` is creating an instance of the `IsotonicRegression` class from
+        # the scikit-learn library.
         """
         Execute a trade on the external market using
         the current price.

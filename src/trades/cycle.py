@@ -13,6 +13,7 @@ class Cycle:
         self.trades = trades
         self.n = len(trades)
         self.expected_profit = expected_profit
+        self.basis_address = trades[0].get_address(trades[0].i)
 
         # check that this is a cycle
         for i, trade in enumerate(trades):
@@ -20,8 +21,8 @@ class Cycle:
                 next_trade = trades[i + 1]
             else:
                 next_trade = trades[0]
-            token_out = trade.get_address(trade.j).lower()
-            token_in = next_trade.get_address(next_trade.i).lower()
+            token_out = trade.get_address(trade.j)
+            token_in = next_trade.get_address(next_trade.i)
             assert token_in == token_out, (
                 token_in,
                 token_out,
@@ -29,6 +30,7 @@ class Cycle:
 
     def execute(self) -> float:
         """Execute trades."""
+        logging.info(f"Executing cycle {self}.")
         trade = self.trades[0]
         amt_in = trade.amt
 

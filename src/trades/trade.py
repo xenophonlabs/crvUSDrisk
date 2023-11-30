@@ -37,8 +37,8 @@ class Swap(Trade):
 
     def get_address(self, index: int):
         if isinstance(self.pool, SimCurveStableSwapPool):
-            return self.pool.coins[index].address
-        return self.pool.coin_addresses[index]
+            return self.pool.coins[index].address.lower()
+        return self.pool.coin_addresses[index].lower()
 
     def get_decimals(self, index: int):
         return self.pool.coin_decimals[index]
@@ -87,9 +87,9 @@ class Liquidation(Trade):
 
     def get_address(self, index: int):
         if index == 0:
-            return self.controller.STABLECOIN.address
+            return self.controller.STABLECOIN.address.lower()
         else:
-            return self.controller.COLLATERAL_TOKEN.address
+            return self.controller.COLLATERAL_TOKEN.address.lower()
 
     def get_decimals(self, index: int):
         if index == 0:
