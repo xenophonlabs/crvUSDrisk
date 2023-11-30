@@ -19,9 +19,8 @@ def simulate(config: str):
 
     Returns
     -------
-    metrics : MetricsProcessor
-        A metrics processor object, containing the
-        necessary metrics for analyzing the simulation.
+    MetricsResult
+        An object containing the results for the simulation.
     """
     # Currently only simulating one LLAMMA. TODO simulate multiple LLAMMAs
     scenario = Scenario(config)

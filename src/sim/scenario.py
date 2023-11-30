@@ -11,7 +11,7 @@ from ..db.datahandler import DataHandler
 from ..agents.arbitrageur import Arbitrageur
 from ..agents.liquidator import Liquidator
 from ..data_transfer_objects import TokenDTO
-from ..metrics.metricsprocessor import MetricsProcessor
+from ..metrics.metricsprocessor import MetricsProcessor, MetricsResult
 
 
 @dataclass
@@ -96,7 +96,7 @@ class Scenario:
 
     def generate_metrics_processor(self):
         # TODO implement metrics processor
-        self.metrics: MetricsProcessor = MetricsProcessor()
+        self.metricsprocessor: MetricsProcessor = MetricsProcessor()
 
     def update_market_prices(self, sample: PriceSample):
         """
@@ -130,7 +130,7 @@ class Scenario:
         pass
 
     def update_metrics(self):
-        pass
+        self.metricsprocessor.update()
 
-    def process_metrics(self):
-        pass
+    def process_metrics(self) -> MetricsResult:
+        return self.metricsprocessor.process()
