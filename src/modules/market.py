@@ -60,6 +60,9 @@ class ExternalMarket:
     def coin_decimals(self):
         return [c.decimals for c in self.coins]
 
+    def price(self, i: int, j: int) -> float:
+        return self.prices[i][j]
+
     def update_price(self, prices: Dict[str, Dict[str, float]]):
         """
         Update the markets prices.

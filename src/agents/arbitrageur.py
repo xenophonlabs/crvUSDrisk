@@ -47,7 +47,6 @@ class Arbitrageur(Agent):
 
         Note
         ----
-        TODO need to handle LLAMMAs
         TODO need to handle longer cycles
         TODO need to handle different cycle formats?
         TODO need to track pool-specific metrics
@@ -78,7 +77,7 @@ class Arbitrageur(Agent):
 
     def find_best_arbitrage(self, cycles):
         """Find the optimal liquidity-constrained cyclic arbitrages."""
-        best_trade = None
+        best_cycle = None
         best_profit = 0
 
         for cycle in cycles:
@@ -86,6 +85,6 @@ class Arbitrageur(Agent):
             cycle.optimize()
             if cycle.expected_profit > best_profit:
                 best_profit = cycle.expected_profit
-                best_trade = cycle.trade
+                best_cycle = cycle
 
-        return best_trade
+        return best_cycle

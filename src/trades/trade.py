@@ -56,9 +56,9 @@ class Swap(Trade):
         with context_manager:
             result = pool.trade(self.i, self.j, amt_in)
 
-        if isinstance(pool, (ExternalMarket, SimCurveStableSwapPool)):
+        if isinstance(pool, ExternalMarket):
             amt_out = result
-        elif isinstance(pool, SimLLAMMAPool):
+        elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
             # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
             in_amount_done, amt_out, _ = result
             if in_amount_done != amt_in:
@@ -71,6 +71,9 @@ class Swap(Trade):
             raise NotImplementedError
 
         return amt_out, self.get_decimals(self.j)
+
+    def __repr__(self):
+        return f"Swap(pool={self.pool.name}, in={self.pool.coin_names[self.i]}, out={self.pool.coin_names[self.j]}, amt={self.amt})"
 
 
 @dataclass
