@@ -18,7 +18,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install black pylint mypy
+        grep -v 'crvusdsim' requirements.txt > temp_requirements.txt
+        python -m pip install -r temp_requirements.txt
+        python -m pip install git+https://github.com/Tcintra/crvusdsim --no-deps
     - name: Run Black
       run: black --check .
     - name: Run Pylint
