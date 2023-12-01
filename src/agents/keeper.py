@@ -1,3 +1,4 @@
+"""Provides the `Keeper` class."""
 import logging
 from typing import List, Tuple
 from crvusdsim.pool import PegKeeper
@@ -6,9 +7,10 @@ from .agent import Agent
 PRECISION = 1e18
 
 
+# pylint: disable=too-few-public-methods
 class Keeper(Agent):
     """
-    Keeper calls the `update` method on Peg Keepers.
+    Keeper calls the `update` method on `PegKeeper`s.
     """
 
     def __init__(self, tolerance: float = 0):
@@ -45,7 +47,9 @@ class Keeper(Agent):
                 assert _profit > 0, "Update not profitable."
                 profit += _profit
                 count += 1
-                logging.info(f"Updating {pk.name} Peg Keeper with pnl {round(profit)}.")
+                logging.info(
+                    "Updating %s Peg Keeper with pnl %d.", pk.name, round(profit)
+                )
         self._profit += profit
         self._count += count
         return profit, count

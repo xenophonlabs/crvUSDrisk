@@ -1,20 +1,27 @@
+"""
+Provides the `ExternalMarket` class for modeling
+swaps in external liquidity venues.
+"""
+from __future__ import annotations
 import logging
-import numpy as np
-import pandas as pd
 from collections import defaultdict
 from itertools import permutations
-from typing import Any, List, Dict, Optional
-
-# from sklearn.neighbors import KNeighborsRegressor
+from typing import Any, Tuple, Dict, Optional, TYPE_CHECKING
+import numpy as np
+import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from ..data_transfer_objects import TokenDTO
+
+if TYPE_CHECKING:
+    from ..types import PairwisePricesType
 
 
 class ExternalMarket:
     """
     A representation of external liquidity venues
     for relevant tokens. These markets are statistical
-    models trained on 1inch quotes.
+    models trained on 1inch quotes. We are currently
+    using an IsotonicRegression to model fees and price impact.
 
     Note
     ----
@@ -24,7 +31,7 @@ class ExternalMarket:
 
     def __init__(
         self,
-        coins: List[TokenDTO],
+        coins: Tuple[TokenDTO, TokenDTO],
     ):
         n = len(coins)
         assert n == 2
@@ -34,40 +41,45 @@ class ExternalMarket:
         self.n = n
         self.prices: Optional[Dict[int, Dict[int, float]]] = None
         self.models: Dict[int, Dict[int, IsotonicRegression]] = defaultdict(dict)
-        # self.models[i][j] is the model for swapping i->j
 
     @property
     def name(self):
+        """Market name."""
         return f"External Market ({self.coins[0].symbol}, {self.coins[1].symbol})"
 
     @property
     def coin_names(self):
+        """List of coin names in the market."""
         return [c.name for c in self.coins]
 
     @property
     def coin_symbols(self):
+        """List of coin symbols in the market."""
         return [c.symbol for c in self.coins]
 
     @property
     def coin_addresses(self):
+        """List of coin addresses in the market."""
         return [c.address for c in self.coins]
 
     @property
     def coin_decimals(self):
+        """List of coin decimals in the market."""
         return [c.decimals for c in self.coins]
 
     def price(self, i: int, j: int) -> float:
+        """Get the price of token i in terms of token j."""
         if not self.prices:
             raise ValueError("Prices not set for External Market.")
         return self.prices[i][j]
 
-    def update_price(self, prices: Dict[str, Dict[str, float]]):
+    def update_price(self, prices: "PairwisePricesType"):
         """
         Update the markets prices.
 
         Parameters
         ----------
-        prices : PriceSample or or Dict[str, Dict[str, float]]
+        prices : PairwisePricesType
             prices[token1][token2] is the price of token1 in terms of token2.
             Notice that token1, token2 are addresses.
         """
@@ -83,7 +95,7 @@ class ExternalMarket:
 
     def fit(self, quotes: pd.DataFrame):
         """
-        Fit a KNN regression to the price impact data for each
+        Fit an IsotonicRegression to the price impact data for each
         pair of tokens.
 
         Parameters
@@ -94,21 +106,16 @@ class ExternalMarket:
         for i, j in self.pair_indices:
             quotes_ = quotes.loc[(self.coin_addresses[i], self.coin_addresses[j])]
 
-            X = quotes_["in_amount"].values.reshape(-1, 1)
+            x = quotes_["in_amount"].values.reshape(-1, 1)
             y = quotes_["price_impact"].values
 
-            # TODO KNN regression is too noisy. Delete
-            # model = KNeighborsRegressor(n_neighbors=k, weights="distance")
             model = IsotonicRegression(
                 y_min=0, y_max=1, increasing=True, out_of_bounds="clip"
             )
-            model.fit(X, y)
+            model.fit(x, y)
             self.models[i][j] = model
 
-    def trade(self, i: int, j: int, size: Any) -> Any:
-        # The line `model = IsotonicRegression(y_min=0, y_max=1, increasing=True,
-        # out_of_bounds="clip")` is creating an instance of the `IsotonicRegression` class from
-        # the scikit-learn library.
+    def trade(self, i: int, j: int, size: int) -> Any:
         """
         Execute a trade on the external market using
         the current price.
@@ -119,15 +126,13 @@ class ExternalMarket:
             The index of the token_in.
         j : int
             The index of the token_out.
-        size : Any
+        size : int
             The amount of token_in to sell for each trade.
-            Can be an int/float (1 trade), or an array of ints/floats.
 
         Returns
         -------
         int
-            The amount of token j the user gets out for each trade.
-            Can be an int/float (1 trade), or an array of ints/floats.
+            The amount of token j the user gets out.
 
         Note
         ----
@@ -151,11 +156,12 @@ class ExternalMarket:
         j : int
             The index of the token_out.
         size : Any
-            The amount of token_in to sell. Could be
+            The amount of token_in to sell. Could be an int
+            or a list of ints.
 
         Returns
         -------
-        float
+        int or List[int]
             The price_impact for given trade.
 
         TODO this should account for trades that happened "recently".
@@ -175,11 +181,17 @@ class ExternalMarket:
 
         if np.any(impact < 0):
             logging.error(
-                f"Price impact for {self.coin_symbols[i]} -> {self.coin_symbols[i]} is negative: {impact}!"
+                "Price impact for %s -> %s is negative: %f!",
+                self.coin_symbols[i],
+                self.coin_symbols[i],
+                impact,
             )
         elif np.any(impact > 1):
             logging.error(
-                f"Price impact for {self.coin_symbols[i]} -> {self.coin_symbols[i]} is over 100%: {impact}!"
+                "Price impact for %s -> %s is over 100%%: %f!",
+                self.coin_symbols[i],
+                self.coin_symbols[i],
+                impact,
             )
         return np.clip(impact, 0, 1)
 

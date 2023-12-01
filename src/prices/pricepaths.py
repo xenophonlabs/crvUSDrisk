@@ -1,37 +1,51 @@
+"""
+Provides the `PricePaths` for generating and iterating
+through `PriceSample`s. A `PriceSample` stores USD token prices
+at a given timestep and converts them to pairwise prices.
+"""
+from __future__ import annotations
 import json
 import logging
-import pandas as pd
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 from dataclasses import dataclass
 from itertools import permutations
 from collections import defaultdict
-from .utils import gen_cor_prices, gran, factor
+import pandas as pd
+from .utils import gen_cor_prices, get_gran, get_factor
 from ..network.coingecko import address_from_coin_id, get_current_prices
 
+if TYPE_CHECKING:
+    from ..types import PairwisePricesType
 
-def get_pairwise_prices(_prices):
-    pairs = list(permutations(_prices.keys(), 2))
-    prices = defaultdict(dict)
+
+def get_pairwise_prices(prices_usd: Dict[str, float]) -> "PairwisePricesType":
+    """Convert USD prices into pairwise prices."""
+    pairs = list(permutations(prices_usd.keys(), 2))
+    prices: "PairwisePricesType" = defaultdict(dict)
     for pair in pairs:
         in_token, out_token = pair
-        prices[in_token][out_token] = _prices[in_token] / _prices[out_token]
+        prices[in_token][out_token] = prices_usd[in_token] / prices_usd[out_token]
     return prices
 
 
 @dataclass
 class PriceSample:
-    def __init__(self, ts: int, _prices: Dict[str, float]):
-        self.ts = ts
-        self._prices = _prices
-        self.prices = get_pairwise_prices(_prices)
+    """
+    Stores USD and pairwise prices at a given timestep.
+    """
 
-    def update(self, _prices: Dict[str, float]):
+    def __init__(self, ts: int, prices_usd: Dict[str, float]):
+        self.ts = ts
+        self.prices_usd = prices_usd  # USD
+        self.prices = get_pairwise_prices(prices_usd)
+
+    def update(self, prices_usd: Dict[str, float]):
         """
         Update USD prices for any subset of tokens.
         Recalculate pairwise prices.
         """
-        self._prices.update(_prices)
-        self.prices = get_pairwise_prices(self._prices)
+        self.prices_usd.update(prices_usd)
+        self.prices = get_pairwise_prices(self.prices_usd)
 
     def __getitem__(self, address: str) -> Dict[str, float]:
         """
@@ -41,54 +55,42 @@ class PriceSample:
         return self.prices[address]
 
     def __repr__(self):
-        return f"PriceSample({self.ts}, {self._prices})"
+        return f"PriceSample({self.ts}, {self.prices_usd})"
 
 
 class PricePaths:
     """
-    Convenient class for storing params required
-    to generate prices.
+    `PricePaths` generates prices from the price config file
+    and implements an iterator over `PriceSample`s.
     """
 
-    def __init__(self, fn: str, N: int):
+    def __init__(self, fn: str, num_steps: int):
         """
         Generate price paths from config file.
-
-        Parameters
-        ----------
-        fn : str
-            Path to price config file.
-        N : int
-            Number of timesteps.
-
         TODO integrate with curvesim PriceSampler?
         """
-
-        with open(fn, "r") as f:
-            logging.info(f"Reading price config from {fn}.")
+        with open(fn, "r", encoding="utf-8") as f:
+            logging.info("Reading price config from %s.", fn)
             config = json.load(f)
 
-        self.N = N
-        self.params = config["params"]
-        self.cov = pd.DataFrame.from_dict(config["cov"])
-        self.freq = config["freq"]
-        self.gran = gran(self.freq)  # in seconds
-        self.coin_ids = list(self.params.keys())
-        self.coins = [address_from_coin_id(coin_id) for coin_id in self.coin_ids]
-        self.S0s = get_current_prices(self.coin_ids)
-        self.annual_factor = factor(self.freq)
-        self.dt = 1 / self.annual_factor
-        self.T = self.N * self.dt
-        self.S = gen_cor_prices(
-            self.coin_ids,
-            self.T,
-            self.dt,
-            self.S0s,
-            self.cov,
-            self.params,
+        freq = config["freq"]
+        coin_ids = list(config["params"].keys())
+        annual_factor = get_factor(freq)
+        dt = 1 / annual_factor
+
+        self.prices = gen_cor_prices(
+            coin_ids,  # List of coin IDs (coingecko)
+            num_steps * dt,  # Time horizon in years
+            dt,  # Time step in years
+            get_current_prices(coin_ids),
+            pd.DataFrame.from_dict(config["cov"]),
+            config["params"],
             timestamps=True,
-            gran=self.gran,
+            gran=get_gran(freq),
         )
+
+        self.config = config
+        self.coins = [address_from_coin_id(coin_id) for coin_id in coin_ids]
 
     def __iter__(self):
         """
@@ -96,10 +98,10 @@ class PricePaths:
         ------
         :class: `PriceSample`
         """
-        for ts, prices in self.S.iterrows():
-            yield PriceSample(ts, prices.to_dict())
+        for ts, sample in self.prices.iterrows():
+            yield PriceSample(ts, sample.to_dict())
 
     def __getitem__(self, i: int) -> PriceSample:
-        ts = self.S.index[i]
-        prices = self.S.iloc[i]
-        return PriceSample(ts, prices.to_dict())
+        ts = self.prices.index[i]
+        sample = self.prices.iloc[i]
+        return PriceSample(ts, sample.to_dict())

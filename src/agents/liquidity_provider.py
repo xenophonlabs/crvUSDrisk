@@ -1,6 +1,10 @@
+"""Provides the `LiquidityProvider` class."""
 from .agent import Agent
 
 
+# pylint: disable=too-few-public-methods
 class LiquidityProvider(Agent):
-    def __init__(self):
-        pass
+    """
+    The LiquidityProvider either adds or removes
+    liquidity from Curve pools.
+    """

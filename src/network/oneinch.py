@@ -1,12 +1,17 @@
+"""
+Provides the `OneInchQuotes` class to 
+fetch quotes from the 1inch API, and the `QuoteResponse` class
+to store the response data.
+"""
 import json
 import logging
+from datetime import datetime
+from dataclasses import dataclass
+from itertools import permutations
+from typing import List, Dict, Optional, Any
+import requests as req
 import pandas as pd
 import numpy as np
-import requests as req
-from typing import List, Dict, Optional, Any
-from datetime import datetime
-from itertools import permutations
-from dataclasses import dataclass
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -23,8 +28,11 @@ def is_rate_limit_error(e):
     return isinstance(e, req.exceptions.HTTPError) and e.response.status_code == 429
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class QuoteResponse:
+    """Store 1inch quote response."""
+
     src: str
     dst: str
     in_amount: int
@@ -112,8 +120,8 @@ class OneInchQuotes:
         """
         Note
         ----
-        The config file should be a dictionary of TokenDTO objects
-        The token key can be the address itself, or a natural language name like USDC.
+        The config file should be a dictionary of TokenDTO objects, where
+        the key is the token address.
         """
         self.chain_id = self.chains[chain]
         self.api_key = api_key
@@ -122,18 +130,22 @@ class OneInchQuotes:
 
     @property
     def quote_url(self) -> str:
+        """URL endpoint for 1inch quotes."""
         return f"{self.base_url}/{self.version}/{self.chain_id}/quote"
 
     @property
     def protocols_url(self) -> str:
+        """URL endpoint for 1inch protocols."""
         return f"{self.base_url}/{self.version}/{self.chain_id}/liquidity-sources"
 
     @property
     def header(self) -> dict:
+        """Header for 1inch API requests."""
         return {"Authorization": f"Bearer {self.api_key}", "accept": "application/json"}
 
     def protocols(self) -> dict:
-        res = req.get(self.protocols_url, headers=self.header)
+        """GET 1inch protocols."""
+        res = req.get(self.protocols_url, headers=self.header, timeout=5)
         return res.json()
 
     @retry(
@@ -142,7 +154,7 @@ class OneInchQuotes:
         retry=retry_if_exception_type(req.HTTPError),
     )
     def quote(self, in_token: str, out_token: str, in_amount: int) -> QuoteResponse:
-        """Get a quote from 1inch API. Retry if rate limit error."""
+        """GET a quote from 1inch API. Retry if rate limit error."""
         params: Dict[str, Any] = {
             "src": in_token,
             "dst": out_token,
@@ -151,7 +163,7 @@ class OneInchQuotes:
             "includeTokensInfo": True,
             "includeProtocols": True,
         }
-        res = req.get(self.quote_url, params=params, headers=self.header)
+        res = req.get(self.quote_url, params=params, headers=self.header, timeout=5)
         res.raise_for_status()  # retry if rate limit error
         ts = int(datetime.now().timestamp())
         return QuoteResponse(res.json(), in_amount, ts)
@@ -160,8 +172,11 @@ class OneInchQuotes:
         self, pair: tuple, calls: Optional[int] = None
     ) -> List[QuoteResponse]:
         """
-        Get quotes for a pair of tokens using the specified amount
-        range in the config.
+        GET quotes for a pair of tokens using the specified amount
+        range in the config. The number of calls is specified by
+        the `calls` parameter. If `calls` is None, use the default
+        number of calls. Calls are spaced logarithmically between
+        the min and max trade sizes.
         """
         calls = calls if calls else self.calls  # default to self.calls
         in_token, out_token = pair
@@ -187,12 +202,12 @@ class OneInchQuotes:
     def all_quotes(
         self, tokens: List[str], calls: Optional[int] = None
     ) -> List[QuoteResponse]:
-        """Get the quotes for all pairs of the input tokens."""
+        """GET the quotes for all pairs of the input tokens."""
         pairs = list(permutations(tokens, 2))
         n = len(pairs)
         responses = []
         for i, pair in enumerate(pairs):
-            logging.info(f"Fetching: {pair}... {i+1}/{n}")
+            logging.info("Fetching: %s... %d/%d", pair, i + 1, n)
             responses.extend(self.quotes_for_pair(pair, calls=calls))
         return responses
 

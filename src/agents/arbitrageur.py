@@ -1,3 +1,4 @@
+"""Provides the `Arbitrageur` class."""
 import logging
 from typing import List, Tuple, Optional
 from .agent import Agent
@@ -15,8 +16,8 @@ class Arbitrageur(Agent):
         - TriCrypto-ng pools TODO
         - LLAMMAs.
     TODO need to investigate which pools to include in arbitrage
-    search (e.g. TriCRV, other crvUSD pools, etc..). Otherwise, we
-    are artificially constraining the available crvUSD liquidity.
+    search (e.g. TriCRV, other crvusd pools, etc..). Otherwise, we
+    are artificially constraining the available crvusd liquidity.
     """
 
     def __init__(self, tolerance: float = 1):
@@ -29,12 +30,12 @@ class Arbitrageur(Agent):
 
     def arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> Tuple[float, int]:
         """
-        Identify optimal arbitrages involving crvUSD of the form:
+        Identify optimal arbitrages involving crvusd of the form:
 
-            crvUSD pool -> crvUSD pool -> External Market
+            crvusd pool -> crvusd pool -> External Market
 
-        LLAMMA Example: WETH/crvUSD -> USDC/crvUSD -> USDC/WETH
-        StableSwap Example: USDC/crvUSD -> USDT/crvUSD -> USDT/USDC
+        LLAMMA Example: WETH/crvusd -> USDC/crvusd -> USDC/WETH
+        StableSwap Example: USDC/crvusd -> USDT/crvusd -> USDT/USDC
 
         Parameters
         ----------
@@ -66,7 +67,7 @@ class Arbitrageur(Agent):
             if best_cycle and best_profit > self.tolerance:
                 # Dollarize profit
                 _profit = (
-                    best_cycle.execute() * prices._prices[best_cycle.basis_address]
+                    best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
                 )
                 assert _profit == best_profit, RuntimeError(
                     "Expected profit != actual profit."
@@ -112,7 +113,7 @@ class Arbitrageur(Agent):
             assert cycle.expected_profit
             # Dollarize the expected profit
             expected_profit = (
-                cycle.expected_profit * prices._prices[cycle.basis_address]
+                cycle.expected_profit * prices.prices_usd[cycle.basis_address]
             )
             if expected_profit > best_profit:
                 best_profit = expected_profit

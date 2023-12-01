@@ -3,9 +3,9 @@ Utility functions.
 """
 
 
-def get_crvUSD_index(pool):
+def get_crvusd_index(pool):
     """
-    Return index of crvUSD in pool.
+    Return index of crvusd in pool.
     """
     symbols = [c.symbol for c in pool.coins]
     return symbols.index("crvUSD")

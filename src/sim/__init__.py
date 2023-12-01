@@ -1,14 +1,18 @@
-from .scenario import Scenario
+"""
+Main module for the simulation package. Runs a stress test scenario for a 
+given stress test configuration.
+"""
 import logging
+from .scenario import Scenario
 
-__all__ = ["Scenario", "simulate"]
+__all__ = ["Scenario", "sim"]
 
 logging.basicConfig(
     filename="./logs/sim.log", level=logging.INFO, format="%(asctime)s %(message)s"
 )
 
 
-def simulate(config: str):
+def sim(config: str):
     """
     Simulate a stress test scenario.
 
@@ -39,11 +43,3 @@ def simulate(config: str):
     # - Include gas
 
     return scenario.process_metrics()
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()

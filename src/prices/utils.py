@@ -1,16 +1,24 @@
-import numpy as np
-import scipy.optimize as so
+"""
+Provides utilities for generating stochastic 
+prices based on historical data. This includes:
+1. Generating correlated prices using Cholesky decomposition.
+2. Estimating generative parameters for GBMs and OU processes.
+    a. We use a Log-Likelihood MLE for estimating OU parameters.
+"""
 import logging
 import json
-import pandas as pd
-import matplotlib.pyplot as plt
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
+import numpy as np
+import pandas as pd
+import scipy.optimize as so
+import matplotlib.pyplot as plt
 from ..configs import STABLE_CG_IDS
 from ..plotting import plot_prices
 from ..network.coingecko import get_prices_df, address_from_coin_id
 
 
+# pylint: disable=too-many-arguments, too-many-locals
 def gen_price_config(
     fn: str,
     coins: List[str],
@@ -61,8 +69,8 @@ def gen_price_config(
 
     logging.info("Processing parameters.")
     params, cov = process_prices(df, freq)
-    logging.info(f"Params\n{pd.DataFrame.from_dict(params)}")
-    logging.info(f"Cov\n{cov}")
+    logging.info("Params\n%s", pd.DataFrame.from_dict(params))
+    logging.info("Cov\n%s", cov)
     config = {
         "params": params,
         "cov": cov.to_dict(),
@@ -71,16 +79,18 @@ def gen_price_config(
         "end": end,
     }
 
-    with open(fn, "w") as f:
-        logging.info(f"Writing price config to {fn}.")
+    with open(fn, "w", encoding="utf-8") as f:
+        logging.info("Writing price config to %s.", fn)
         json.dump(config, f)
 
     if plot:
         coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()
         logging.info(
-            f"Plotting empirical and simulated prices from {datetime.fromtimestamp(start).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end).strftime('%Y-%m-%d')}.\n"
+            "Plotting empirical and simulated prices from %s to %s.",
+            datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
+            datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
         )
-        annual_factor = factor(freq)
+        annual_factor = get_factor(freq)
         T = df.shape[0] / annual_factor
         dt = 1 / annual_factor
         S0s = df[coin_ids].iloc[0].to_dict()  # Get first row of prices
@@ -94,27 +104,25 @@ def gen_price_config(
 ### ========== Analyze Historical Prices ========== ###
 
 
-def factor(freq: str) -> int:
+def get_factor(freq: str) -> int:
     """Annualizing factor."""
     if freq == "1d":
         return 365
-    elif freq == "1h":
+    if freq == "1h":
         return 365 * 24
-    else:
-        raise ValueError(f"Invalid frequency: {freq}")
+    raise ValueError(f"Invalid frequency: {freq}")
 
 
-def gran(freq: str) -> int:
+def get_gran(freq: str) -> int:
     """Granularity in seconds"""
     if freq == "1d":
         return 60 * 60 * 24
-    elif freq == "1h":
+    if freq == "1h":
         return 60 * 60
-    else:
-        raise ValueError(f"Invalid frequency: {freq}")
+    raise ValueError(f"Invalid frequency: {freq}")
 
 
-def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
+def process_prices(df: pd.DataFrame, freq: str = "1d") -> Tuple[dict, pd.DataFrame]:
     """
     Given a DataFrame of prices, compute:
         1. Parameters for the generative process
@@ -149,7 +157,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
 
     params = {}
 
-    annual_factor = factor(freq)
+    annual_factor = get_factor(freq)
 
     dt = 1 / annual_factor  # Time step
 
@@ -161,7 +169,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> tuple:
 
         if col in STABLE_CG_IDS:
             # Estimate an OU Process
-            theta, mu, sigma = estimate_ou_parameters_MLE(df[col].tolist(), dt)
+            theta, mu, sigma = estimate_ou_parameters_mle(df[col].tolist(), dt)
             sigma *= np.sqrt(annual_factor)  # annualize
             params[col] = {"theta": theta, "mu": mu, "sigma": sigma, "type": "OU"}
         else:
@@ -216,16 +224,16 @@ def log_likelihood(params, X, dt):
     summation_term = -summation_term / (2 * n * sigma_tilde_squared)
 
     # Corrected the log likelihood calculation
-    log_likelihood = (
+    ll = (
         (-np.log(2 * np.pi) / 2)
         - (np.log(np.sqrt(sigma_tilde_squared)))
         + summation_term
     )
 
-    return -log_likelihood  # Negative for minimization
+    return -ll  # Negative for minimization
 
 
-def estimate_ou_parameters_MLE(X: List[float], dt: float) -> tuple:
+def estimate_ou_parameters_mle(X: List[float], dt: float) -> tuple:
     """
     Estimate the parameters of an OU process using MLE.
 
@@ -264,14 +272,16 @@ def estimate_ou_parameters_MLE(X: List[float], dt: float) -> tuple:
 
     if result.success:
         return result.x
-    else:
-        raise RuntimeError("Maximum likelihood estimation failed to converge")
+    raise RuntimeError("Maximum likelihood estimation failed to converge")
 
 
 ### ========== Generate Simulated Prices ========== ###
 
 
 def gen_dW(dt, shape):
+    """
+    Generate a Wiener process of shape `shape`.
+    """
     if isinstance(shape, tuple):
         N, n = shape
         return np.sqrt(dt) * np.random.randn(N, n)

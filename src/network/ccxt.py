@@ -1,8 +1,15 @@
+# mypy: ignore-errors
+"""
+Provides the `CCXTDataFetcher` class for
+querying CEX trade and OHLCV data.
+
+TODO fix mypy errors and uncomment ignore-errors.
+"""
 import math
 import logging
-import ccxt as ccxt  # type: ignore
-import pandas as pd
 from datetime import datetime, timezone
+import ccxt  # type: ignore
+import pandas as pd
 from ..exceptions import ccxtInvalidSymbolException
 
 
@@ -16,9 +23,9 @@ class CCXTDataFetcher:
 
     def __init__(
         self,
-        coinbase_pro_api_key,
-        coinbase_pro_api_secret,
-        coinbase_pro_api_password,
+        coinbase_pro_api_key: str,
+        coinbase_pro_api_secret: str,
+        coinbase_pro_api_password: str,
         enable_rate_limit: bool = True,
     ):
         self.coinbasepro = ccxt.coinbasepro(
@@ -42,17 +49,24 @@ class CCXTDataFetcher:
         dt to UNIX millisecond timestamps.
         """
         exchange = getattr(self, exchange_id)
-        return exchange.parse8601(datetime.isoformat(dt, tz=timezone.utc))
+        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return exchange.parse8601(datetime.isoformat(dt.astimezone(timezone.utc)))
 
-    def to_strftime(self, dt) -> str:
+    def to_strftime(self, dt: int | datetime | str) -> str:
+        """
+        Get string representation of datetime or UNIX timestamp.
+        """
         if isinstance(dt, int):
             # Assumed mili
             dt = datetime.fromtimestamp(dt / 1000, tz=timezone.utc)
+        elif isinstance(dt, str):
+            dt = datetime.fromisoformat(dt)
         return dt.strftime("%d/%m/%Y, %H:%M:%S")
 
-    # def fetch_ohlcv(self, )
-
-    def fetch_trades_coinbasepro(self, symbol, since):
+    def fetch_trades_coinbasepro(
+        self, symbol: str, since: int | datetime | str
+    ) -> pd.DataFrame:
         """
         `fetchTrades` on coinbasepro returns the most
         recent page of trades. You must then walk backwards
@@ -79,12 +93,15 @@ class CCXTDataFetcher:
             since = exchange.parse8601(since)
 
         logging.info(
-            f"\nQuerying {symbol} trades from Coinbase Pro between {self.to_strftime(start_time)} and {self.to_strftime(since)}.\n"
+            "Querying %s trades from Coinbase Pro between %s and %s.",
+            symbol,
+            self.to_strftime(start_time),
+            self.to_strftime(since),
         )
 
         total = int(start_time.timestamp() * 1000) - since
-        bars = [x for x in range(101)]
-        logging.info(f"Progress: {bars.pop(0)}%", end="\r")
+        bars = list(range(101))
+        logging.info("Progress: %f%%", bars.pop(0), end="\r")
 
         param_key = ""
         param_value = ""
@@ -96,7 +113,7 @@ class CCXTDataFetcher:
                     new_trades = exchange.fetch_trades(
                         symbol, params={param_key: param_value}
                     )
-                    if not len(new_trades):
+                    if not new_trades:
                         break
                     trades.extend(new_trades)
                     after = exchange.last_response_headers.get("Cb-After")
@@ -107,20 +124,18 @@ class CCXTDataFetcher:
                     else:
                         break  # Last page
                     progress = round((1 - (last_trade_ts - since) / total) * 100)
-                    if len(bars) and progress in bars:
+                    if bars and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        logging.info(f"Progress: {progress}%", end="\r")
+                        logging.info("Progress: %f%%", progress, end="\r")
                 except ccxt.RateLimitExceeded:
                     logging.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
-                except Exception:
-                    raise
         else:
             raise ccxtInvalidSymbolException
 
         end_time = datetime.now(tz=timezone.utc)
 
-        logging.info(f"\nFinished. Time taken: {end_time - start_time}\n")
+        logging.info("Finished. Time taken: %s", end_time - start_time)
 
         return CCXTDataFetcher.trades_to_df(trades)
 
@@ -157,48 +172,51 @@ class CCXTDataFetcher:
         end = min(end, cur) if end else cur
 
         logging.info(
-            f"\nQuerying {symbol} trades from Binance between {self.to_strftime(since)} and {self.to_strftime(end)}.\n"
+            "Querying %s trades from Binance between %s and %s.",
+            symbol,
+            self.to_strftime(since),
+            self.to_strftime(end),
         )
 
         total = end - since
-        bars = [x for x in range(101)]
-        logging.info(f"Progress: {bars.pop(0)}%", end="\r")
+        bars = list(range(101))
+        logging.info("Progress: %f%%", bars.pop(0), end="\r")
         trades = []
         if symbol in exchange.markets:
             while since < end:
                 try:
                     new_trades = exchange.fetch_trades(symbol, since=since)
-                    if not len(new_trades):
+                    if not new_trades:
                         break
                     trades.extend(new_trades)
                     since = trades[-1]["timestamp"]  # "latest" trade
 
                     progress = round((1 - (end - since) / total) * 100)
-                    if len(bars) and progress in bars:
+                    if bars and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        logging.info(f"Progress: {progress}%", end="\r")
+                        logging.info("Progress: %f%%", progress, end="\r")
                 except ccxt.RateLimitExceeded:
                     logging.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
-                except Exception:
-                    raise
         else:
             raise ccxtInvalidSymbolException
 
         end_time = datetime.now(tz=timezone.utc)
 
-        logging.info(f"\n\nFinished. Time taken: {end_time - start_time}\n")
+        logging.info("Finished. Time taken: %s.", end_time - start_time)
 
         return CCXTDataFetcher.trades_to_df(trades)
 
     @staticmethod
     def trades_to_df(trades: list) -> pd.DataFrame:
+        """Convert a list of trades to a pd.DataFrame."""
         df = pd.DataFrame(trades)
         df.set_index("datetime", inplace=True)
         df.sort_index(inplace=True)
         return df
 
     def ohlcv_to_df(self, ohlcv: list) -> pd.DataFrame:
+        """Convert a list of OHLCV to a pd.DataFrame."""
         df = pd.DataFrame(
             ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
         )

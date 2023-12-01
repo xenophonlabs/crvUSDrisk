@@ -1,10 +1,13 @@
-class crvUSDRiskException(Exception):
+"""Provides custom exceptions."""
+
+
+class crvusdRiskException(Exception):
     """Base class for exceptions in this module."""
 
 
-class coingeckoRateLimitException(crvUSDRiskException):
+class coingeckoRateLimitException(crvusdRiskException):
     """Coingecko API Rate Limit Exceeded."""
 
 
-class ccxtInvalidSymbolException(crvUSDRiskException):
+class ccxtInvalidSymbolException(crvusdRiskException):
     """Exchange does not support input symbol."""

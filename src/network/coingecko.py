@@ -1,9 +1,10 @@
-import requests as req
-import pandas as pd
+"""Provides functions for fetching Coingecko API data."""
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import List
+import requests as req
 from curvesim.network.coingecko import coin_ids_from_addresses_sync
+import pandas as pd
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -38,8 +39,8 @@ MAX_RETRIES = 5
     retry=retry_if_exception_type(req.HTTPError),
 )
 def _get(url: str, params: dict) -> dict:
-    """Get data from coingecko API."""
-    res = req.get(url, params=params)
+    """GET data from coingecko API."""
+    res = req.get(url, params=params, timeout=5)
     res.raise_for_status()  # retry if rate limit error
     return res.json()
 
@@ -127,7 +128,9 @@ def get_prices_df(
     """
     dfs = []
     for i, coin in enumerate(coins):
-        logging.info(f"Fetching Coingecko price data for {coin}...{i + 1}/{len(coins)}")
+        logging.info(
+            "Fetching Coingecko price data for %s...%d/%d", coin, i + 1, len(coins)
+        )
         if "0x" in coin:
             # Convert Ethereum address to Coingecko coin id
             coin = coin_ids_from_addresses_sync([coin], "mainnet")[0]
@@ -152,7 +155,7 @@ def address_from_coin_id(coin_id, chain="ethereum"):
     if chain == "ethereum" and coin_id in KNOWN_IDS_MAP:
         return KNOWN_IDS_MAP[coin_id]
 
-    logging.info(f"Fetching {coin_id} address from Coingecko API.")
+    logging.info("Fetching %s address from Coingecko API.", coin_id)
     url = COINGECKO_URL + f"coins/{coin_id}"
     params = {
         "localization": "false",

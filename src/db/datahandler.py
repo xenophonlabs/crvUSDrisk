@@ -1,14 +1,26 @@
+"""
+Provides a `DataHandler` class 
+for accessing our PG database.
+"""
+import logging
+from typing import List, Type
 import pandas as pd
-from typing import List, Optional, Type
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.dialects.postgresql import insert
-from .models import Entity, Token, Quote
+from .models import Base, Token, Quote
 from ..configs import URI, TOKEN_DTOs
 
 
 class DataHandler:
+    """
+    The DataHandler class provides an interface
+    for accessing our PG database. It provides
+    methods for creating the database, inserting
+    data, and querying data.
+    """
+
     def __init__(self, uri=URI):
         self.uri = uri
         self.engine = create_engine(uri)
@@ -16,21 +28,24 @@ class DataHandler:
         self.session = scoped_session(self.session_factory)
 
     def close(self):
+        """Close the SQLAlchemy session."""
         self.session.remove()
 
     def __enter__(self):
+        """Enter DataHandler context manager."""
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """Exit DataHandler context manager."""
         self.close()
 
     def create_database(self):
-        """Create tables if they don't exist"""
-        print("Creating database...")
+        """Create SQL tables if they don't exist"""
+        logging.info("Creating database...")
         Base.metadata.create_all(self.engine)
-        print("Inserting tokens from config...")
+        logging.info("Inserting tokens from config...")
         self.insert_tokens()
-        print("Done.")
+        logging.info("Done.")
 
     def insert_tokens(self):
         """Create the tokens table based on the config."""
@@ -44,18 +59,21 @@ class DataHandler:
 
     def insert_quotes(self, quotes: pd.DataFrame):
         """Given a dataframe of quotes, insert them sequentially in db."""
-        if not len(quotes):
+        if quotes.empty:
             return
         self.insert_df(quotes, Quote)
 
     def insert_df(
         self,
         df: pd.DataFrame,
-        entity: Entity,
+        entity: Type[Base],
         replace: bool = False,
-        index_elements: List[str] = [],
+        index_elements: List[str] | None = None,
     ):
-        """Insert rows from dataframe."""
+        """
+        Insert rows from dataframe in `entity`. If `replace`
+        is True, then conflicting rows will be updated.
+        """
         for _, row in df.iterrows():
             stmt = insert(entity.__table__).values(**row)
             if replace:
@@ -75,12 +93,15 @@ class DataHandler:
     def insert_list(
         self,
         lst: List[dict],
-        entity: Entity,
+        entity: Type[Base],
         replace: bool = False,
-        index_elements: List[str] = [],
+        index_elements: List[str] | None = None,
     ):
-        """Insert a list of dictionaries"""
-        if len(lst) == 0:
+        """
+        Insert a list of dicts in `entity`. If `replace`
+        is True, then conflicting rows will be updated.
+        """
+        if not lst:
             return
 
         for d in lst:
@@ -103,14 +124,13 @@ class DataHandler:
         """
         Performs the following processing steps:
             1. Create datetime index (floored to hours).
-            2. Add reference prices for each block of quotes:
-                a. Quotes are fetched every hour.
+            2. Add reference prices for each 'round' of quotes:
+                a. Quotes are fetched every hour. This is a 'round'.
                 b. The reference price is the best price for
-                that block.
+                that 'round'.
             3. Add price impact as the pct difference
             between the reference price and the quoted price.
         """
-        # TODO float ok instead of int?
         df["in_amount"] = df["in_amount"].astype(float)
         df["out_amount"] = df["out_amount"].astype(float)
 
@@ -141,35 +161,38 @@ class DataHandler:
 
         return df
 
-    def get_tokens(
-        self, cols: List[str] = ["id", "symbol", "decimals"]
-    ) -> pd.DataFrame:
+    def get_tokens(self, cols: List[str] | None = None) -> pd.DataFrame:
         """Get tokens from database."""
+        if not cols:
+            cols = ["id", "symbol", "decimals"]
         query = self.session.query(*[getattr(Token, col) for col in cols])
         results = query.all()
-        if not len(results):
+        if not results:
             return pd.DataFrame()
         return pd.DataFrame.from_dict(results)
 
+    # pylint: disable=too-many-arguments
     def get_quotes(
         self,
-        pair: Optional[tuple] = None,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
-        cols: List[str] = [
-            "src",
-            "dst",
-            "in_amount",
-            "out_amount",
-            "price",
-            "timestamp",
-        ],
+        pair: tuple | None = None,
+        start: int | None = None,
+        end: int | None = None,
+        cols: List[str] | None = None,
         process: bool = False,
     ) -> pd.DataFrame:
         """
         Get 1inch quotes from database. Filter
         query by the input parameters.
         """
+        if not cols:
+            cols = [
+                "src",
+                "dst",
+                "in_amount",
+                "out_amount",
+                "price",
+                "timestamp",
+            ]
         query = self.session.query(*[getattr(Quote, col) for col in cols])
         if pair:
             query = query.filter(Quote.src == pair[0], Quote.dst == pair[1])
@@ -178,7 +201,7 @@ class DataHandler:
         if end:
             query = query.filter(Quote.timestamp < end)
         results = query.all()
-        if not len(results):
+        if not results:
             return pd.DataFrame()
         results = pd.DataFrame.from_dict(results)
         if process:

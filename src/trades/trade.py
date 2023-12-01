@@ -1,45 +1,77 @@
+"""
+Provides the `Swap` and `Liquidation` classes,
+as well as the `Trade` interface.
+"""
 import logging
 from abc import ABC
-from typing import Optional, Tuple
+from typing import Tuple
 from contextlib import nullcontext
 from dataclasses import dataclass
-from crvusdsim.pool.crvusd.controller import Position
 from curvesim.pool.sim_interface import SimCurvePool
-from crvusdsim.pool.sim_interface import SimLLAMMAPool, SimController
-from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
+from crvusdsim.pool.crvusd.controller import Position
+from crvusdsim.pool.sim_interface import (
+    SimLLAMMAPool,
+    SimController,
+    SimCurveStableSwapPool,
+)
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
 from ..modules import ExternalMarket
-from ..typing import SimPoolType
+from ..types import SimPoolType
 
 
 @dataclass
 class Trade(ABC):
-    def get_address(self, index: int):
+    """Simple trade interface."""
+
+    def get_address(self, i: int):
+        """Get the address of token `i`."""
+        raise NotImplementedError
+
+    def get_decimals(self, i: int):
+        """Get the decimals of token `i`."""
         raise NotImplementedError
 
     def do(self, use_snapshot_context=False):
-        raise NotImplementedError
-
-    def get_decimals(self, index: int):
+        """Perform the trade."""
         raise NotImplementedError
 
 
 @dataclass
 class Swap(Trade):
+    """
+    A `Swap` is a `Trade` that involves swapping
+    two tokens in a `SimPoolType` pool.
+    """
+
     pool: SimPoolType
     i: int
     j: int
-    amt: Optional[int]
+    amt: int
 
-    def get_address(self, index: int):
+    def get_address(self, i: int):
+        """Get the address of token `i`."""
         if isinstance(self.pool, SimCurveStableSwapPool):
-            return self.pool.coins[index].address.lower()
-        return self.pool.coin_addresses[index].lower()
+            return self.pool.coins[i].address.lower()
+        return self.pool.coin_addresses[i].lower()
 
-    def get_decimals(self, index: int):
-        return self.pool.coin_decimals[index]
+    def get_decimals(self, i: int):
+        """Get the decimals of token `i`."""
+        return self.pool.coin_decimals[i]
 
     def do(self, use_snapshot_context: bool = False) -> Tuple[int, int]:
+        """
+        Perform the swap.
+
+        Parameters
+        ----------
+        use_snapshot_context : bool, optional
+            Whether to use a snapshot context manager, by default False
+
+        Returns
+        -------
+        Tuple[int, int]
+            The amount of token `j` received, and the decimals of token `j`.
+        """
         pool = self.pool
         amt_in = self.amt
 
@@ -52,6 +84,7 @@ class Swap(Trade):
         with context_manager:
             result = pool.trade(self.i, self.j, amt_in)
 
+        # Unpack result
         if isinstance(pool, ExternalMarket):
             amt_out = result
         elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
@@ -59,7 +92,7 @@ class Swap(Trade):
             in_amount_done, amt_out, _ = result
             if in_amount_done != amt_in:
                 logging.warning(
-                    f"LLAMMA amt_in {amt_in} != in_amount_done {in_amount_done}."
+                    "LLAMMA amt_in %d != in_amount_done %d.", amt_in, in_amount_done
                 )
         elif isinstance(pool, SimCurvePool):
             amt_out, _ = result
@@ -69,11 +102,21 @@ class Swap(Trade):
         return amt_out, self.get_decimals(self.j)
 
     def __repr__(self):
-        return f"Swap(pool={self.pool.name}, in={self.pool.coin_names[self.i]}, out={self.pool.coin_names[self.j]}, amt={self.amt})"
+        return (
+            f"Swap(pool={self.pool.name}, "
+            f"in={self.pool.coin_names[self.i]}, "
+            f"out={self.pool.coin_names[self.j]}, "
+            f"amt={self.amt})"
+        )
 
 
 @dataclass
 class Liquidation(Trade):
+    """
+    A `Liquidation` is a `Trade` that involves
+    liquidating a crvusd borrower in a `SimController`.
+    """
+
     controller: SimController
     position: Position
     amt: int  # to repay
@@ -81,20 +124,32 @@ class Liquidation(Trade):
     i: int = 0  # repay stablecoin
     j: int = 1  # receive collateral
 
-    def get_address(self, index: int):
-        if index == 0:
+    def get_address(self, i: int):
+        """Get the address of token `i`."""
+        if i == 0:
             return self.controller.STABLECOIN.address.lower()
-        else:
-            return self.controller.COLLATERAL_TOKEN.address.lower()
+        return self.controller.COLLATERAL_TOKEN.address.lower()
 
-    def get_decimals(self, index: int):
-        if index == 0:
+    def get_decimals(self, i: int):
+        """Get the decimals of token `i`."""
+        if i == 0:
             return self.controller.STABLECOIN.decimals
-        else:
-            return self.controller.COLLATERAL_TOKEN.decimals
+        return self.controller.COLLATERAL_TOKEN.decimals
 
     def do(self, use_snapshot_context=False) -> Tuple[int, int]:
-        """Perform liquidation."""
+        """
+        Perform the liquidation.
+
+        Parameters
+        ----------
+        use_snapshot_context : bool, optional
+            Whether to use a snapshot context manager, by default False
+
+        Returns
+        -------
+        Tuple[int, int]
+            The amount of collateral received, and its decimals.
+        """
         context_manager = (
             self.controller.use_snapshot_context()
             if use_snapshot_context

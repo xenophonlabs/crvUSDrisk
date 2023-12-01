@@ -4,6 +4,11 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, order=True)
 class TokenDTO:
+    """
+    Data Transfer Object to store relevant
+    token data.
+    """
+
     # TODO DTO min/max trade sizes should be dynamic
     address: str
     name: str

@@ -1,3 +1,4 @@
+"""Provides the `Liquidator` class."""
 import math
 import logging
 from typing import List, Dict, Tuple
@@ -9,12 +10,14 @@ from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
 from .agent import Agent
 from ..modules import ExternalMarket
 from ..trades.cycle import Swap, Liquidation, Cycle
-from ..utils import get_crvUSD_index
+from ..utils import get_crvusd_index
 from ..configs import TOKEN_DTOs
 
 
 @dataclass
 class Path:
+    """Simple dataclass to store liquidation paths."""
+
     basis_token: str  # address
     crvusd_pool: SimCurveStableSwapPool
     collat_pool: ExternalMarket
@@ -22,7 +25,21 @@ class Path:
 
 class Liquidator(Agent):
     """
-    Liquidator performs hard liquidations on LLAMMAs.
+    The Liquidator performs hard liquidations on LLAMMAs.
+    Liquidations are routed through `Path`s, which are
+    set by the `set_paths` function. A Path will always
+    be a `Cycle` of trades that begins and ends with a
+    `basis_token`.
+
+    Example
+    -------
+    With USDC as the basis token,
+    a liquidation will look like:
+    1. Purchase crvUSD from the crvUSD/USDC pool.
+    2. Liquidate the user in the Controller.
+    3. Sell collateral for USDC in the USDC/collateral External Market.
+
+    TODO consider more general liquidation paths.
     """
 
     basis_tokens: list = [
@@ -41,12 +58,12 @@ class Liquidator(Agent):
     def set_paths(
         self,
         controller: SimController,
-        crvUSD_pools: List[SimCurveStableSwapPool],
+        crvusd_pools: List[SimCurveStableSwapPool],
         collat_pools: Dict[tuple, ExternalMarket],
     ):
         """
         Set the paths for liquidations. Currently:
-        1. Purchase crvUSD from basis_token/crvUSD pools.
+        1. Purchase crvusd from basis_token/crvusd pools.
         2. Liquidate the user in the Controller.
         3. Sell collateral for basis_token in collateral/basis_token
         External markets.
@@ -56,8 +73,8 @@ class Liquidator(Agent):
         self.paths = []
         for basis_token in self.basis_tokens:
             pair = tuple(sorted([basis_token, collateral]))
-            # Get basis_token/crvUSD pool
-            for pool in crvUSD_pools:
+            # Get basis_token/crvusd pool
+            for pool in crvusd_pools:
                 coins = [c.address for c in pool.coins]
                 if basis_token.address in coins:
                     crvusd_pool = pool
@@ -85,13 +102,13 @@ class Liquidator(Agent):
         total_profit : float
             Profit in USD units from Liquidations.
         underwater_debt : float
-            Total crvUSD debt of underwater positions.
+            Total crvusd debt of underwater positions.
 
         TODO liquidations should be ordered by profitability
         """
         to_liquidate = controller.users_to_liquidate()
 
-        logging.info(f"There are {len(to_liquidate)} users to liquidate.")
+        logging.info("There are %d users to liquidate.", len(to_liquidate))
 
         if len(to_liquidate) == 0:
             return 0.0, 0
@@ -113,6 +130,7 @@ class Liquidator(Agent):
 
         return total_profit, underwater_debt
 
+    # pylint: disable=too-many-locals
     def maybe_liquidate(
         self,
         position: Position,
@@ -120,10 +138,10 @@ class Liquidator(Agent):
     ) -> float:
         """
         This is the hard liquidation:
-        1. Liquidator checks the crvUSD debt they'll have to repay.
+        1. Liquidator checks the crvusd debt they'll have to repay.
         2. For each basis token (e.g. USDC, USDT) they:
             a. Compute how much of the basis token they must swap
-            to obtain the necessary crvUSD.
+            to obtain the necessary crvusd.
             b. Compute how much of the basis token they receive
             from selling the corresponding collateral.
             c. Profit = b - a
@@ -145,7 +163,7 @@ class Liquidator(Agent):
 
         Note
         ----
-        TODO incorporate liquidations that source crvUSD partly from
+        TODO incorporate liquidations that source crvusd partly from
         USDC and partly from USDT.
         TODO incorporate liquidations against other tokens (not just
         USDC and USDT).
@@ -172,13 +190,13 @@ class Liquidator(Agent):
             # TODO Abstract this into the `Cycle.populate` function
             # TODO dollarize the profit based on current USD market prices
 
-            # basis token -> crvUSD
-            j = get_crvUSD_index(crvusd_pool)
+            # basis token -> crvusd
+            j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
             amt_in = self.search(crvusd_pool, i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
-            # crvUSD -> collateral
+            # crvusd -> collateral
             trade2 = Liquidation(controller, position, to_repay)
 
             # collateral -> basis token
@@ -197,16 +215,20 @@ class Liquidator(Agent):
 
         if best and best_expected_profit > self.tolerance:
             logging.info(
-                f"Liquidating user {user} with expected profit: {best_expected_profit}."
+                "Liquidating user %s with expected profit: %f.",
+                user,
+                best_expected_profit,
             )
             profit = best.execute()
-            logging.info(f"Liquidated user {user} with profit: {profit}.")
+            logging.info("Liquidated user %s with profit: %f.", user, profit)
             return profit
-        else:
-            logging.info(
-                f"Missed liquidation for user {user}. Health: {health}. Expected profit: {best_expected_profit}."
-            )
-            return 0.0
+        logging.info(
+            "Missed liquidation for user %s. Health: %f. Expected profit: %f.",
+            user,
+            health,
+            best_expected_profit,
+        )
+        return 0.0
 
     def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
         """
@@ -214,7 +236,7 @@ class Liquidator(Agent):
         amt_out from a swap.
 
         Currently only meant for USDC or USDT ->
-        crvUSD.
+        crvusd.
 
         TODO move this to SimCurveStableSwapPool
         """
@@ -246,5 +268,4 @@ class Liquidator(Agent):
 
         if res.converged:
             return int(res.root)
-        else:
-            raise RuntimeError(res.message)
+        raise RuntimeError(res.message)

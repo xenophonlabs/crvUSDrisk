@@ -1,4 +1,4 @@
-from typing import Type
+"""Package for SQLAlchemy models for accessing our PG database."""
 from sqlalchemy import (
     Column,
     Integer,
@@ -9,23 +9,32 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.declarative import as_declarative
+from sqlalchemy.ext.declarative import as_declarative, DeclarativeMeta
+
+# from sqlalchemy.orm.decl_api import DeclarativeMeta
+
 
 @as_declarative()
-class Base:
-    __tablename__: str
+class Base(DeclarativeMeta):
+    """Base class for SQLAlchemy models."""
+
     __table__: Table
 
-Entity = Type[Base]
 
+# pylint: disable=too-few-public-methods
 class Token(Base):
+    """A dimension table storing token metadata."""
+
     __tablename__ = "tokens"
     id = Column(String, primary_key=True)
     symbol = Column(String, nullable=False)
     decimals = Column(Integer, nullable=False)
 
 
+# pylint: disable=too-few-public-methods
 class Quote(Base):
+    """A fact table storing 1inch quotes."""
+
     __tablename__ = "quotes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     src = Column(String, ForeignKey("tokens.id"))
