@@ -1,12 +1,11 @@
 """Provides the `Scenario` class for running simulations."""
-import json
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from dataclasses import dataclass
 from itertools import combinations
 from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
-from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
+from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE, get_config
 from ..modules import ExternalMarket
 from ..db.datahandler import DataHandler
 from ..agents import Arbitrageur
@@ -25,17 +24,13 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, fn: str):
+    def __init__(self, scenario: str):
         "Generate the scenario from the stress test scenario config file."
 
-        with open(fn, "r", encoding="utf-8") as f:
-            logging.info("Reading price config from %s.", fn)
-            self.config = config = json.load(f)
-
+        self.config = config = get_config(scenario, "scenarios")
         self.name: str = config["name"]
         self.description: str = config["description"]
         self.num_steps: int = config["N"]
-        self.price_config: str = config["price_config"]
         self.coins: List[TokenDTO] = [TOKEN_DTOs[a] for a in config["coins"]]
         self.pairs: List[Tuple[TokenDTO, TokenDTO]] = [
             (sorted_pair[0], sorted_pair[1])
@@ -53,20 +48,20 @@ class Scenario:
         """Generate the external markets for the scenario."""
         with DataHandler() as datahandler:
             quotes = datahandler.get_quotes(process=True)
-            logging.info("Using %d 1Inch quotes.", quotes.shape[0])
-        logging.info("Fitting external markets against 1inch quotes.")
+            logging.debug("Using %d 1Inch quotes.", quotes.shape[0])
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
             market.fit(quotes)
             self.markets[pair] = market
 
-    def generate_pricepaths(self, fn: Optional[str] = None) -> None:
+    def generate_pricepaths(self) -> None:
         """
         Generate the pricepaths for the scenario.
         """
-        fn = fn if fn else self.price_config  # override
-        self.pricepaths: PricePaths = PricePaths(fn, self.num_steps)
+        self.pricepaths: PricePaths = PricePaths(
+            self.config["price_config"], self.num_steps
+        )
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""

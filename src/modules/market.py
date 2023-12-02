@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from itertools import permutations
-from typing import Any, Tuple, Dict, Optional, TYPE_CHECKING
+from typing import Any, Tuple, Dict, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
@@ -39,7 +39,7 @@ class ExternalMarket:
         self.coins = coins
         self.pair_indices = list(permutations(range(n), 2))
         self.n = n
-        self.prices: Optional[Dict[int, Dict[int, float]]] = None
+        self.prices: Dict[int, Dict[int, float]] | None = None
         self.models: Dict[int, Dict[int, IsotonicRegression]] = defaultdict(dict)
 
     @property

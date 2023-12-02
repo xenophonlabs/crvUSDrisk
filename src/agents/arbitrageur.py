@@ -1,6 +1,6 @@
 """Provides the `Arbitrageur` class."""
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from .agent import Agent
 from ..trades import Cycle
 from ..prices import PriceSample
@@ -85,7 +85,7 @@ class Arbitrageur(Agent):
 
     def find_best_arbitrage(
         self, cycles: List[Cycle], prices: PriceSample
-    ) -> Tuple[Optional[Cycle], float]:
+    ) -> Tuple[Cycle | None, float]:
         """
         Find the optimal liquidity-constrained cyclic arbitrages.
         Dollarize the profit by marking it to current USD market price.
@@ -110,7 +110,7 @@ class Arbitrageur(Agent):
 
         for cycle in cycles:
             cycle.optimize()
-            assert cycle.expected_profit
+            assert cycle.expected_profit is not None
             # Dollarize the expected profit
             expected_profit = (
                 cycle.expected_profit * prices.prices_usd[cycle.basis_address]

@@ -7,18 +7,19 @@ from sqlalchemy import (
     String,
     ForeignKey,
     Table,
+    MetaData,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.declarative import as_declarative, DeclarativeMeta
-
-# from sqlalchemy.orm.decl_api import DeclarativeMeta
+from sqlalchemy.ext.declarative import as_declarative
 
 
+# pylint: disable=too-few-public-methods
 @as_declarative()
-class Base(DeclarativeMeta):
+class Base:
     """Base class for SQLAlchemy models."""
 
     __table__: Table
+    metadata: MetaData
 
 
 # pylint: disable=too-few-public-methods

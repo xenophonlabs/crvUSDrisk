@@ -4,14 +4,14 @@ liquidity pools and their connections. The graph implements a
 DFS algorithm to find all cycles of a given length.
 """
 import logging
-from typing import List, Tuple, Set, Dict, Optional
+from typing import List, Tuple, Set, Dict
 from ..trades import Swap, Cycle
 from ..modules import ExternalMarket
 from ..types import SimPoolType
 
 
 def shared_address(
-    p1: SimPoolType, p2: SimPoolType, used: Optional[Set[str]] = None
+    p1: SimPoolType, p2: SimPoolType, used: Set[str] | None = None
 ) -> Set[str]:
     """Check if two pools share coins by checking their addrs."""
     assert p1 != p2, ValueError("Cannot share coins with self.")

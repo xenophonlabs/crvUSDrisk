@@ -2,7 +2,6 @@
 Plotting functions for 1inch quotes 
 and generated price impact curves.
 """
-from typing import Optional
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +12,7 @@ S = 5
 
 
 def plot_quotes(
-    df: pd.DataFrame, in_token: str, out_token: str, fn: Optional[str] = None
+    df: pd.DataFrame, in_token: str, out_token: str, fn: str | None = None
 ) -> plt.Figure:
     """Plot 1inch quotes for a given token pair."""
     dt = pd.to_datetime(df["hour"], unit="s")
@@ -40,9 +39,9 @@ def plot_regression(
     i: int,
     j: int,
     market: ExternalMarket,
-    fn: Optional[str] = None,
+    fn: str | None = None,
     scale: str = "log",
-    xlim: Optional[float] = None,
+    xlim: float | None = None,
 ) -> plt.Figure:
     """
     Plot price impact from 1inch quotes against
@@ -87,9 +86,9 @@ def plot_predictions(
     i: int,
     j: int,
     market: ExternalMarket,
-    fn: Optional[str] = None,
+    fn: str | None = None,
     scale: str = "log",
-    xlim: Optional[float] = None,
+    xlim: float | None = None,
 ) -> plt.Figure:
     """
     Plot amount in vs amount out from 1inch quotes against

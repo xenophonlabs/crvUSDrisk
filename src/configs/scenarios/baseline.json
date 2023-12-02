@@ -1,7 +1,7 @@
 {
     "name": "Baseline",
     "description": "Baseline scenario.",
-    "price_config": "src/configs/prices/1h_1696108632_1701289032.json",
+    "price_config": "1h_1696108632_1701289032",
     "N": 168,
     "coins": [
         "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",

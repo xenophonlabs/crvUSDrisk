@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from dataclasses import dataclass
 from itertools import permutations
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 import requests as req
 import pandas as pd
 import numpy as np
@@ -169,7 +169,7 @@ class OneInchQuotes:
         return QuoteResponse(res.json(), in_amount, ts)
 
     def quotes_for_pair(
-        self, pair: tuple, calls: Optional[int] = None
+        self, pair: tuple, calls: int | None = None
     ) -> List[QuoteResponse]:
         """
         GET quotes for a pair of tokens using the specified amount
@@ -200,7 +200,7 @@ class OneInchQuotes:
         return responses
 
     def all_quotes(
-        self, tokens: List[str], calls: Optional[int] = None
+        self, tokens: List[str], calls: int | None = None
     ) -> List[QuoteResponse]:
         """GET the quotes for all pairs of the input tokens."""
         pairs = list(permutations(tokens, 2))

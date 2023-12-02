@@ -253,7 +253,7 @@ class Liquidator(Agent):
             """
             amt_in = int(amt_in)
             with pool.use_snapshot_context():
-                amt_out_ = pool.trade(i, j, amt_in)
+                _, amt_out_, _ = pool.trade(i, j, amt_in)
             return amt_out_float - amt_out_
 
         high = pool.get_max_trade_size(i, j)

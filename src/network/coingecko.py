@@ -118,7 +118,7 @@ def get_prices_df(
         Unix timestamp in milliseconds.
     end : int
         Unix timestamp in milliseconds.
-    freq : Optional[str]
+    freq : str
         Frequency of price data. Default is daily.
 
     Returns

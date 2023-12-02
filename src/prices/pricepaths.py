@@ -4,14 +4,13 @@ through `PriceSample`s. A `PriceSample` stores USD token prices
 at a given timestep and converts them to pairwise prices.
 """
 from __future__ import annotations
-import json
-import logging
 from typing import Dict, TYPE_CHECKING
 from dataclasses import dataclass
 from itertools import permutations
 from collections import defaultdict
 import pandas as pd
 from .utils import gen_cor_prices, get_gran, get_factor
+from ..configs import get_config
 from ..network.coingecko import address_from_coin_id, get_current_prices
 
 if TYPE_CHECKING:
@@ -69,9 +68,7 @@ class PricePaths:
         Generate price paths from config file.
         TODO integrate with curvesim PriceSampler?
         """
-        with open(fn, "r", encoding="utf-8") as f:
-            logging.info("Reading price config from %s.", fn)
-            config = json.load(f)
+        self.config = config = get_config(fn, "prices")
 
         freq = config["freq"]
         coin_ids = list(config["params"].keys())
@@ -89,7 +86,6 @@ class PricePaths:
             gran=get_gran(freq),
         )
 
-        self.config = config
         self.coins = [address_from_coin_id(coin_id) for coin_id in coin_ids]
 
     def __iter__(self):

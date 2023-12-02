@@ -7,7 +7,7 @@ prices based on historical data. This includes:
 """
 import logging
 import json
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -46,9 +46,9 @@ def gen_price_config(
         Unix timestamp in milliseconds.
     end : int
         Unix timestamp in milliseconds.
-    freq : Optional[str]
+    freq : str
         Frequency of price data. Default is hourly.
-    plot : Optional[bool]
+    plot : bool
         Whether to plot simulated prices.
 
     Returns
@@ -138,7 +138,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> Tuple[dict, pd.DataFra
     ----------
     df : pd.DataFrame
         DataFrame of prices.
-    freq : Optional[str]
+    freq : str
         Frequency of price data. Default is daily.
 
     Returns
@@ -307,7 +307,7 @@ def gen_ou(theta, mu, sigma, dt, S0, N, dW=None):
         Initial value of the process.
     N : int
         Number of steps to simulate.
-    dW : Optional[np.array]
+    dW : np.array | None
         Correlated Wiener process.
 
     Returns
@@ -347,7 +347,7 @@ def gen_gbm(mu, sigma, dt, S0, N, dW=None):
         Initial value of the process.
     N : int
         Number of steps to simulate.
-    dW : Optional[np.array]
+    dW : np.array | None
         Correlated Wiener process.
 
     Returns
@@ -371,7 +371,7 @@ def gen_cor_prices(
     cov: pd.DataFrame,
     params: dict,
     timestamps: bool = False,
-    gran: Optional[int] = None,
+    gran: int | None = None,
 ):
     """
     Generate a matrix of correlated GBMs using
@@ -393,7 +393,7 @@ def gen_cor_prices(
         Dictionary of parameters for each asset.
     timestamps : bool
         Add timestamps to df index.
-    gran : int
+    gran : int | None
         Timestamp granularity
 
     Returns

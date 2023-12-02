@@ -3,8 +3,11 @@ Master config with basic constants.
 """
 
 import os
+import json
 from dotenv import load_dotenv
 from .tokens import ADDRESSES, TOKEN_DTOs, STABLE_CG_IDS
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 __all__ = [
     "URI",
@@ -35,3 +38,11 @@ SYMBOL_TO_ADDRESS = {v.symbol: k for k, v in TOKEN_DTOs.items()}
 
 # Constatns
 DEFAULT_PROFIT_TOLERANCE = 1  # one dollah
+
+
+def get_config(fn: str, dir_: str) -> dict:
+    """Return config dict."""
+    fn = os.path.join(BASE_DIR, dir_, fn + ".json")
+    with open(fn, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    return config

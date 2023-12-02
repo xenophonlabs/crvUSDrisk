@@ -1,4 +1,4 @@
-name: Python Code Quality Checks
+name: CI
 
 on:
   push:

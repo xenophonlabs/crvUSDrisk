@@ -1,9 +1,8 @@
 crvusd Risk Modeling
 =======================================
 
-![Run Black](https://github.com/xenophonlabs/crvusdrisk/workflows/Run%20Black/badge.svg)
-![Run Pylint](https://github.com/xenophonlabs/crvusdrisk/workflows/Run%20Pylint/badge.svg)
-![Run Mypy](https://github.com/xenophonlabs/crvusdrisk/workflows/Run%20Mypy/badge.svg)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![CI](https://github.com/xenophonlabs/crvUSDrisk/actions/workflows/CI.yml/badge.svg)](https://github.com/xenophonlabs/crvUSDrisk/actions/workflows/CI.yml/badge.svg)
 
 
 Overview

@@ -398,7 +398,9 @@ def plot_borrowers(borrowers, price, fn=None):
     return save(f, fn)
 
 
-def plot_prices(df, df2=None, fn=None):
+def plot_prices(
+    df: pd.DataFrame, df2: pd.DataFrame | None = None, fn: str | None = None
+) -> plt.Figure:
     """
     Plot prices in df. Assumes that each col
     in the df is a coin.
@@ -407,7 +409,7 @@ def plot_prices(df, df2=None, fn=None):
     ----------
     df : pd.DataFrame
         Dataframe with prices
-    fn : Optional[str]
+    fn : str | None
         Filename to save plot to
     """
     # Get coin names
