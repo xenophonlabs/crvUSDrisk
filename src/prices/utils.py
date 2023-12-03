@@ -441,7 +441,9 @@ def gen_cor_prices(
     if timestamps:
         assert gran
         now = int(datetime.now().timestamp())
-        df.index = pd.Index(list(range(now, now + N * gran, gran)))
+        df.index = pd.Index(
+            pd.to_datetime(list(range(now, now + N * gran, gran)), unit="s")
+        )
 
     return df
 

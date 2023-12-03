@@ -83,6 +83,12 @@ class Scenario:
         sim_market = get("weth", bands_data="controller")
         self.llamma = sim_market.pool
         self.controller = sim_market.controller
+        self.stableswap_pools = sim_market.stableswap_pools
+        self.aggregator = sim_market.aggregator
+        self.price_oracle = sim_market.price_oracle
+        self.peg_keepers = sim_market.peg_keepers
+        self.policy = sim_market.policy
+        self.factory = sim_market.factory
 
     def generate_metrics_processor(self) -> None:
         """Generate the metrics processor for the scenario."""
@@ -95,6 +101,17 @@ class Scenario:
 
     def prepare_for_run(self, prices: PriceSample) -> None:
         """Prepare all modules for a simulation run."""
+        self.update_market_prices(prices)
+        self.llamma.prepare_for_run(prices)  # TODO prices is the wrong type
+        self.controller.prepare_for_run(prices)  # TODO prices is the wrong type
+        for spool in self.stableswap_pools:
+            spool.prepare_for_run(prices)
+        for pk in self.peg_keepers:
+            pk.prepare_for_run(prices)
+        self.aggregator.prepare_for_run(prices)
+        # self.policy.prepare_for_run(prices)
+        # self.factory.prepare_for_run(prices)
+        # self.price_oracle.prepare_for_run(prices)
 
     def prepare_for_trades(self, ts: int) -> None:
         """Prepare all modules for a new time step."""
