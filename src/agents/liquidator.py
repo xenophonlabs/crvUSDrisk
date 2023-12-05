@@ -1,7 +1,7 @@
 """Provides the `Liquidator` class."""
 import math
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 from dataclasses import dataclass
 from scipy.optimize import root_scalar
 from crvusdsim.pool.crvusd.controller import Position
@@ -12,13 +12,15 @@ from ..modules import ExternalMarket
 from ..trades.cycle import Swap, Liquidation, Cycle
 from ..utils import get_crvusd_index
 from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
+from ..types import MarketsType
+from ..data_transfer_objects import TokenDTO
 
 
 @dataclass
 class Path:
     """Simple dataclass to store liquidation paths."""
 
-    basis_token: str  # address
+    basis_token: TokenDTO
     crvusd_pool: SimCurveStableSwapPool
     collat_pool: ExternalMarket
 
@@ -42,7 +44,7 @@ class Liquidator(Agent):
     TODO consider more general liquidation paths.
     """
 
-    basis_tokens: list = [
+    basis_tokens: List[TokenDTO] = [
         TOKEN_DTOs["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],  # USDC
         TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
     ]
@@ -59,7 +61,7 @@ class Liquidator(Agent):
         self,
         controller: SimController,
         crvusd_pools: List[SimCurveStableSwapPool],
-        collat_pools: Dict[tuple, ExternalMarket],
+        collat_pools: MarketsType,
     ):
         """
         Set the paths for liquidations. Currently:
@@ -72,7 +74,11 @@ class Liquidator(Agent):
 
         self.paths = []
         for basis_token in self.basis_tokens:
-            pair = tuple(sorted([basis_token, collateral]))
+            pair = (
+                min(basis_token, collateral),
+                max(basis_token, collateral),
+            )  # sorted
+
             # Get basis_token/crvusd pool
             for pool in crvusd_pools:
                 coins = [c.address for c in pool.coins]

@@ -43,6 +43,8 @@ class Scenario:
         self.generate_sim_market()
         self.generate_agents()
 
+        self.timestamp = self.pricepaths[0].timestamp
+
     def generate_markets(self) -> None:
         """Generate the external markets for the scenario."""
         with DataHandler() as datahandler:
@@ -91,6 +93,7 @@ class Scenario:
         # assert pool.COLLATERAL_TOKEN == controller.COLLATERAL_TOKEN
         logging.info("Fetching sim_market from subgraph.")
         sim_market = get("weth", bands_data="controller")
+
         self.llamma = sim_market.pool
         self.controller = sim_market.controller
         self.stableswap_pools = sim_market.stableswap_pools
@@ -99,6 +102,7 @@ class Scenario:
         self.peg_keepers = sim_market.peg_keepers
         self.policy = sim_market.policy
         self.factory = sim_market.factory
+        self.stablecoin = sim_market.stablecoin
 
     def update_market_prices(self, sample: PriceSample) -> None:
         """Update market prices with a new sample."""
@@ -128,6 +132,8 @@ class Scenario:
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
+        self.timestamp = ts
+
         self.update_market_prices(sample)
 
         self.llamma.prepare_for_trades(ts)
@@ -149,15 +155,10 @@ class Scenario:
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
-        profit_liquidator, count_liquidator = self.liquidator.perform_liquidations(
-            self.controller
-        )  # TODO add count to output
-        profit_arbitrageur, count_arbitrageur = self.arbitrageur.arbitrage(
-            self.cycles, prices
-        )
-        profit_keeper, count_keeper = self.keeper.update(self.peg_keepers)
+        _, _ = self.liquidator.perform_liquidations(self.controller)
+        _, _ = self.arbitrageur.arbitrage(self.cycles, prices)
+        _, _ = self.keeper.update(self.peg_keepers)
         # TODO what is the right order for the actions?
-        # TODO might want to separate metrics for diff pools
         # TODO need to incorporate non-PK pools for arbs (e.g. TriCRV)
         # TODO need to incorporate LPs add/remove liquidity
         # ^ currently USDT pool has more liquidity and this doesn't change since we

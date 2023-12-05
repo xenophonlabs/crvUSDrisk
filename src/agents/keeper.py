@@ -8,6 +8,7 @@ PRECISION = 1e18
 
 
 def get_pk_symbols(pk: PegKeeper) -> str:
+    """Get symbols for a PegKeeper."""
     return pk.POOL.name.replace("Curve.fi Factory Plain Pool: ", "")
 
 
@@ -29,7 +30,7 @@ class Keeper(Agent):
         assert tolerance >= 0
 
         self.tolerance = tolerance
-        self._profit = 0
+        self._profit = 0.0
         self._count = 0
 
     def update(self, pks: List[PegKeeper]) -> Tuple[float, int]:
@@ -62,6 +63,11 @@ class Keeper(Agent):
                     "Updating %s Peg Keeper with profit %d.",
                     get_pk_symbols(pk),
                     round(profit / PRECISION),
+                )
+            else:
+                logging.info(
+                    "Not updating %s Peg Keeper.",
+                    get_pk_symbols(pk),
                 )
         self._profit += profit
         self._count += count

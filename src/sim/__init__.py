@@ -4,6 +4,7 @@ given stress test configuration.
 """
 import logging
 from .scenario import Scenario
+from ..metrics import MetricsProcessor
 
 __all__ = ["Scenario", "sim"]
 
@@ -28,18 +29,19 @@ def sim(config: str):
     """
     # Currently only simulating one LLAMMA. TODO simulate multiple LLAMMAs
     scenario = Scenario(config)
-    scenario.prepare_for_run(scenario.pricepaths[0])
+    scenario.prepare_for_run()
+    metrics_processor = MetricsProcessor(scenario)
 
-    for ts, sample in scenario.pricepaths:
+    for _, sample in scenario.pricepaths:
         scenario.update_market_prices(sample)
         scenario.prepare_for_trades(sample)
         scenario.perform_actions(sample)
         scenario.after_trades()
-        scenario.update_metrics()
+        metrics_processor.update()
 
     # TODO
     # - Try tighter granularity on simulation, e.g. 1 minute?
     # - See how dependent the results are on this param.
     # - Include gas
 
-    return scenario.process_metrics()
+    return metrics_processor.process()

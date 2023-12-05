@@ -67,6 +67,7 @@ class Cycle:
 
         return profit
 
+    # TODO add caching
     def optimize(self):
         """
         Optimize the `amt_in` for the first trade in the cycle.
