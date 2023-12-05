@@ -36,7 +36,7 @@ COINGECKO_URL = "https://api.coingecko.com/api/v3/"
 ADDRESS_TO_SYMBOL = {k: v.symbol for k, v in TOKEN_DTOs.items()}
 SYMBOL_TO_ADDRESS = {v.symbol: k for k, v in TOKEN_DTOs.items()}
 
-# Constatns
+# Constants
 DEFAULT_PROFIT_TOLERANCE = 1  # one dollah
 
 

@@ -32,7 +32,7 @@ def sim(config: str):
 
     for ts, sample in scenario.pricepaths:
         scenario.update_market_prices(sample)
-        scenario.prepare_for_trades(ts)
+        scenario.prepare_for_trades(sample)
         scenario.perform_actions(sample)
         scenario.after_trades()
         scenario.update_metrics()

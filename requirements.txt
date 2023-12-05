@@ -18,7 +18,7 @@ click==8.1.7
 comm==0.1.4
 contourpy==1.1.1
 cramjam==2.7.0
-crvusdsim @ git+https://github.com/Tcintra/crvusdsim
+crvusdsim @ git+https://github.com/Tcintra/crvusdsim@prepare
 cryptography==41.0.5
 curvesim @ git+https://github.com/curveresearch/curvesim.git@5e0a36b0b99065a695894d8c87b575d3111aa3d2
 cycler==0.12.1

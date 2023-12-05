@@ -34,7 +34,7 @@ class PriceSample:
     """
 
     def __init__(self, ts: int, prices_usd: Dict[str, float]):
-        self.ts = ts
+        self.timestamp = ts
         self.prices_usd = prices_usd  # USD
         self.prices = get_pairwise_prices(prices_usd)
 
@@ -54,7 +54,7 @@ class PriceSample:
         return self.prices[address]
 
     def __repr__(self):
-        return f"PriceSample({self.ts}, {self.prices_usd})"
+        return f"PriceSample({self.timestamp}, {self.prices_usd})"
 
 
 class PricePaths:

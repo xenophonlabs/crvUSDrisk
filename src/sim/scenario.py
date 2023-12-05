@@ -5,14 +5,13 @@ from dataclasses import dataclass
 from itertools import combinations
 from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
-from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE, get_config
+from ..configs import TOKEN_DTOs, get_config
 from ..modules import ExternalMarket
 from ..db.datahandler import DataHandler
-from ..agents import Arbitrageur
-from ..agents import Liquidator
+from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
-from ..metrics.metricsprocessor import MetricsProcessor, MetricsResult
 from ..types import MarketsType
+from ..utils.poolgraph import PoolGraph
 
 
 @dataclass
@@ -37,12 +36,12 @@ class Scenario:
             for pair in combinations(self.coins, 2)
             for sorted_pair in [sorted(pair)]
         ]
+        self.arb_cycle_length = 3  # TODO place in config
 
         self.generate_pricepaths()
         self.generate_markets()
         self.generate_sim_market()
         self.generate_agents()
-        self.generate_metrics_processor()
 
     def generate_markets(self) -> None:
         """Generate the external markets for the scenario."""
@@ -65,9 +64,19 @@ class Scenario:
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
-        self.arbitrageur: Arbitrageur = Arbitrageur(DEFAULT_PROFIT_TOLERANCE)
-        self.liquidator: Liquidator = Liquidator(DEFAULT_PROFIT_TOLERANCE)
-        # TODO set liquidator paths
+        self.arbitrageur: Arbitrageur = Arbitrageur()
+        self.liquidator: Liquidator = Liquidator()
+        self.keeper: Keeper = Keeper()
+        self.borrower: Borrower = Borrower()
+        self.liquidity_provider: LiquidityProvider = LiquidityProvider()
+
+        # Set liquidator paths
+        self.liquidator.set_paths(self.controller, self.stableswap_pools, self.markets)
+        # Set arbitrage cycles
+        graph = PoolGraph(
+            self.stableswap_pools + [self.llamma] + list(self.markets.values())
+        )
+        self.cycles = graph.find_cycles(n=self.arb_cycle_length)
 
     def generate_sim_market(self) -> None:
         """
@@ -80,6 +89,7 @@ class Scenario:
         # assert pool == controller.AMM, "`controller.AMM` is not `pool`"
         # assert pool.BORROWED_TOKEN == controller.STABLECOIN
         # assert pool.COLLATERAL_TOKEN == controller.COLLATERAL_TOKEN
+        logging.info("Fetching sim_market from subgraph.")
         sim_market = get("weth", bands_data="controller")
         self.llamma = sim_market.pool
         self.controller = sim_market.controller
@@ -90,35 +100,46 @@ class Scenario:
         self.policy = sim_market.policy
         self.factory = sim_market.factory
 
-    def generate_metrics_processor(self) -> None:
-        """Generate the metrics processor for the scenario."""
-        self.metricsprocessor: MetricsProcessor = MetricsProcessor()
-
     def update_market_prices(self, sample: PriceSample) -> None:
         """Update market prices with a new sample."""
         for pair in self.pairs:
             self.markets[pair].update_price(sample.prices)
 
-    def prepare_for_run(self, prices: PriceSample) -> None:
-        """Prepare all modules for a simulation run."""
-        self.update_market_prices(prices)
-        self.llamma.prepare_for_run(prices)  # TODO prices is the wrong type
-        self.controller.prepare_for_run(prices)  # TODO prices is the wrong type
-        for spool in self.stableswap_pools:
-            spool.prepare_for_run(prices)
-        for pk in self.peg_keepers:
-            pk.prepare_for_run(prices)
-        self.aggregator.prepare_for_run(prices)
+    def prepare_for_run(self) -> None:
+        """TODO Prepare all modules for a simulation run."""
+        # We need oracles/aggregators/etc to agree on price at the
+        # start of the simulation. EXCEPT: we aren't currently simulating
+        # crvUSD price explicitly! This means that the simulated pools
+        # are TELLING us what the price is, not the other way around.
+        prices = self.pricepaths.prices
+        # All `prepare_for_run` methods mostly set the timestamp and initial price
+        # of pools/oracles to the first price/timestamp of the price sampler.
+        self.llamma.prepare_for_run(prices, keep_price=True)
+        self.controller.prepare_for_run(prices)
+        self.aggregator.prepare_for_run(self.pricepaths, keep_price=True)
         # self.policy.prepare_for_run(prices)
         # self.factory.prepare_for_run(prices)
         # self.price_oracle.prepare_for_run(prices)
+        for spool in self.stableswap_pools:
+            spool.prepare_for_run(prices, keep_price=True)
+        for peg_keeper in self.peg_keepers:
+            peg_keeper.prepare_for_run(prices)
 
-    def prepare_for_trades(self, ts: int) -> None:
+    def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
-        # TODO prepare aggregator for trades? <- update timestamps
-        # TODO prepare pegkeeper for trades? <- update timestamps
-        # TODO prepare stableswap pools for trades? <- update timestamps
-        # TODO prepare tricryptoo pools for trades? <- update timestamps
+        ts = sample.timestamp
+        self.update_market_prices(sample)
+
+        self.llamma.prepare_for_trades(ts)
+        self.controller.prepare_for_trades(ts)
+        self.aggregator.prepare_for_trades(ts)
+        # self.policy.prepare_for_trades(ts)
+        # self.factory.prepare_for_trades(ts)
+        # self.price_oracle.prepare_for_trades(ts)
+        for spool in self.stableswap_pools:
+            spool.prepare_for_trades(ts)
+        for peg_keeper in self.peg_keepers:
+            peg_keeper.prepare_for_trades(ts)
 
     def after_trades(self) -> None:
         """Perform post processing for all modules at the end of a time step."""
@@ -128,16 +149,17 @@ class Scenario:
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
-        # TODO arbitrageur
-        # TODO liquidator
-        # TODO keeper
+        profit_liquidator, count_liquidator = self.liquidator.perform_liquidations(
+            self.controller
+        )  # TODO add count to output
+        profit_arbitrageur, count_arbitrageur = self.arbitrageur.arbitrage(
+            self.cycles, prices
+        )
+        profit_keeper, count_keeper = self.keeper.update(self.peg_keepers)
+        # TODO what is the right order for the actions?
+        # TODO might want to separate metrics for diff pools
+        # TODO need to incorporate non-PK pools for arbs (e.g. TriCRV)
+        # TODO need to incorporate LPs add/remove liquidity
+        # ^ currently USDT pool has more liquidity and this doesn't change since we
+        # only model swaps.
         # TODO borrower
-        # TODO liquidity_provider
-
-    def update_metrics(self) -> None:
-        """Update the metrics processor with data from the current time step."""
-        self.metricsprocessor.update()
-
-    def process_metrics(self) -> MetricsResult:
-        """Process the metrics for this simulation run."""
-        return self.metricsprocessor.process()

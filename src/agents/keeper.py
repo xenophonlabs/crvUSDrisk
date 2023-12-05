@@ -7,20 +7,32 @@ from .agent import Agent
 PRECISION = 1e18
 
 
+def get_pk_symbols(pk: PegKeeper) -> str:
+    return pk.POOL.name.replace("Curve.fi Factory Plain Pool: ", "")
+
+
 # pylint: disable=too-few-public-methods
 class Keeper(Agent):
     """
     Keeper calls the `update` method on `PegKeeper`s.
     """
 
+    address: str = "DEFAULT_KEEPER"
+
     def __init__(self, tolerance: float = 0):
+        """
+        Note
+        ----
+        The `tolerance` must be in LP share units
+        (decimals = 18).
+        """
         assert tolerance >= 0
 
         self.tolerance = tolerance
         self._profit = 0
         self._count = 0
 
-    def update(self, pks: List[PegKeeper], ts: int) -> Tuple[float, int]:
+    def update(self, pks: List[PegKeeper]) -> Tuple[float, int]:
         """
         Checks if any PegKeeper is profitable to update. Updates
         if profitable.
@@ -29,8 +41,6 @@ class Keeper(Agent):
         ----------
         pks : List[PegKeeper]
             List of PegKeeper objects to check.
-        ts : int
-            Timestamp of update.
 
         Returns
         -------
@@ -39,16 +49,19 @@ class Keeper(Agent):
         count : int
             Number of Peg Keepers updated.
         """
-        profit = 0
+        profit = 0.0
         count = 0
         for pk in pks:
-            if pk.estimate_caller_profit(ts) > self.tolerance:
-                _profit = pk.update(ts)
+            estimate = pk.estimate_caller_profit()
+            if estimate > self.tolerance:
+                _profit = pk.update(self.address)
                 assert _profit > 0, "Update not profitable."
                 profit += _profit
                 count += 1
                 logging.info(
-                    "Updating %s Peg Keeper with pnl %d.", pk.name, round(profit)
+                    "Updating %s Peg Keeper with profit %d.",
+                    get_pk_symbols(pk),
+                    round(profit / PRECISION),
                 )
         self._profit += profit
         self._count += count

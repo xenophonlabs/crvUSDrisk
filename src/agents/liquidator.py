@@ -11,7 +11,7 @@ from .agent import Agent
 from ..modules import ExternalMarket
 from ..trades.cycle import Swap, Liquidation, Cycle
 from ..utils import get_crvusd_index
-from ..configs import TOKEN_DTOs
+from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
 
 
 @dataclass
@@ -49,7 +49,7 @@ class Liquidator(Agent):
 
     paths: List[Path] = []
 
-    def __init__(self, tolerance: float = 0):
+    def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
         assert tolerance >= 0
         self.tolerance = tolerance
         self._profit: float = 0.0
@@ -99,10 +99,10 @@ class Liquidator(Agent):
 
         Returns
         -------
-        total_profit : float
-            Profit in USD units from Liquidations.
-        underwater_debt : float
-            Total crvusd debt of underwater positions.
+        profit : float
+            Profit in USD units from liquidations.
+        count : int
+            Count of liquidations performed.
 
         TODO liquidations should be ordered by profitability
         """
@@ -113,22 +113,20 @@ class Liquidator(Agent):
         if len(to_liquidate) == 0:
             return 0.0, 0
 
-        underwater_debt = 0
-        total_profit = 0.0
+        profit = 0.0
+        count = 0
 
         for position in to_liquidate:
-            profit = self.maybe_liquidate(position, controller)
+            profit_ = self.maybe_liquidate(position, controller)
 
-            if profit > self.tolerance:
-                total_profit += profit
-                self._count += 1
-            else:
-                # Liquidation was missed
-                underwater_debt += position.debt
+            if profit_ > self.tolerance:
+                profit += profit_
+                count += 1
 
-        self._profit += total_profit
+        self._profit += profit
+        self._count += count
 
-        return total_profit, underwater_debt
+        return profit, count
 
     # pylint: disable=too-many-locals
     def maybe_liquidate(
@@ -268,4 +266,4 @@ class Liquidator(Agent):
 
         if res.converged:
             return int(res.root)
-        raise RuntimeError(res.message)
+        raise RuntimeError(res.flag)

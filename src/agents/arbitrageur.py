@@ -4,6 +4,7 @@ from typing import List, Tuple
 from .agent import Agent
 from ..trades import Cycle
 from ..prices import PriceSample
+from ..configs import DEFAULT_PROFIT_TOLERANCE
 
 PRECISION = 1e18
 
@@ -20,7 +21,7 @@ class Arbitrageur(Agent):
     are artificially constraining the available crvusd liquidity.
     """
 
-    def __init__(self, tolerance: float = 1):
+    def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
         # tolerance in units of USD
         assert tolerance > 0  # default is one dollah
 
