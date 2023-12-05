@@ -15,11 +15,11 @@ def plot_quotes(
     df: pd.DataFrame, in_token: str, out_token: str, fn: str | None = None
 ) -> plt.Figure:
     """Plot 1inch quotes for a given token pair."""
-    dt = pd.to_datetime(df["hour"], unit="s")
-
     f, ax = plt.subplots(figsize=(10, 5))
 
-    scatter = ax.scatter(df["in_amount"], df["price"], s=S, c=dt, cmap="viridis")
+    scatter = ax.scatter(
+        df["in_amount"], df["price"], s=S, c=df["timestamp"], cmap="viridis"
+    )
 
     ax.set_xscale("log")
     ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
@@ -27,7 +27,9 @@ def plot_quotes(
     ax.set_xlabel(f"Trade Size ({in_token})")
 
     cbar = plt.colorbar(scatter, ax=ax)
-    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.ax.set_yticklabels(
+        pd.to_datetime(cbar.get_ticks(), unit="s").strftime("%d %b %Y")
+    )
     cbar.set_label("Date")
 
     return save(f, fn)
@@ -50,7 +52,6 @@ def plot_regression(
     in_token = market.coins[i]
     out_token = market.coins[j]
 
-    dt = pd.to_datetime(df["timestamp"], unit="s")
     x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
     y = market.price_impact(i, j, x) * 100
 
@@ -58,7 +59,7 @@ def plot_regression(
     scatter = ax.scatter(
         df["in_amount"] / 10**in_token.decimals,
         df["price_impact"] * 100,
-        c=dt,
+        c=df["timestamp"],
         s=S,
         label="1inch Quotes",
     )
@@ -70,7 +71,9 @@ def plot_regression(
     ax.set_title(f"{in_token.symbol} -> {out_token.symbol} Price Impact")
 
     cbar = plt.colorbar(scatter, ax=ax)
-    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.ax.set_yticklabels(
+        pd.to_datetime(cbar.get_ticks(), unit="s").strftime("%d %b %Y")
+    )
     cbar.set_label("Date")
 
     if xlim:
@@ -97,8 +100,6 @@ def plot_predictions(
     in_token = market.coins[i]
     out_token = market.coins[j]
 
-    dt = pd.to_datetime(df["timestamp"], unit="s")
-
     x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
     y = np.array([market.trade(i, j, x) for x in x])
 
@@ -106,7 +107,7 @@ def plot_predictions(
     scatter = ax.scatter(
         df["in_amount"] / 10**in_token.decimals,
         df["out_amount"] / 10**out_token.decimals,
-        c=dt,
+        c=df["timestamp"],
         s=S,
         label="1inch Quotes",
     )
@@ -124,7 +125,9 @@ def plot_predictions(
     ax.set_title(f"{in_token.symbol} -> {out_token.symbol} Quotes")
 
     cbar = plt.colorbar(scatter, ax=ax)
-    cbar.ax.set_yticklabels(dt.dt.strftime("%d %b %Y"))
+    cbar.ax.set_yticklabels(
+        pd.to_datetime(cbar.get_ticks(), unit="s").strftime("%d %b %Y")
+    )
     cbar.set_label("Date")
 
     if xlim:
