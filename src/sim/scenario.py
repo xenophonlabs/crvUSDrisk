@@ -48,12 +48,12 @@ class Scenario:
     def generate_markets(self) -> None:
         """Generate the external markets for the scenario."""
         with DataHandler() as datahandler:
-            quotes = datahandler.get_quotes(process=True)
-            logging.debug("Using %d 1Inch quotes.", quotes.shape[0])
+            self.quotes = datahandler.get_quotes(process=True)
+            logging.debug("Using %d 1Inch quotes.", self.quotes.shape[0])
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
-            market.fit(quotes)
+            market.fit(self.quotes)
             self.markets[pair] = market
 
     def generate_pricepaths(self) -> None:
