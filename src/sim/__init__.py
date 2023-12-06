@@ -32,7 +32,7 @@ def sim(config: str):
     scenario.prepare_for_run()
     metrics_processor = MetricsProcessor(scenario)
 
-    for _, sample in scenario.pricepaths:
+    for sample in scenario.pricepaths:
         scenario.update_market_prices(sample)
         scenario.prepare_for_trades(sample)
         scenario.perform_actions(sample)

@@ -71,6 +71,7 @@ class MetricsProcessor:
     Controller: Number of loans
     Controller: Debt
     Controller: Liquidation volume TODO
+    Controller: Users to liquidate TODO
     StableSwap: Price
     StableSwap: MA Price
     StableSwap: LP Token Supply
@@ -187,7 +188,7 @@ class MetricsProcessor:
 
         # LLAMMA
         res.append(scenario.llamma.price(0, 1))
-        res.append(scenario.llamma.price_oracle()[0])
+        res.append(scenario.llamma.price_oracle())
         res.append(scenario.llamma.admin_fees_x)
         res.append(scenario.llamma.admin_fees_y)
         res.append(sum(scenario.llamma.bands_x.values()))

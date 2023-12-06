@@ -239,8 +239,8 @@ class Liquidator(Agent):
         Find the amt_in required to get the desired
         amt_out from a swap.
 
-        Currently only meant for USDC or USDT ->
-        crvusd.
+        This is essentially a more optimized binary search
+        using Brent's method.
 
         TODO move this to SimCurveStableSwapPool
         """
@@ -266,10 +266,12 @@ class Liquidator(Agent):
             loss,
             args=(pool, i, j),
             bracket=(0, high),
-            xtol=1e-6,
+            xtol=1, # This is 1e-18 in crvusd units TODO is it even necessary to specify?
             method="brentq",
+            # maxiter=1000,
         )
 
         if res.converged:
             return int(res.root)
+        breakpoint()
         raise RuntimeError(res.flag)

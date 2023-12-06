@@ -6,6 +6,7 @@ import imageio
 from PIL import Image
 from ..utils import get_crvusd_index
 from .utils import save
+from ..configs import ADDRESS_TO_SYMBOL
 
 FPS = 3
 
@@ -426,7 +427,10 @@ def plot_prices(
             col = cols.pop()
             ax = axs[i, j]
             ax.plot(df.index, df[col], lw=1, c="royalblue", label="Real")
-            ax.set_title(f"{col} Prices")
+            title = col
+            if "0x" in title and title in ADDRESS_TO_SYMBOL:
+                title = ADDRESS_TO_SYMBOL[title]
+            ax.set_title(f"{title} Prices")
             ax.set_ylabel("Price (USD)")
             ax.tick_params(axis="x", rotation=45)
 
