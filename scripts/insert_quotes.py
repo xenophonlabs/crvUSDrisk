@@ -1,9 +1,8 @@
 import os
 
-import logging
 from datetime import datetime
 from dotenv import load_dotenv
-
+from src.logging import get_logger
 from src.db.datahandler import DataHandler
 from src.network.oneinch import OneInchQuotes
 from src.configs import TOKEN_DTOs
@@ -12,12 +11,7 @@ load_dotenv()
 INCH_API_KEY = os.getenv("1INCH_API_KEY")
 assert INCH_API_KEY, "Missing API Key in .env"
 
-# TODO implement logging
-logging.basicConfig(
-    filename="./logs/quotes.log", level=logging.INFO, format="%(asctime)s %(message)s"
-)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("urllib3").propagate = False
+logger = get_logger(__name__)
 
 # TODO make more granular, need lower API rate limits
 # currently 1RPS means it takes ~30 min to query 72 pairs 20 times each

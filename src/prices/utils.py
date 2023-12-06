@@ -5,7 +5,6 @@ prices based on historical data. This includes:
 2. Estimating generative parameters for GBMs and OU processes.
     a. We use a Log-Likelihood MLE for estimating OU parameters.
 """
-import logging
 import json
 from typing import List, Tuple
 from datetime import datetime
@@ -16,6 +15,10 @@ import matplotlib.pyplot as plt
 from ..configs import STABLE_CG_IDS
 from ..plotting import plot_prices
 from ..network.coingecko import get_prices_df, address_from_coin_id
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 # pylint: disable=too-many-arguments, too-many-locals
@@ -63,14 +66,14 @@ def gen_price_config(
     assert fn, "Must provide filename to write to."
     assert freq in ["1h", "1d"], f"Frequency must be 1h or 1d, not {freq}."
 
-    logging.info("Fetching price data.")
+    logger.info("Fetching price data.")
     df = get_prices_df(coins, start, end, freq)
     assert df.shape[0] > 0, "Price data is empty."
 
-    logging.info("Processing parameters.")
+    logger.info("Processing parameters.")
     params, cov = process_prices(df, freq)
-    logging.info("Params\n%s", pd.DataFrame.from_dict(params))
-    logging.info("Cov\n%s", cov)
+    logger.info("Params\n%s", pd.DataFrame.from_dict(params))
+    logger.info("Cov\n%s", cov)
     config = {
         "params": params,
         "cov": cov.to_dict(),
@@ -80,12 +83,12 @@ def gen_price_config(
     }
 
     with open(fn, "w", encoding="utf-8") as f:
-        logging.info("Writing price config to %s.", fn)
+        logger.info("Writing price config to %s.", fn)
         json.dump(config, f)
 
     if plot:
         coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()
-        logging.info(
+        logger.info(
             "Plotting empirical and simulated prices from %s to %s.",
             datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
             datetime.fromtimestamp(end).strftime("%Y-%m-%d"),

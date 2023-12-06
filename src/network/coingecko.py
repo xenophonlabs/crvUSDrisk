@@ -1,5 +1,5 @@
 """Provides functions for fetching Coingecko API data."""
-import logging
+
 from datetime import datetime
 from typing import List
 import requests as req
@@ -12,9 +12,11 @@ from tenacity import (
     retry_if_exception_type,
 )
 from ..configs import COINGECKO_URL
+from ..logging import get_logger
 
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("urllib3").propagate = False
+
+logger = get_logger(__name__)
+
 
 # A hack to minimize API calls
 KNOWN_IDS_MAP = {
@@ -128,7 +130,7 @@ def get_prices_df(
     """
     dfs = []
     for i, coin in enumerate(coins):
-        logging.info(
+        logger.info(
             "Fetching Coingecko price data for %s...%d/%d", coin, i + 1, len(coins)
         )
         if "0x" in coin:
@@ -155,7 +157,7 @@ def address_from_coin_id(coin_id, chain="ethereum"):
     if chain == "ethereum" and coin_id in KNOWN_IDS_MAP:
         return KNOWN_IDS_MAP[coin_id]
 
-    logging.info("Fetching %s address from Coingecko API.", coin_id)
+    logger.info("Fetching %s address from Coingecko API.", coin_id)
     url = COINGECKO_URL + f"coins/{coin_id}"
     params = {
         "localization": "false",

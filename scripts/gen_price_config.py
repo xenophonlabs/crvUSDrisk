@@ -19,12 +19,14 @@ We default to a 1h granularity in price data, sampled over
 the last 60 days.
 """
 import argparse
-import logging
 from datetime import datetime, timedelta
 from src.prices.utils import gen_price_config
 from src.configs import ADDRESSES
+from src.logging import get_logger
 
-logging.basicConfig(level=logging.INFO)
+
+logger = get_logger(__name__)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate price config for sim.")

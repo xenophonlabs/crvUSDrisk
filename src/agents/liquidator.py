@@ -1,6 +1,5 @@
 """Provides the `Liquidator` class."""
 import math
-import logging
 from typing import List, Tuple
 from dataclasses import dataclass
 from scipy.optimize import root_scalar
@@ -14,6 +13,10 @@ from ..utils import get_crvusd_index
 from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
 from ..types import MarketsType
 from ..data_transfer_objects import TokenDTO
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -114,7 +117,7 @@ class Liquidator(Agent):
         """
         to_liquidate = controller.users_to_liquidate()
 
-        logging.info("There are %d users to liquidate.", len(to_liquidate))
+        logger.info("There are %d users to liquidate.", len(to_liquidate))
 
         if len(to_liquidate) == 0:
             return 0.0, 0
@@ -218,15 +221,15 @@ class Liquidator(Agent):
                 best_expected_profit = expected_profit
 
         if best and best_expected_profit > self.tolerance:
-            logging.info(
+            logger.info(
                 "Liquidating user %s with expected profit: %f.",
                 user,
                 best_expected_profit,
             )
             profit = best.execute()
-            logging.info("Liquidated user %s with profit: %f.", user, profit)
+            logger.info("Liquidated user %s with profit: %f.", user, profit)
             return profit
-        logging.info(
+        logger.info(
             "Missed liquidation for user %s. Health: %f. Expected profit: %f.",
             user,
             health,

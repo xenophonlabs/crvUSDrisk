@@ -3,7 +3,6 @@ Provides the `ExternalMarket` class for modeling
 swaps in external liquidity venues.
 """
 from __future__ import annotations
-import logging
 from collections import defaultdict
 from itertools import permutations
 from typing import Any, Tuple, Dict, TYPE_CHECKING
@@ -11,9 +10,13 @@ import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from ..data_transfer_objects import TokenDTO
+from ..logging import get_logger
 
 if TYPE_CHECKING:
     from ..types import PairwisePricesType
+
+
+logger = get_logger(__name__)
 
 
 class ExternalMarket:
@@ -180,14 +183,14 @@ class ExternalMarket:
         impact = model.predict(size)
 
         if np.any(impact < 0):
-            logging.error(
+            logger.error(
                 "Price impact for %s -> %s is negative: %f!",
                 self.coin_symbols[i],
                 self.coin_symbols[i],
                 impact,
             )
         elif np.any(impact > 1):
-            logging.error(
+            logger.error(
                 "Price impact for %s -> %s is over 100%%: %f!",
                 self.coin_symbols[i],
                 self.coin_symbols[i],

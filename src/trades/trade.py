@@ -2,7 +2,7 @@
 Provides the `Swap` and `Liquidation` classes,
 as well as the `Trade` interface.
 """
-import logging
+
 from abc import ABC
 from typing import Tuple
 from contextlib import nullcontext
@@ -17,6 +17,10 @@ from crvusdsim.pool.sim_interface import (
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
 from ..modules import ExternalMarket
 from ..types import SimPoolType
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -91,7 +95,7 @@ class Swap(Trade):
             # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
             in_amount_done, amt_out, _ = result
             if in_amount_done != amt_in:
-                logging.warning(
+                logger.warning(
                     "LLAMMA amt_in %d != in_amount_done %d.", amt_in, in_amount_done
                 )
         elif isinstance(pool, SimCurvePool):

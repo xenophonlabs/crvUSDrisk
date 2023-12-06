@@ -2,12 +2,14 @@
 Provides the `Cycle` class for optimizing and
 exeucuting a sequence of trades.
 """
-import logging
 from typing import Sequence
 from scipy.optimize import minimize_scalar
 from .trade import Swap, Liquidation
+from ..logging import get_logger
 
 TOLERANCE = 1e-6
+
+logger = get_logger(__name__)
 
 
 class Cycle:
@@ -44,13 +46,13 @@ class Cycle:
 
     def execute(self) -> float:
         """Execute trades."""
-        logging.info("Executing cycle %s.", self)
+        logger.info("Executing cycle %s.", self)
 
         trade = self.trades[0]
         amt_in = trade.amt
 
         for i, trade in enumerate(self.trades):
-            logging.info("Executing trade %s.", trade)
+            logger.info("Executing trade %s.", trade)
             if i != self.n - 1:
                 amt_out, decimals = trade.do()
                 assert (
@@ -61,7 +63,7 @@ class Cycle:
 
         profit = (amt_out - amt_in) / 10**decimals
         if abs(profit - self.expected_profit) > TOLERANCE:
-            logging.warning(
+            logger.warning(
                 "Expected profit %f != actual profit %f.", self.expected_profit, profit
             )
 

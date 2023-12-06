@@ -3,7 +3,7 @@ Plot the simulated price impact curve for each [directional]
 permutation of modeled tokens. These are based off the 
 1inch quotes we store in our postgres database.
 """
-import logging
+from src.logging import get_logger
 from src.sim import Scenario
 from src.plotting import plot_regression, plot_predictions
 
@@ -11,18 +11,7 @@ PATH = "figs/price_impacts"
 FN_REGR = f"{PATH}/regressions/" + "{}_{}.png"
 FN_PRED = f"{PATH}/predictions/" + "{}_{}.png"
 
-
-class FlushFileHandler(logging.FileHandler):
-    def emit(self, record):
-        super().emit(record)
-        self.flush()
-
-
-logging.basicConfig(
-    handlers=[FlushFileHandler("./logs/plots.log")],
-    level=logging.INFO,
-    format="%(asctime)s %(message)s",
-)
+logger = get_logger(__name__)
 
 
 def plot(quotes, market, i, j, scale="log", fn_regr=None, fn_pred=None):
@@ -48,7 +37,7 @@ def main():
         market = scenario.markets[pair]
         token1, token2 = pair
 
-        logging.info(f"Plotting ({token1.symbol, token2.symbol}). ({i}/{n})")
+        logger.info(f"Plotting ({token1.symbol, token2.symbol}). ({i}/{n})")
         plot(
             quotes,
             market,
@@ -61,7 +50,7 @@ def main():
 
         i += 1
 
-        logging.info(f"Plotting ({token2.symbol, token1.symbol}). ({i}/{n})")
+        logger.info(f"Plotting ({token2.symbol, token1.symbol}). ({i}/{n})")
         plot(
             quotes,
             market,

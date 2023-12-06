@@ -6,11 +6,14 @@ querying CEX trade and OHLCV data.
 TODO fix mypy errors and uncomment ignore-errors.
 """
 import math
-import logging
 from datetime import datetime, timezone
 import ccxt  # type: ignore
 import pandas as pd
 from ..exceptions import ccxtInvalidSymbolException
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class CCXTDataFetcher:
@@ -92,7 +95,7 @@ class CCXTDataFetcher:
         if isinstance(since, str):
             since = exchange.parse8601(since)
 
-        logging.info(
+        logger.info(
             "Querying %s trades from Coinbase Pro between %s and %s.",
             symbol,
             self.to_strftime(start_time),
@@ -101,7 +104,7 @@ class CCXTDataFetcher:
 
         total = int(start_time.timestamp() * 1000) - since
         bars = list(range(101))
-        logging.info("Progress: %f%%", bars.pop(0), end="\r")
+        logger.info("Progress: %f%%", bars.pop(0), end="\r")
 
         param_key = ""
         param_value = ""
@@ -126,16 +129,16 @@ class CCXTDataFetcher:
                     progress = round((1 - (last_trade_ts - since) / total) * 100)
                     if bars and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        logging.info("Progress: %f%%", progress, end="\r")
+                        logger.info("Progress: %f%%", progress, end="\r")
                 except ccxt.RateLimitExceeded:
-                    logging.warning("Rate limit exceeded.")
+                    logger.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
         else:
             raise ccxtInvalidSymbolException
 
         end_time = datetime.now(tz=timezone.utc)
 
-        logging.info("Finished. Time taken: %s", end_time - start_time)
+        logger.info("Finished. Time taken: %s", end_time - start_time)
 
         return CCXTDataFetcher.trades_to_df(trades)
 
@@ -171,7 +174,7 @@ class CCXTDataFetcher:
         cur = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
         end = min(end, cur) if end else cur
 
-        logging.info(
+        logger.info(
             "Querying %s trades from Binance between %s and %s.",
             symbol,
             self.to_strftime(since),
@@ -180,7 +183,7 @@ class CCXTDataFetcher:
 
         total = end - since
         bars = list(range(101))
-        logging.info("Progress: %f%%", bars.pop(0), end="\r")
+        logger.info("Progress: %f%%", bars.pop(0), end="\r")
         trades = []
         if symbol in exchange.markets:
             while since < end:
@@ -194,16 +197,16 @@ class CCXTDataFetcher:
                     progress = round((1 - (end - since) / total) * 100)
                     if bars and progress in bars:
                         bars = bars[bars.index(progress) + 1 :]
-                        logging.info("Progress: %f%%", progress, end="\r")
+                        logger.info("Progress: %f%%", progress, end="\r")
                 except ccxt.RateLimitExceeded:
-                    logging.warning("Rate limit exceeded.")
+                    logger.warning("Rate limit exceeded.")
                     exchange.sleep(10000)
         else:
             raise ccxtInvalidSymbolException
 
         end_time = datetime.now(tz=timezone.utc)
 
-        logging.info("Finished. Time taken: %s.", end_time - start_time)
+        logger.info("Finished. Time taken: %s.", end_time - start_time)
 
         return CCXTDataFetcher.trades_to_df(trades)
 

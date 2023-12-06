@@ -3,11 +3,14 @@ Module providing an undirected graph data structure to represent
 liquidity pools and their connections. The graph implements a 
 DFS algorithm to find all cycles of a given length.
 """
-import logging
 from typing import List, Tuple, Set, Dict
 from ..trades import Swap, Cycle
 from ..modules import ExternalMarket
 from ..types import SimPoolType
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def shared_address(
@@ -74,7 +77,7 @@ class PoolGraph:
         for pool in self.pools:
             self.dfs(pool, [pool], set(), cycles, n)
         valid = self.validate(cycles)
-        logging.info("Found %d valid cycles of length %d.", len(valid), n)
+        logger.info("Found %d valid cycles of length %d.", len(valid), n)
         return valid
 
     def can_traverse(self, curr: SimPoolType, nxt: SimPoolType, used: Set[str]) -> bool:

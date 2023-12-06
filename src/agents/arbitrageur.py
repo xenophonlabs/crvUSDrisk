@@ -1,12 +1,14 @@
 """Provides the `Arbitrageur` class."""
-import logging
 from typing import List, Tuple
 from .agent import Agent
 from ..trades import Cycle
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
+from ..logging import get_logger
 
 PRECISION = 1e18
+
+logger = get_logger(__name__)
 
 
 class Arbitrageur(Agent):
@@ -76,7 +78,7 @@ class Arbitrageur(Agent):
                 profit += best_profit
                 count += 1
             else:
-                logging.info("No more profitable arbitrages.")
+                logger.info("No more profitable arbitrages.")
                 break
 
         self._profit += profit

@@ -1,10 +1,13 @@
 """Provides the `Keeper` class."""
-import logging
+
 from typing import List, Tuple
 from crvusdsim.pool import PegKeeper
 from .agent import Agent
+from ..logging import get_logger
 
 PRECISION = 1e18
+
+logger = get_logger(__name__)
 
 
 def get_pk_symbols(pk: PegKeeper) -> str:
@@ -59,13 +62,13 @@ class Keeper(Agent):
                 assert _profit > 0, "Update not profitable."
                 profit += _profit
                 count += 1
-                logging.info(
+                logger.info(
                     "Updating %s Peg Keeper with profit %d.",
                     get_pk_symbols(pk),
                     round(profit / PRECISION),
                 )
             else:
-                logging.info(
+                logger.info(
                     "Not updating %s Peg Keeper.",
                     get_pk_symbols(pk),
                 )

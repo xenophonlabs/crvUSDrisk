@@ -4,7 +4,6 @@ fetch quotes from the 1inch API, and the `QuoteResponse` class
 to store the response data.
 """
 import json
-import logging
 from datetime import datetime
 from dataclasses import dataclass
 from itertools import permutations
@@ -18,9 +17,12 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
-from src.data_transfer_objects import TokenDTO
+from ..data_transfer_objects import TokenDTO
+from ..logging import get_logger
 
 MAX_RETRIES = 3
+
+logger = get_logger(__name__)
 
 
 def is_rate_limit_error(e):
@@ -207,7 +209,7 @@ class OneInchQuotes:
         n = len(pairs)
         responses = []
         for i, pair in enumerate(pairs):
-            logging.info("Fetching: %s... %d/%d", pair, i + 1, n)
+            logger.info("Fetching: %s... %d/%d", pair, i + 1, n)
             responses.extend(self.quotes_for_pair(pair, calls=calls))
         return responses
 

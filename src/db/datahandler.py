@@ -2,7 +2,6 @@
 Provides a `DataHandler` class 
 for accessing our PG database.
 """
-import logging
 from typing import List, Type
 import pandas as pd
 from sqlalchemy import create_engine
@@ -11,6 +10,10 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.dialects.postgresql import insert
 from .models import Base, Token, Quote
 from ..configs import URI, TOKEN_DTOs
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class DataHandler:
@@ -41,11 +44,11 @@ class DataHandler:
 
     def create_database(self):
         """Create SQL tables if they don't exist"""
-        logging.info("Creating database...")
+        logger.info("Creating database...")
         Base.metadata.create_all(self.engine)
-        logging.info("Inserting tokens from config...")
+        logger.info("Inserting tokens from config...")
         self.insert_tokens()
-        logging.info("Done.")
+        logger.info("Done.")
 
     def insert_tokens(self):
         """Create the tokens table based on the config."""

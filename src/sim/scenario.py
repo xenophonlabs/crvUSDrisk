@@ -1,5 +1,4 @@
 """Provides the `Scenario` class for running simulations."""
-import logging
 from typing import List, Tuple
 from dataclasses import dataclass
 from itertools import combinations
@@ -12,6 +11,10 @@ from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvide
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
 from ..utils.poolgraph import PoolGraph
+from ..logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -49,7 +52,7 @@ class Scenario:
         """Generate the external markets for the scenario."""
         with DataHandler() as datahandler:
             self.quotes = datahandler.get_quotes(process=True)
-            logging.debug("Using %d 1Inch quotes.", self.quotes.shape[0])
+            logger.debug("Using %d 1Inch quotes.", self.quotes.shape[0])
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
@@ -91,7 +94,7 @@ class Scenario:
         # assert pool == controller.AMM, "`controller.AMM` is not `pool`"
         # assert pool.BORROWED_TOKEN == controller.STABLECOIN
         # assert pool.COLLATERAL_TOKEN == controller.COLLATERAL_TOKEN
-        logging.info("Fetching sim_market from subgraph.")
+        logger.info("Fetching sim_market from subgraph.")
         sim_market = get("weth", bands_data="controller")
 
         self.llamma = sim_market.pool

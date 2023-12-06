@@ -2,13 +2,15 @@
 Main module for the simulation package. Runs a stress test scenario for a 
 given stress test configuration.
 """
-import logging
 import pickle
 from .scenario import Scenario
 from ..metrics import MetricsProcessor
 from ..plotting.sim import plot_prices
+from ..logging import get_logger
 
 __all__ = ["Scenario", "sim"]
+
+logger = get_logger(__name__)
 
 
 def sim(config: str):
@@ -27,7 +29,7 @@ def sim(config: str):
     """
     scenario = Scenario(config)
     scenario.prepare_for_run()
-    logging.info(
+    logger.info(
         "Running simulation for %d steps at frequency %s",
         scenario.num_steps,
         scenario.pricepaths.config["freq"],
