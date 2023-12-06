@@ -145,7 +145,7 @@ class OneInchQuotes:
 
     def protocols(self) -> dict:
         """GET 1inch protocols."""
-        res = req.get(self.protocols_url, headers=self.header, timeout=10)
+        res = req.get(self.protocols_url, headers=self.header, timeout=15)
         return res.json()
 
     @retry(
@@ -163,7 +163,7 @@ class OneInchQuotes:
             "includeTokensInfo": True,
             "includeProtocols": True,
         }
-        res = req.get(self.quote_url, params=params, headers=self.header, timeout=10)
+        res = req.get(self.quote_url, params=params, headers=self.header, timeout=15)
         res.raise_for_status()  # retry if rate limit error
         ts = int(datetime.now().timestamp())
         return QuoteResponse(res.json(), in_amount, ts)

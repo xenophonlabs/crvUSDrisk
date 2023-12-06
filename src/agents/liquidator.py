@@ -266,12 +266,11 @@ class Liquidator(Agent):
             loss,
             args=(pool, i, j),
             bracket=(0, high),
-            xtol=1, # This is 1e-18 in crvusd units TODO is it even necessary to specify?
+            xtol=1,  # This is 1e-18 in crvusd units TODO is it even necessary to specify?
             method="brentq",
             # maxiter=1000,
         )
 
         if res.converged:
             return int(res.root)
-        breakpoint()
         raise RuntimeError(res.flag)

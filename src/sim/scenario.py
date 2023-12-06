@@ -136,6 +136,13 @@ class Scenario:
 
         self.update_market_prices(sample)
 
+        # FIXME Manually update LLAMMA oracle price
+        _p = int(
+            sample.prices_usd[self.llamma.COLLATERAL_TOKEN.address]
+            * 10**self.llamma.COLLATERAL_TOKEN.decimals
+        )
+        self.price_oracle.set_price(_p)
+
         self.llamma.prepare_for_trades(ts)
         self.controller.prepare_for_trades(ts)
         self.aggregator.prepare_for_trades(ts)
