@@ -2,6 +2,7 @@
 from typing import List, Tuple
 from .agent import Agent
 from ..trades import Cycle
+from ..trades.cycle import _optimize_mem  # TODO remove, using for testing
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
 from ..logging import get_logger
@@ -80,6 +81,8 @@ class Arbitrageur(Agent):
             else:
                 logger.info("No more profitable arbitrages.")
                 break
+
+        logger.debug("Cache info: %s", _optimize_mem.cache_info())
 
         self._profit += profit
         self._count += count

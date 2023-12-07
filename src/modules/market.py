@@ -148,9 +148,9 @@ class ExternalMarket:
         out = out / 10 ** self.coin_decimals[i] * 10 ** self.coin_decimals[j]
         return int(out)
 
-    def price_impact(self, i: int, j: int, size: Any) -> Any:
+    def price_impact(self, i: int, j: int, size: int) -> int:
         """
-        We model price impact using a KNN regression.
+        We model price impact using an IsotonicRegression.
 
         Parameters
         ----------
@@ -159,8 +159,7 @@ class ExternalMarket:
         j : int
             The index of the token_out.
         size : Any
-            The amount of token_in to sell. Could be an int
-            or a list of ints.
+            The amount of token_in to sell.
 
         Returns
         -------
@@ -172,31 +171,55 @@ class ExternalMarket:
         reverting process: learn the speed of mean-reversion (which is
         basically a half-life measure). Implement this on the "price" attr.
         """
-        if isinstance(size, (float, int)):
-            size = np.array(size).reshape(-1, 1)
-        elif isinstance(size, list):
-            size = np.array(size).reshape(-1, 1)
-        elif size.ndim == 1:
-            size = size.reshape(-1, 1)
-
         model = self.models[i][j]
-        impact = model.predict(size)
+        x = np.clip(
+            np.array(size).reshape(-1, 1).astype(float), model.X_min_, model.X_max_
+        )
+        return int(model.f_(x))  # NOTE this is way faster than `predict`
 
-        if np.any(impact < 0):
-            logger.error(
-                "Price impact for %s -> %s is negative: %f!",
-                self.coin_symbols[i],
-                self.coin_symbols[i],
-                impact,
-            )
-        elif np.any(impact > 1):
-            logger.error(
-                "Price impact for %s -> %s is over 100%%: %f!",
-                self.coin_symbols[i],
-                self.coin_symbols[i],
-                impact,
-            )
-        return np.clip(impact, 0, 1)
+    def price_impact_many(self, i: int, j: int, size: np.ndarray) -> np.ndarray:
+        """
+        Predict price impact on many obs.
+        """
+        model = self.models[i][j]
+        if size.ndim == 1:
+            size = size.reshape(-1, 1)
+        return model.predict(size)
+
+    def get_max_trade_size(self, i: int, j: int, out_balance_perc: float = 0.01) -> int:
+        """Returns the maximum trade size observed when fitting quotes."""
+        model = self.models[i][j]
+        return int(model.X_max_ * (1 - out_balance_perc))
 
     def __repr__(self):
         return self.name
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExternalMarket):
+            return False
+        return (
+            self.coins == other.coins
+            and self.n == other.n
+            and self.prices == other.prices
+            # self.models == other.models # FIXME this will check `is
+        )
+
+    def __hash__(self) -> int:
+        coins_hash = hash(tuple(hash(coin) for coin in self.coins))
+        if not self.prices:
+            prices_hash = hash(self.prices)
+        else:
+            # convert nested dict into hashable tuple
+            prices_hash = hash(
+                tuple(
+                    sorted(
+                        {
+                            key: tuple(sorted(pj.items()))
+                            for key, pj in self.prices.items()
+                        }.items()
+                    )
+                )
+            )
+        return hash(
+            (coins_hash, self.n, prices_hash)
+        )  # FIXME IsotonicRegressor does not implement __hash__

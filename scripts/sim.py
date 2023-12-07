@@ -13,6 +13,6 @@ if __name__ == "__main__":
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)
-    stats.sort_stats(pstats.SortKey.TIME)
+    stats.sort_stats(pstats.SortKey.CUMULATIVE)
     stats.print_stats()
     stats.dump_stats("./logs/sim.prof")

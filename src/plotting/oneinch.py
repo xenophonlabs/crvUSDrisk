@@ -53,7 +53,7 @@ def plot_regression(
     out_token = market.coins[j]
 
     x = np.geomspace(df["in_amount"].min(), df["in_amount"].max(), 100)
-    y = market.price_impact(i, j, x) * 100
+    y = market.price_impact_many(i, j, x) * 100
 
     f, ax = plt.subplots(figsize=(10, 5))
     scatter = ax.scatter(

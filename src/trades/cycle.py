@@ -2,10 +2,14 @@
 Provides the `Cycle` class for optimizing and
 exeucuting a sequence of trades.
 """
-from typing import Sequence
+from typing import Sequence, cast
+from functools import lru_cache
 from scipy.optimize import minimize_scalar
+from crvusdsim.pool import SimLLAMMAPool, SimCurveStableSwapPool
+from curvesim.pool import SimCurvePool
 from .trade import Swap, Liquidation
 from ..logging import get_logger
+from ..modules import ExternalMarket
 
 TOLERANCE = 1e-6
 
@@ -33,6 +37,7 @@ class Cycle:
         self.n: int = len(trades)
         self.expected_profit = expected_profit
         self.basis_address: str = trades[0].get_address(trades[0].i)
+        self.state_key: StateKey = StateKey(self)  # for memoization
 
         # check that this is a cycle
         for i, trade in enumerate(trades):
@@ -69,29 +74,11 @@ class Cycle:
 
         return profit
 
-    # TODO add caching
     def optimize(self):
         """
         Optimize the `amt_in` for the first trade in the cycle.
         """
-        assert all(
-            isinstance(trade, Swap) for trade in self.trades
-        ), NotImplementedError("Can only optimize swap cycles.")
-
-        trade = self.trades[0]
-        high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
-
-        res = minimize_scalar(
-            lambda x: -self.populate(x),
-            args=(),
-            bounds=(0, high),
-            method="bounded",
-        )
-
-        if res.success:
-            self.populate(res.x)
-        else:
-            raise RuntimeError(res.message)
+        _optimize_mem(self.state_key)
 
     def populate(self, amt_in: float | int) -> float:
         """
@@ -122,5 +109,98 @@ class Cycle:
         self.expected_profit = expected_profit
         return expected_profit
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Cycle(Trades: {self.trades}, Expected Profit: {self.expected_profit})"
+
+
+# pylint: disable=too-few-public-methods
+class StateKey:
+    """
+    Get the hash key for LRU cache.
+
+    Note
+    ----
+    We don't want to get `amt` for trade since this
+    is the quantity that gets populated by optimize.
+    Similarly, we don't want to use the cycle's
+    `expected_profit`.
+
+    It is crucial that whatever goes into the `state_key`
+    provides a complete picture of the pool we are trading on.
+    If any component of the pool which affects trade execution
+    has changed, this MUST invalidate the cache!
+
+    TODO we could implement __hash__ on the `Snapshot` class,
+    in which case we could just hash the snapshot.
+    """
+
+    def __init__(self, cycle: Cycle):
+        self.cycle = cycle
+
+    def __hash__(self):
+        trades = self.cycle.trades
+        hashes = []
+        for trade in trades:
+            if isinstance(trade, Swap):
+                if isinstance(trade.pool, ExternalMarket):
+                    # we implement a custom hash for this
+                    # the only thing that matters is price.
+                    pool_hash = hash(trade.pool)
+                elif isinstance(trade.pool, SimLLAMMAPool):
+                    pool_hash = hash(
+                        (
+                            trade.pool.address,
+                            trade.pool.active_band,
+                            trade.pool.old_p_o,  # TODO is this updated?
+                            tuple(trade.pool.bands_x.items()),
+                            tuple(trade.pool.bands_y.items()),
+                        )
+                    )
+                elif isinstance(trade.pool, (SimCurveStableSwapPool, SimCurvePool)):
+                    pool_hash = hash(
+                        (
+                            trade.pool.address,
+                            tuple(trade.pool.balances),
+                        )
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Pool type {type(trade.pool)} not supported."
+                    )
+                hashes.append(pool_hash)
+            elif isinstance(trade, Liquidation):
+                # controller_hash = hash((
+                #     trade.controller.AMM.address,
+                #     trade,
+                # ))
+                # hashes.append(controller_hash)
+                raise NotImplementedError(
+                    "Liquidation not supported in optimization."
+                )  # TODO
+        return hash(tuple(hashes))
+
+
+@lru_cache(maxsize=1000)  # TODO might need to be larger when considering many pools
+def _optimize_mem(state_key: StateKey) -> None:
+    """
+    Memoized optimization for the `amt_in` for the
+    first trade in the cycle.
+
+    NOTE all trades in `Cycle` MUST BE of type `Swap`.
+    """
+    cycle = state_key.cycle
+    trades = cast(Sequence[Swap], cycle.trades)  # for mypy
+    trade = trades[0]
+    high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
+
+    res = minimize_scalar(
+        lambda x: -cycle.populate(x),
+        args=(),
+        bounds=(0, high),
+        method="bounded",
+    )
+
+    if res.success:
+        cycle.populate(res.x)
+    else:
+        raise RuntimeError(res.message)

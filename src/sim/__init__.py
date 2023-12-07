@@ -43,10 +43,7 @@ def sim(config: str):
         # scenario.after_trades()
         metrics_processor.update()
 
-    # FIXME Temp save results for analysis
-    df = metrics_processor.df
-    df.to_csv("./data/results.csv")
-
+    # Results are dumped into metrics_processor!
     with open("./pickles/scenario.pkl", "wb") as f:
         pickle.dump(scenario, f)
     with open("./pickles/metrics_processor.pkl", "wb") as f:
