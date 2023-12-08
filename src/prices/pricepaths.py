@@ -74,10 +74,11 @@ class PricePaths:
         coin_ids = list(config["params"].keys())
         annual_factor = get_factor(freq)
         dt = 1 / annual_factor
+        T = num_steps * dt
 
         self.prices = gen_cor_prices(
             coin_ids,  # List of coin IDs (coingecko)
-            num_steps * dt,  # Time horizon in years
+            T,  # Time horizon in years
             dt,  # Time step in years
             get_current_prices(coin_ids),
             pd.DataFrame.from_dict(config["cov"]),
@@ -86,6 +87,8 @@ class PricePaths:
             gran=get_gran(freq),
         )
 
+        self.T = num_steps * dt
+        self.dt = dt
         self.coins = [address_from_coin_id(coin_id) for coin_id in coin_ids]
 
     def __iter__(self):

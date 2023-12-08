@@ -200,7 +200,7 @@ class Liquidator(Agent):
             # basis token -> crvusd
             j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
-            amt_in = self.search(crvusd_pool, i, j, to_repay)
+            amt_in = crvusd_pool.get_dy(i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
             # crvusd -> collateral
@@ -239,15 +239,14 @@ class Liquidator(Agent):
 
     def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
         """
+        DEPRECATED: use `SimCurveStableSwapPool.get_dy` instead.
+
         Find the amt_in required to get the desired
         amt_out from a swap.
 
         This is essentially a more optimized binary search
         using Brent's method.
-
-        TODO move this to SimCurveStableSwapPool
         """
-
         amt_out_float = float(amt_out)  # For scipy
 
         assert isinstance(pool, SimCurveStableSwapPool)
@@ -269,7 +268,7 @@ class Liquidator(Agent):
             loss,
             args=(pool, i, j),
             bracket=(0, high),
-            xtol=1,  # This is 1e-18 in crvusd units TODO is it even necessary to specify?
+            xtol=1,  # Absolute error. This is 1e-18 in crvusd units TODO could make =$1 MTM
             method="brentq",
             # maxiter=1000,
         )

@@ -22,14 +22,14 @@ logger = get_logger(__name__)
 
 def main():
     dt = int(datetime.now().timestamp())
-    print(
+    logger.info(
         f"Fetching quotes on {datetime.fromtimestamp(dt).strftime('%m/%d/%Y, %H:%M:%S')} UTC"
     )
     quoter = OneInchQuotes(INCH_API_KEY, TOKEN_DTOs, calls=20)
     payload = quoter.all_quotes(list(TOKEN_DTOs.keys()))
     df = quoter.to_df(payload)
     dh = DataHandler()
-    print("Inserting...")
+    logger.info("Inserting...")
     dh.insert_quotes(df)
 
 

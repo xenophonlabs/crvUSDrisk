@@ -2,7 +2,8 @@
 Provides the `Cycle` class for optimizing and
 exeucuting a sequence of trades.
 """
-from typing import Sequence, cast
+import math
+from typing import Sequence, cast, Dict, Any
 from functools import lru_cache
 from scipy.optimize import minimize_scalar
 from crvusdsim.pool import SimLLAMMAPool, SimCurveStableSwapPool
@@ -74,11 +75,11 @@ class Cycle:
 
         return profit
 
-    def optimize(self):
+    def optimize(self, xatol: int | None = None) -> None:
         """
         Optimize the `amt_in` for the first trade in the cycle.
         """
-        _optimize_mem(self.state_key)
+        _optimize_mem(self.state_key, xatol=xatol)
 
     def populate(self, amt_in: float | int) -> float:
         """
@@ -94,18 +95,20 @@ class Cycle:
         expected_profit : float
             The expected profit of the cycle.
         """
+        if amt_in < 0:
+            return -math.inf
+
         amt_in = int(amt_in)  # cast float to int
-        # TODO add a unit test to ensure snapshot context is used correctly
 
         trade = self.trades[0]
         trade.amt = amt_in
 
         for i, trade in enumerate(self.trades):
-            amt, decimals = trade.do(use_snapshot_context=True)
+            amt_out, decimals = trade.do(use_snapshot_context=True)
             if i != self.n - 1:
-                self.trades[i + 1].amt = amt
+                self.trades[i + 1].amt = amt_out
 
-        expected_profit = float((amt - amt_in) / 10**decimals)
+        expected_profit = float((amt_out - amt_in) / 10**decimals)
         self.expected_profit = expected_profit
         return expected_profit
 
@@ -181,24 +184,60 @@ class StateKey:
 
 
 @lru_cache(maxsize=1000)  # TODO might need to be larger when considering many pools
-def _optimize_mem(state_key: StateKey) -> None:
+def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> None:
     """
     Memoized optimization for the `amt_in` for the
     first trade in the cycle.
 
-    NOTE all trades in `Cycle` MUST BE of type `Swap`.
+    We set the `xatol` parameter for the minimization. This
+    provides a massive speed up. We set the absolute tolerance
+    to $1 in the token being traded based on current market price.
+    We use the `bounded` method because it allows us to specify
+    absolute rather than relative tolerances. Furthermore, we
+    have found `bounded` to perform much faster than `brent`
+    for our use case.
+
+    Deprecated
+    ----------
+    The `frac` parameter will scale down the upper
+    bound for the optimization. In general,
+    `get_max_trade_size` will return an extremely
+    large amount. For the vast majority of cases, the
+    optimal will be several orders of magnitude below
+    this value. Based on the analysis in `notebooks.analyze.ipynb`,
+    we determined that a frac of 1e-8 provides the best
+    speed up to this function's execution.
+
+    If `frac` reduces the upper bound too much, then
+    the function will default to frac=1.
+
+    TODO find a better/dynamic way of setting `frac`.
+
+    Note
+    ----
+    All trades in `Cycle` MUST BE of type `Swap`.
     """
     cycle = state_key.cycle
     trades = cast(Sequence[Swap], cycle.trades)  # for mypy
     trade = trades[0]
-    high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
+    low = 0
+    high = float(trade.pool.get_max_trade_size(trade.i, trade.j))  # * frac
 
-    res = minimize_scalar(
-        lambda x: -cycle.populate(x),
-        args=(),
-        bounds=(0, high),
-        method="bounded",
-    )
+    if high == 0:
+        logger.info("No liquidity for %s.", str(cycle))
+        cycle.populate(0)
+        return
+
+    kwargs: Dict[str, Any] = {
+        "args": (),
+        "bounds": (low, high),
+        "method": "bounded",
+    }
+
+    if xatol:
+        kwargs["options"] = {"xatol": xatol}
+
+    res = minimize_scalar(lambda x: -cycle.populate(x), **kwargs)
 
     if res.success:
         cycle.populate(res.x)

@@ -47,12 +47,13 @@ class Scenario:
         self.generate_agents()
 
         self.timestamp = self.pricepaths[0].timestamp
+        self.curr_price = self.pricepaths[0]
 
     def generate_markets(self) -> None:
         """Generate the external markets for the scenario."""
         with DataHandler() as datahandler:
             self.quotes = datahandler.get_quotes(process=True)
-            logger.debug("Using %d 1Inch quotes.", self.quotes.shape[0])
+            logger.info("Using %d 1Inch quotes.", self.quotes.shape[0])
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
@@ -136,7 +137,7 @@ class Scenario:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
         self.timestamp = ts
-
+        self.curr_price = sample
         self.update_market_prices(sample)
 
         # FIXME Manually update LLAMMA oracle price

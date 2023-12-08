@@ -1,7 +1,7 @@
 """Provides the `Arbitrageur` class."""
-from typing import List, Tuple
+from typing import List, Tuple, cast
 from .agent import Agent
-from ..trades import Cycle
+from ..trades import Cycle, Swap
 from ..trades.cycle import _optimize_mem  # TODO remove, using for testing
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
@@ -69,6 +69,7 @@ class Arbitrageur(Agent):
             best_cycle, best_profit = self.find_best_arbitrage(cycles, prices)
 
             if best_cycle and best_profit > self.tolerance:
+                logger.info("Executing arbitrage: %s.", best_cycle)
                 # Dollarize profit
                 _profit = (
                     best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
@@ -82,7 +83,7 @@ class Arbitrageur(Agent):
                 logger.info("No more profitable arbitrages.")
                 break
 
-        logger.debug("Cache info: %s", _optimize_mem.cache_info())
+        logger.info("Cache info: %s", _optimize_mem.cache_info())
 
         self._profit += profit
         self._count += count
@@ -115,12 +116,17 @@ class Arbitrageur(Agent):
         best_profit = 0.0
 
         for cycle in cycles:
-            cycle.optimize()
-            assert cycle.expected_profit is not None
+            # Get 1 dollar's worth (marked to market)
+            trade = cast(Swap, cycle.trades[0])
+            decimals = trade.get_decimals(trade.i)
+            xatol = int(10**decimals / prices.prices_usd[cycle.basis_address])
+
+            cycle.optimize(xatol=xatol)
+            expected_profit = cast(float, cycle.expected_profit)
+
             # Dollarize the expected profit
-            expected_profit = (
-                cycle.expected_profit * prices.prices_usd[cycle.basis_address]
-            )
+            expected_profit *= prices.prices_usd[cycle.basis_address]
+
             if expected_profit > best_profit:
                 best_profit = expected_profit
                 best_cycle = cycle
