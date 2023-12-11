@@ -149,7 +149,7 @@ class ExternalMarket:
         out = out / 10 ** self.coin_decimals[i] * 10 ** self.coin_decimals[j]
         return int(out)
 
-    def price_impact(self, i: int, j: int, size: int) -> int:
+    def price_impact(self, i: int, j: int, size: int) -> float:
         """
         We model price impact using an IsotonicRegression.
 
@@ -176,7 +176,7 @@ class ExternalMarket:
         x = np.clip(
             np.array(size).reshape(-1, 1).astype(float), model.X_min_, model.X_max_
         )
-        return int(model.f_(x))  # NOTE this is way faster than `predict`
+        return float(model.f_(x))  # NOTE this is way faster than `predict`
 
     def price_impact_many(self, i: int, j: int, size: np.ndarray) -> np.ndarray:
         """
