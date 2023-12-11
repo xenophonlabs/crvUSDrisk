@@ -5,6 +5,7 @@ swaps in external liquidity venues.
 from __future__ import annotations
 from collections import defaultdict
 from itertools import permutations
+from functools import cached_property
 from typing import Any, Tuple, Dict, TYPE_CHECKING
 import numpy as np
 import pandas as pd
@@ -45,27 +46,27 @@ class ExternalMarket:
         self.prices: Dict[int, Dict[int, float]] | None = None
         self.models: Dict[int, Dict[int, IsotonicRegression]] = defaultdict(dict)
 
-    @property
+    @cached_property
     def name(self):
         """Market name."""
         return f"External Market ({self.coins[0].symbol}, {self.coins[1].symbol})"
 
-    @property
+    @cached_property
     def coin_names(self):
         """List of coin names in the market."""
         return [c.name for c in self.coins]
 
-    @property
+    @cached_property
     def coin_symbols(self):
         """List of coin symbols in the market."""
         return [c.symbol for c in self.coins]
 
-    @property
+    @cached_property
     def coin_addresses(self):
         """List of coin addresses in the market."""
         return [c.address for c in self.coins]
 
-    @property
+    @cached_property
     def coin_decimals(self):
         """List of coin decimals in the market."""
         return [c.decimals for c in self.coins]
