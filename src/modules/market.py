@@ -194,33 +194,3 @@ class ExternalMarket:
 
     def __repr__(self):
         return self.name
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ExternalMarket):
-            return False
-        return (
-            self.coins == other.coins
-            and self.n == other.n
-            and self.prices == other.prices
-            # self.models == other.models # FIXME this will check `is
-        )
-
-    def __hash__(self) -> int:
-        coins_hash = hash(tuple(hash(coin) for coin in self.coins))
-        if not self.prices:
-            prices_hash = hash(self.prices)
-        else:
-            # convert nested dict into hashable tuple
-            prices_hash = hash(
-                tuple(
-                    sorted(
-                        {
-                            key: tuple(sorted(pj.items()))
-                            for key, pj in self.prices.items()
-                        }.items()
-                    )
-                )
-            )
-        return hash(
-            (coins_hash, self.n, prices_hash)
-        )  # FIXME IsotonicRegressor does not implement __hash__

@@ -3,7 +3,7 @@ Provides the `Cycle` class for optimizing and
 exeucuting a sequence of trades.
 """
 import math
-from typing import Sequence, cast, Dict, Any
+from typing import Sequence, cast, Dict, Any, Tuple
 from functools import lru_cache
 from scipy.optimize import minimize_scalar
 from crvusdsim.pool import SimLLAMMAPool, SimCurveStableSwapPool
@@ -79,7 +79,11 @@ class Cycle:
         """
         Optimize the `amt_in` for the first trade in the cycle.
         """
-        _optimize_mem(self.state_key, xatol=xatol)
+        amt, expected_profit = _optimize_mem(self.state_key, xatol=xatol)
+        self.populate(amt)
+        # TODO remove assert for testing
+        if expected_profit and self.expected_profit:
+            assert abs(self.expected_profit - expected_profit) / expected_profit < 1e-6
 
     def populate(self, amt_in: float | int) -> float:
         """
@@ -145,31 +149,43 @@ class StateKey:
         hashes = []
         for trade in trades:
             if isinstance(trade, Swap):
-                if isinstance(trade.pool, ExternalMarket):
-                    # we implement a custom hash for this
-                    # the only thing that matters is price.
-                    pool_hash = hash(trade.pool)
-                elif isinstance(trade.pool, SimLLAMMAPool):
+                pool = trade.pool
+                if isinstance(pool, ExternalMarket):
+                    coins_hash = hash(tuple(hash(coin) for coin in pool.coins))
+                    if not pool.prices:
+                        prices_hash = hash(pool.prices)
+                    else:
+                        # convert nested dict into hashable tuple
+                        prices_hash = hash(
+                            tuple(
+                                sorted(
+                                    {
+                                        key: tuple(sorted(pj.items()))
+                                        for key, pj in pool.prices.items()
+                                    }.items()
+                                )
+                            )
+                        )
+                    pool_hash = hash((coins_hash, pool.n, prices_hash))
+                elif isinstance(pool, SimLLAMMAPool):
                     pool_hash = hash(
                         (
-                            trade.pool.address,
-                            trade.pool.active_band,
-                            trade.pool.old_p_o,  # TODO is this updated?
-                            tuple(trade.pool.bands_x.items()),
-                            tuple(trade.pool.bands_y.items()),
+                            pool.address,
+                            pool.active_band,
+                            pool.old_p_o,  # TODO is this updated?
+                            tuple(pool.bands_x.items()),
+                            tuple(pool.bands_y.items()),
                         )
                     )
-                elif isinstance(trade.pool, (SimCurveStableSwapPool, SimCurvePool)):
+                elif isinstance(pool, (SimCurveStableSwapPool, SimCurvePool)):
                     pool_hash = hash(
                         (
-                            trade.pool.address,
-                            tuple(trade.pool.balances),
+                            pool.address,
+                            tuple(pool.balances),
                         )
                     )
                 else:
-                    raise NotImplementedError(
-                        f"Pool type {type(trade.pool)} not supported."
-                    )
+                    raise NotImplementedError(f"Pool type {type(pool)} not supported.")
                 hashes.append(pool_hash)
             elif isinstance(trade, Liquidation):
                 # controller_hash = hash((
@@ -184,7 +200,7 @@ class StateKey:
 
 
 @lru_cache(maxsize=1000)  # TODO might need to be larger when considering many pools
-def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> None:
+def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, float]:
     """
     Memoized optimization for the `amt_in` for the
     first trade in the cycle.
@@ -211,8 +227,6 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> None:
     If `frac` reduces the upper bound too much, then
     the function will default to frac=1.
 
-    TODO find a better/dynamic way of setting `frac`.
-
     Note
     ----
     All trades in `Cycle` MUST BE of type `Swap`.
@@ -226,7 +240,7 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> None:
     if high == 0:
         logger.info("No liquidity for %s.", str(cycle))
         cycle.populate(0)
-        return
+        return 0, 0.0
 
     kwargs: Dict[str, Any] = {
         "args": (),
@@ -240,6 +254,5 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> None:
     res = minimize_scalar(lambda x: -cycle.populate(x), **kwargs)
 
     if res.success:
-        cycle.populate(res.x)
-    else:
-        raise RuntimeError(res.message)
+        return int(res.x), -res.fun
+    raise RuntimeError(res.message)

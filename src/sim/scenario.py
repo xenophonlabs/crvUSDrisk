@@ -79,10 +79,10 @@ class Scenario:
         # Set liquidator paths
         self.liquidator.set_paths(self.controller, self.stableswap_pools, self.markets)
         # Set arbitrage cycles
-        graph = PoolGraph(
+        self.graph = PoolGraph(
             self.stableswap_pools + [self.llamma] + list(self.markets.values())
         )
-        self.cycles = graph.find_cycles(n=self.arb_cycle_length)
+        self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
     def generate_sim_market(self) -> None:
         """

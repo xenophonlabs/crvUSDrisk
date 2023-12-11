@@ -58,7 +58,7 @@ class PoolGraph:
             )
             graph[pool] = []
             for other in self.pools:
-                if other != pool and bool(shared_address(pool, other)):
+                if other != pool and self.can_traverse(pool, other, set()):
                     graph[pool].append(other)
         return graph
 
