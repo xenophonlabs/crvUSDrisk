@@ -200,7 +200,8 @@ class Liquidator(Agent):
             # basis token -> crvusd
             j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
-            amt_in = crvusd_pool.get_dy(i, j, to_repay)
+            # amt_in = crvusd_pool.get_dy(i, j, to_repay)  # FIXME
+            amt_in = self.search(crvusd_pool, i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
             # crvusd -> collateral
