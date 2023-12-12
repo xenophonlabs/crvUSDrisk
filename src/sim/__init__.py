@@ -13,7 +13,7 @@ __all__ = ["Scenario", "sim"]
 logger = get_logger(__name__)
 
 
-def sim(config: str):
+def sim(config: str, market_name: str):
     """
     Simulate a stress test scenario.
 
@@ -27,7 +27,7 @@ def sim(config: str):
     MetricsResult
         An object containing the results for the simulation.
     """
-    scenario = Scenario(config)
+    scenario = Scenario(config, market_name)
     scenario.prepare_for_run()
     logger.info(
         "Running simulation for %d steps at frequency %s",

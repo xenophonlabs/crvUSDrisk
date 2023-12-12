@@ -26,9 +26,10 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, scenario: str):
+    def __init__(self, scenario: str, market_name: str):
         "Generate the scenario from the stress test scenario config file."
 
+        self.market_name = market_name
         self.config = config = get_config(scenario, "scenarios")
         self.name: str = config["name"]
         self.description: str = config["description"]
@@ -90,13 +91,12 @@ class Scenario:
         LLAMMAs, Controllers, StableSwap pools, etc.
         """
         # TODO handle generation of multiple markets
-        # TODO unpack sim_market objects
         # TODO assert that shared modules `is` the same object
         # assert pool == controller.AMM, "`controller.AMM` is not `pool`"
         # assert pool.BORROWED_TOKEN == controller.STABLECOIN
         # assert pool.COLLATERAL_TOKEN == controller.COLLATERAL_TOKEN
         logger.info("Fetching sim_market from subgraph.")
-        sim_market = get("weth", bands_data="controller")
+        sim_market = get(self.market_name, bands_data="controller")
 
         self.llamma = sim_market.pool
         self.controller = sim_market.controller
