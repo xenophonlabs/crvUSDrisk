@@ -1,9 +1,7 @@
 """Provides the `Scenario` class for running simulations."""
 from typing import List, Tuple, Set
-from dataclasses import dataclass
 from itertools import combinations
 from datetime import datetime, timedelta
-import pandas as pd
 from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
 from ..configs import TOKEN_DTOs, get_scenario_config, CRVUSD_DTO
@@ -18,7 +16,6 @@ from ..utils import get_quotes
 logger = get_logger(__name__)
 
 
-@dataclass
 class Scenario:
     """
     The `Scenario` object holds ALL of the objects required to run
@@ -44,7 +41,7 @@ class Scenario:
         self.timestamp = sample.timestamp
         self.curr_price = sample
 
-    def generate_markets(self) -> pd.DataFrame:
+    def generate_markets(self) -> None:
         """Generate the external markets for the scenario."""
         offset = timedelta(seconds=self.config["quotes"]["offset"])
         period = timedelta(seconds=self.config["quotes"]["period"])
@@ -61,15 +58,11 @@ class Scenario:
             market.fit(quotes)
             self.markets[pair] = market
 
-        return quotes
-
     def generate_pricepaths(self) -> None:
         """
         Generate the pricepaths for the scenario.
         """
         self.pricepaths: PricePaths = PricePaths(self.freq, self.num_steps)
-        self.timestamp = self.pricepaths[0].timestamp
-        self.curr_price = self.pricepaths[0]
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""

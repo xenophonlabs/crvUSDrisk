@@ -19,7 +19,6 @@ We default to a 1h granularity in price data, sampled over
 the last 60 days.
 """
 import os
-import pdb
 import argparse
 from datetime import datetime, timedelta
 from src.prices.utils import gen_price_config
@@ -60,9 +59,4 @@ if __name__ == "__main__":
     fn = os.path.join(config_dir_w_freq, f"{start}_{end}.json")
     plot_fn = os.path.join(plot_dir_w_freq, f"{start}_{end}.png")
 
-    try:
-        gen_price_config(
-            fn, ADDRESSES, start, end, freq=freq, plot=plot, plot_fn=plot_fn
-        )
-    except Exception:
-        pdb.post_mortem()
+    gen_price_config(fn, ADDRESSES, start, end, freq=freq, plot=plot, plot_fn=plot_fn)
