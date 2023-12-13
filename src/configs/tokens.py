@@ -9,6 +9,7 @@ Adding a new token:
 from ..data_transfer_objects import TokenDTO
 
 # Addresses
+CRVUSD = "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e"
 USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 USDT = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 USDP = "0x8e870d67f660d95d5be530380d0ec0bd388289e1"
@@ -30,13 +31,25 @@ COINGECKO_IDS = {
     USDP: "paxos-standard",
     TUSD: "true-usd",
     WETH: "weth",
+    WSTETH: "wrapped-steth",
+    SFRXETH: "staked-frax-ether",
     WBTC: "wrapped-bitcoin",
+    TBTC: "tbtc",
 }
 STABLE_CG_IDS = [COINGECKO_IDS[coin] for coin in STABLES]
 
 # TODO script to update these with new tokens
 
 # DTOs
+CRVUSD_DTO = TokenDTO(
+    address=CRVUSD,
+    name="Curve.Fi USD Stablecoin",
+    symbol="crvUSD",
+    decimals=18,
+    min_trade_size=0,
+    max_trade_size=0,
+)  # NOTE don't add to TOKEN_DTOs
+
 USDC_DTO = TokenDTO(
     address=USDC,
     name="USD Coin",

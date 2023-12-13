@@ -32,17 +32,18 @@ KNOWN_IDS_MAP = {
 }
 
 
-MAX_RETRIES = 5
+MAX_RETRIES = 8
+TIMEOUT = 10
 
 
 @retry(
     stop=stop_after_attempt(MAX_RETRIES),
-    wait=wait_exponential(multiplier=1, min=5, max=20),
+    wait=wait_exponential(multiplier=1.5, min=2, max=60),
     retry=retry_if_exception_type(req.HTTPError),
 )
 def _get(url: str, params: dict) -> dict:
     """GET data from coingecko API."""
-    res = req.get(url, params=params, timeout=5)
+    res = req.get(url, params=params, timeout=TIMEOUT)
     res.raise_for_status()  # retry if rate limit error
     return res.json()
 

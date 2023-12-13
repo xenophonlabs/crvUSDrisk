@@ -1,18 +1,19 @@
 """Provides the `Scenario` class for running simulations."""
-from typing import List, Tuple
+from typing import List, Tuple, Set
 from dataclasses import dataclass
 from itertools import combinations
+from datetime import datetime, timedelta
+import pandas as pd
 from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
-from ..configs import TOKEN_DTOs, get_config
+from ..configs import TOKEN_DTOs, get_scenario_config, CRVUSD_DTO
 from ..modules import ExternalMarket
-from ..db.datahandler import DataHandler
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
 from ..utils.poolgraph import PoolGraph
 from ..logging import get_logger
-
+from ..utils import get_quotes
 
 logger = get_logger(__name__)
 
@@ -27,47 +28,48 @@ class Scenario:
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, scenario: str, market_name: str):
-        "Generate the scenario from the stress test scenario config file."
-
         self.market_name = market_name
-        self.config = config = get_config(scenario, "scenarios")
+        self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
         self.description: str = config["description"]
         self.num_steps: int = config["N"]
-        self.coins: List[TokenDTO] = [TOKEN_DTOs[a] for a in config["coins"]]
-        self.pairs: List[Tuple[TokenDTO, TokenDTO]] = [
-            (sorted_pair[0], sorted_pair[1])
-            for pair in combinations(self.coins, 2)
-            for sorted_pair in [sorted(pair)]
-        ]
-        self.arb_cycle_length = 3  # TODO place in config
+        self.freq: str = config["freq"]
 
+        self.generate_sim_market()  # must be first
         self.generate_pricepaths()
         self.generate_markets()
-        self.generate_sim_market()
         self.generate_agents()
 
-        self.timestamp = self.pricepaths[0].timestamp
-        self.curr_price = self.pricepaths[0]
+        sample = self.pricepaths[0]
+        self.timestamp = sample.timestamp
+        self.curr_price = sample
 
-    def generate_markets(self) -> None:
+    def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
-        with DataHandler() as datahandler:
-            self.quotes = datahandler.get_quotes(process=True)
-            logger.info("Using %d 1Inch quotes.", self.quotes.shape[0])
+        offset = timedelta(seconds=self.config["quotes"]["offset"])
+        period = timedelta(seconds=self.config["quotes"]["period"])
+
+        end = datetime.now() - offset
+        start = end - period
+
+        self.quotes = quotes = get_quotes(int(start.timestamp()), int(end.timestamp()))
+        logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
+
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
-            market.fit(self.quotes)
+            market.fit(quotes)
             self.markets[pair] = market
+
+        return quotes
 
     def generate_pricepaths(self) -> None:
         """
         Generate the pricepaths for the scenario.
         """
-        self.pricepaths: PricePaths = PricePaths(
-            self.config["price_config"], self.num_steps
-        )
+        self.pricepaths: PricePaths = PricePaths(self.freq, self.num_steps)
+        self.timestamp = self.pricepaths[0].timestamp
+        self.curr_price = self.pricepaths[0]
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
@@ -83,6 +85,7 @@ class Scenario:
         self.graph = PoolGraph(
             self.stableswap_pools + [self.llamma] + list(self.markets.values())
         )
+        self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
     def generate_sim_market(self) -> None:
@@ -91,10 +94,6 @@ class Scenario:
         LLAMMAs, Controllers, StableSwap pools, etc.
         """
         # TODO handle generation of multiple markets
-        # TODO assert that shared modules `is` the same object
-        # assert pool == controller.AMM, "`controller.AMM` is not `pool`"
-        # assert pool.BORROWED_TOKEN == controller.STABLECOIN
-        # assert pool.COLLATERAL_TOKEN == controller.COLLATERAL_TOKEN
         logger.info("Fetching sim_market from subgraph.")
         sim_market = get(self.market_name, bands_data="controller")
 
@@ -107,6 +106,22 @@ class Scenario:
         self.policy = sim_market.policy
         self.factory = sim_market.factory
         self.stablecoin = sim_market.stablecoin
+
+        # Convenient reference to all pools
+        # TODO add other LLAMMAs or TriCrypto pools
+        self.pools = [self.llamma] + self.stableswap_pools
+
+        self.coins: Set[TokenDTO] = set()
+        for pool in self.pools:
+            for a in pool.coin_addresses:
+                if a.lower() != CRVUSD_DTO.address.lower():
+                    self.coins.add(TOKEN_DTOs[a.lower()])
+
+        self.pairs: List[Tuple[TokenDTO, TokenDTO]] = [
+            (sorted_pair[0], sorted_pair[1])
+            for pair in combinations(self.coins, 2)
+            for sorted_pair in [sorted(pair)]
+        ]
 
     def update_market_prices(self, sample: PriceSample) -> None:
         """Update market prices with a new sample."""
@@ -136,8 +151,6 @@ class Scenario:
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
-        self.timestamp = ts
-        self.curr_price = sample
         self.update_market_prices(sample)
 
         # FIXME Manually update LLAMMA oracle price

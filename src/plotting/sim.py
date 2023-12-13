@@ -7,6 +7,9 @@ from PIL import Image
 from ..utils import get_crvusd_index
 from .utils import save
 from ..configs import ADDRESS_TO_SYMBOL
+from ..configs.tokens import COINGECKO_IDS
+
+COINGECKO_IDS_ = {v: k for k, v in COINGECKO_IDS.items()}
 
 FPS = 3
 
@@ -405,13 +408,6 @@ def plot_prices(
     """
     Plot prices in df. Assumes that each col
     in the df is a coin.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Dataframe with prices
-    fn : str | None
-        Filename to save plot to
     """
     # Get coin names
     cols = [col for col in df.columns if col != "timestamp"]
@@ -425,7 +421,10 @@ def plot_prices(
     for i in range(n):
         for j in range(m):
             col = cols.pop()
-            ax = axs[i, j]
+            if axs.ndim == 1:
+                ax = axs[j]
+            else:
+                ax = axs[i, j]
             ax.plot(df.index, df[col], lw=1, c="royalblue", label="Real")
             title = col
             if "0x" in title and title in ADDRESS_TO_SYMBOL:
@@ -435,7 +434,13 @@ def plot_prices(
             ax.tick_params(axis="x", rotation=45)
 
             if df2 is not None:
-                ax.plot(df.index, df2[col], lw=1, c="indianred", label="Simulated")
+                ax.plot(
+                    df.index,
+                    df2[COINGECKO_IDS_[col]],
+                    lw=1,
+                    c="indianred",
+                    label="Simulated",
+                )
                 ax.legend()
 
     return save(f, fn)

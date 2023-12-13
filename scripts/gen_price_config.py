@@ -18,11 +18,20 @@ Parameters for Non-Stablecoins:
 We default to a 1h granularity in price data, sampled over
 the last 60 days.
 """
+import os
+import pdb
 import argparse
 from datetime import datetime, timedelta
 from src.prices.utils import gen_price_config
 from src.configs import ADDRESSES
 from src.logging import get_logger
+
+
+BASE_DIR = os.getcwd()
+CONFIG_DIR = os.path.join(BASE_DIR, "src", "configs", "prices")
+PLOTS_DIR = os.path.join(BASE_DIR, "figs", "prices")
+os.makedirs(CONFIG_DIR, exist_ok=True)
+os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
 logger = get_logger(__name__)
@@ -41,6 +50,19 @@ if __name__ == "__main__":
         (datetime.now() - timedelta(hours=1)).timestamp()
     )  # Offset by an hour to prevent missing data
     start = int((datetime.now() - timedelta(days=60)).timestamp())
-    fn = f"./src/configs/prices/{freq}_{start}_{end}.json"
 
-    gen_price_config(fn, ADDRESSES, start, end, freq=freq, plot=plot)
+    config_dir_w_freq = os.path.join(CONFIG_DIR, freq)
+    plot_dir_w_freq = os.path.join(PLOTS_DIR, freq)
+
+    os.makedirs(config_dir_w_freq, exist_ok=True)
+    os.makedirs(plot_dir_w_freq, exist_ok=True)
+
+    fn = os.path.join(config_dir_w_freq, f"{start}_{end}.json")
+    plot_fn = os.path.join(plot_dir_w_freq, f"{start}_{end}.png")
+
+    try:
+        gen_price_config(
+            fn, ADDRESSES, start, end, freq=freq, plot=plot, plot_fn=plot_fn
+        )
+    except Exception:
+        pdb.post_mortem()
