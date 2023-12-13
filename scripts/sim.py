@@ -11,7 +11,7 @@ logger.setLevel(logging.DEBUG)
 if __name__ == "__main__":
     with cProfile.Profile() as pr:
         try:
-            sim("baseline")
+            sim("baseline", "weth")
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)

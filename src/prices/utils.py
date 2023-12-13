@@ -11,7 +11,6 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import scipy.optimize as so
-import matplotlib.pyplot as plt
 from ..configs import STABLE_CG_IDS
 from ..plotting import plot_prices
 from ..network.coingecko import get_prices_df, address_from_coin_id
@@ -29,6 +28,7 @@ def gen_price_config(
     end: int,
     freq: str = "1h",
     plot: bool = False,
+    plot_fn: str | None = None,
 ) -> dict:
     """
     Generate a config file for prices for each input coin.
@@ -97,9 +97,8 @@ def gen_price_config(
         T = df.shape[0] / annual_factor
         dt = 1 / annual_factor
         S0s = df[coin_ids].iloc[0].to_dict()  # Get first row of prices
-        S = gen_cor_prices(coin_ids, T, dt, S0s, cov, params)
-        _ = plot_prices(df[coin_ids], df2=S)
-        plt.show()
+        prices = gen_cor_prices(coin_ids, T, dt, S0s, cov, params)
+        _ = plot_prices(df[coin_ids], df2=prices, fn=plot_fn)
 
     return config
 
@@ -172,7 +171,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> Tuple[dict, pd.DataFra
 
         if col in STABLE_CG_IDS:
             # Estimate an OU Process
-            theta, mu, sigma = estimate_ou_parameters_mle(df[col].tolist(), dt)
+            theta, mu, sigma = estimate_ou_parameters_mle(df[col], dt)
             sigma *= np.sqrt(annual_factor)  # annualize
             params[col] = {"theta": theta, "mu": mu, "sigma": sigma, "type": "OU"}
         else:
@@ -236,7 +235,7 @@ def log_likelihood(params, X, dt):
     return -ll  # Negative for minimization
 
 
-def estimate_ou_parameters_mle(X: List[float], dt: float) -> tuple:
+def estimate_ou_parameters_mle(X: pd.Series, dt: float) -> tuple:
     """
     Estimate the parameters of an OU process using MLE.
 
