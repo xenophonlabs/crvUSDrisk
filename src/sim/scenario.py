@@ -49,7 +49,11 @@ class Scenario:
         end = datetime.now() - offset
         start = end - period
 
-        self.quotes = quotes = get_quotes(int(start.timestamp()), int(end.timestamp()))
+        self.quotes = quotes = get_quotes(
+            int(start.timestamp()),
+            int(end.timestamp()),
+            self.coins,
+        )
         logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
 
         self.markets: MarketsType = {}

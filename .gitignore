@@ -1,5 +1,5 @@
 # Custom
-# figs/*
+*.prof
 data/*
 
 # Byte-compiled / optimized / DLL files

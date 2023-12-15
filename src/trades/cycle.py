@@ -212,7 +212,7 @@ class StateKey:
         return hash(tuple(hashes))
 
 
-# @lru_cache(maxsize=1000)  # TODO might need to be larger when considering many pools
+@lru_cache(maxsize=100)  # TODO might need to increase for more cycles
 def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, float]:
     """
     Memoized optimization for the `amt_in` for the
@@ -237,7 +237,7 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, f
     high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
 
     if high == 0:
-        # logger.info("No liquidity for %s.", str(cycle))
+        logger.info("No liquidity for %s.", str(cycle))
         return 0, 0.0
 
     kwargs: Dict[str, Any] = {

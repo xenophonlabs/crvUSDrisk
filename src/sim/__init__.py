@@ -2,7 +2,6 @@
 Main module for the simulation package. Runs a stress test scenario for a 
 given stress test configuration.
 """
-import pickle
 from .scenario import Scenario
 from ..metrics import MetricsProcessor
 from ..plotting.sim import plot_prices
@@ -42,12 +41,6 @@ def sim(config: str, market_name: str):
         scenario.perform_actions(sample)
         # scenario.after_trades()
         metrics_processor.update()
-
-    # Results are dumped into metrics_processor!
-    with open("./pickles/scenario.pkl", "wb") as f:
-        pickle.dump(scenario, f)
-    with open("./pickles/metrics_processor.pkl", "wb") as f:
-        pickle.dump(metrics_processor, f)
 
     # TODO
     # - Try tighter granularity on simulation, e.g. 1 minute?
