@@ -17,4 +17,3 @@ if __name__ == "__main__":
     stats = pstats.Stats(pr)
     stats.sort_stats(pstats.SortKey.CUMULATIVE)
     stats.print_stats()
-    stats.dump_stats("./logs/sim.prof")

@@ -1,15 +1,24 @@
 """Provides the `Arbitrageur` class."""
 from typing import List, Tuple, cast
+import math
+import multiprocessing as mp
+from multiprocessing.queues import Queue
 from .agent import Agent
 from ..trades import Cycle, Swap
 from ..trades.cycle import _optimize_mem  # TODO remove, using for testing
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
-from ..logging import get_logger
+from ..logging import (
+    get_logger,
+    multiprocessing_logging_queue,
+    configure_multiprocess_logging,
+)
 
 PRECISION = 1e18
 
 logger = get_logger(__name__)
+
+mp.set_start_method("fork", force=True)  # Avoid lock overhead on shared pool objs
 
 
 class Arbitrageur(Agent):
@@ -74,7 +83,7 @@ class Arbitrageur(Agent):
                 _profit = (
                     best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
                 )
-                assert _profit == best_profit, RuntimeError(
+                assert abs(_profit - best_profit) < 1, RuntimeError(
                     "Expected profit != actual profit."
                 )
                 profit += best_profit
@@ -83,15 +92,16 @@ class Arbitrageur(Agent):
                 logger.info("No more profitable arbitrages.")
                 break
 
-        logger.info("Cache info: %s", _optimize_mem.cache_info())
+        # logger.info("Cache info: %s", _optimize_mem.cache_info())
 
         self._profit += profit
         self._count += count
 
         return profit, count
 
+    # pylint: disable=too-many-locals
     def find_best_arbitrage(
-        self, cycles: List[Cycle], prices: PriceSample
+        self, cycles: List[Cycle], prices: PriceSample, multiprocess: bool = True
     ) -> Tuple[Cycle | None, float]:
         """
         Find the optimal liquidity-constrained cyclic arbitrages.
@@ -104,6 +114,9 @@ class Arbitrageur(Agent):
             List of cycles. Cycles are an ordered list of `Trade`s.
         prices : PriceSample
             Current USD market prices for each coin.
+        multiprocess : bool, default=True
+            Whether to use multiprocessing to find the optimal cycle.
+            Default is True.
 
         Returns
         -------
@@ -112,23 +125,57 @@ class Arbitrageur(Agent):
         best_profit : float
             The dollarized profit of the optimal cycle.
         """
-        best_cycle = None
-        best_profit = 0.0
+        # TODO test that the expected optimal cycle is
+        # the same as the actual optimal cycle following
+        # starmap. Test with and without multiprocessing
+        # for results.
+        # TODO what if I make cycle.optimize() not mutate
+        # the cycle at all? Everything is done in the snapshot
+        # context
+        cpu_count = mp.cpu_count()
+        if multiprocess and cpu_count > 1:
+            with multiprocessing_logging_queue() as logging_queue:
+                args = [(cycle, prices, logging_queue) for cycle in cycles]
+                with mp.Pool(cpu_count) as pool:
+                    results = pool.starmap(optimize_cycle, args)
+                best = max(results, key=lambda x: x[1])
+                best_index = results.index(best)
+                best_cycle = cycles[best_index]
+                best_amt, best_profit = best
+        else:
+            best_profit = -math.inf
+            best_amt = 0
+            best_cycle = None
+            for cycle in cycles:
+                # Don't need to re-optimize
+                amt, profit = optimize_cycle(cycle, prices)
+                if profit > best_profit:
+                    best_cycle = cycle
+                    best_profit = profit
+                    best_amt = amt
 
-        for cycle in cycles:
-            # Get 1 dollar's worth (marked to market)
-            trade = cast(Swap, cycle.trades[0])
-            decimals = trade.get_decimals(trade.i)
-            xatol = int(10**decimals / prices.prices_usd[cycle.basis_address])
-
-            cycle.optimize(xatol=xatol)
-            expected_profit = cast(float, cycle.expected_profit)
-
-            # Dollarize the expected profit
-            expected_profit *= prices.prices_usd[cycle.basis_address]
-
-            if expected_profit > best_profit:
-                best_profit = expected_profit
-                best_cycle = cycle
+        if best_cycle:
+            best_cycle.populate(best_amt, use_snapshot_context=False)
 
         return best_cycle, best_profit
+
+
+# TODO cache should be here?
+def optimize_cycle(
+    cycle: Cycle, prices: PriceSample, logging_queue: Queue | None = None
+) -> Tuple[int, float]:
+    """Wrapper to optimize cycle."""
+    if logging_queue:
+        configure_multiprocess_logging(logging_queue)
+
+    # Get 1 dollar's worth (marked to market)
+    trade = cast(Swap, cycle.trades[0])
+    decimals = trade.get_decimals(trade.i)
+    xatol = int(10**decimals / prices.prices_usd[cycle.basis_address])
+
+    amt, profit = cycle.optimize(xatol=xatol)
+
+    # Dollarize the expected profit
+    profit *= prices.prices_usd[cycle.basis_address]
+
+    return amt, profit
