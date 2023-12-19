@@ -6,8 +6,10 @@ astroid==3.0.2
 asttokens==2.4.1
 attrs==23.1.0
 bitarray==2.8.5
+black==23.12.0
 certifi==2023.11.17
 charset-normalizer==3.3.2
+click==8.1.7
 comm==0.2.0
 contourpy==1.2.0
 crvusdsim @ git+https://github.com/Tcintra/crvusdsim@fab4904688a4a2867d8a1d51f1da0b810464ce50
@@ -49,6 +51,8 @@ matplotlib==3.8.2
 matplotlib-inline==0.1.6
 mccabe==0.7.0
 multidict==6.0.4
+mypy==1.7.1
+mypy-extensions==1.0.0
 nest-asyncio==1.5.8
 networkx==3.2.1
 numpy==1.26.2
@@ -56,6 +60,7 @@ packaging==23.2
 pandas==2.1.4
 parsimonious==0.9.0
 parso==0.8.3
+pathspec==0.12.1
 pexpect==4.9.0
 Pillow==10.1.0
 platformdirs==4.1.0
