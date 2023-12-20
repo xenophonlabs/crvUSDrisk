@@ -2,7 +2,7 @@ import logging
 import cProfile
 import pstats
 import pdb
-from src.sim import sim
+from src.sim import run_scenario
 from src.logging import get_logger
 
 logger = get_logger(__name__)
@@ -11,7 +11,8 @@ logger.setLevel(logging.DEBUG)
 if __name__ == "__main__":
     with cProfile.Profile() as pr:
         try:
-            sim("baseline", "wsteth")
+            # local for testing
+            run_scenario("baseline", "wsteth", local="./data/scenarios/test.pkl")
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)

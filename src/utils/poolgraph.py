@@ -77,7 +77,7 @@ class PoolGraph:
         for pool in self.pools:
             self.dfs(pool, [pool], set(), cycles, n)
         valid = self.validate(cycles)
-        logger.info("Found %d valid cycles of length %d.", len(valid), n)
+        logger.info("Found %d valid trading cycles of length %d.", len(valid), n)
         return valid
 
     def can_traverse(self, curr: SimPoolType, nxt: SimPoolType, used: Set[str]) -> bool:

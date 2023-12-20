@@ -1,54 +1,42 @@
 """
-Main module for the simulation package. Runs a stress test scenario for a 
-given stress test configuration.
-"""
-from .scenario import Scenario
-from ..metrics import MetricsProcessor
-from ..plotting.sim import plot_prices
-from ..logging import get_logger
+Tools for running simulation scenarios, inspired by 
+https://github.com/curveresearch/curvesim/blob/main/curvesim/pipelines/__init__.py.
 
-__all__ = ["Scenario", "sim"]
+The basic model for a scenario is to:
+1. Generate a `Scenario` object to be used as a template.
+    This includes Curve assets (like LLAMMAs, Controllers,
+    Stableswap pools), as well as External Markets, and Agents 
+    (e.g. Liquidator, Arbitrageur).
+2. Apply the pre-processing required for the `Scenario`. For example, the "baseline"
+    scenario will apply basic pre-processing (equilibrate pool prices via
+    an initial arbitrage), whereas the "liquidity crunch" scneario will
+    stochastically remove liquidity from the system.
+3. Generate prices for the `Scenario`. For example, the "baseline" scenario
+    will generate prices based on recent historical price data using GBMs and OU
+    processes. The "bear" scenario will depress each token's "drift" parameter,
+    whereas the "high volatility" scenario will augment the "volatility" parameter,
+    and the "flash crash" scenario will apply negative jumps.
+4. Run the simulation. The `Scenario` template is copied into multiple parallel
+    processes that each run their own simulation. 
+5. Aggregate results. The results from each simulation are aggregated together
+    and plots/tables are generated to display statistically significant results.
+"""
+from ..logging import get_logger
+from .scenarios import SCENARIO_MAP
+from .results import MonteCarloResults
 
 logger = get_logger(__name__)
 
 
-def sim(config: str, market_name: str):
+def run_scenario(
+    scenario_name: str, market_name: str, num_iter: int = 1, local: str = ""
+) -> MonteCarloResults:
     """
-    Simulate a stress test scenario.
-
-    Parameters
-    ----------
-    config : str
-        The filepath for the stress test scenario config file.
-
-    Returns
-    -------
-    MetricsResult
-        An object containing the results for the simulation.
+    Core function for running simulation scenarios.
     """
-    scenario = Scenario(config, market_name)
-    scenario.prepare_for_run()
-    logger.info(
-        "Running simulation for %d steps at frequency %s",
-        scenario.num_steps,
-        scenario.pricepaths.config["freq"],
-    )
-    _ = plot_prices(scenario.pricepaths.prices, fn="./figs/sims/prices.png")
-    metrics_processor = MetricsProcessor(scenario)
-
-    for sample in scenario.pricepaths:
-        scenario.prepare_for_trades(sample)
-        scenario.perform_actions(sample)
-        # scenario.after_trades()
-        metrics_processor.update()
-
-    # TODO
-    # - Try tighter granularity on simulation, e.g. 1 minute?
-    # - See how dependent the results are on this param.
-    # - Include gas
-    # - Speed this up
-    # - Include multiple LLAMMAs
-    # - Include borrower actions
-    # - Include LP actions
-
-    # return metrics_processor.process()
+    # TODO consider multiple markets
+    func = SCENARIO_MAP[scenario_name]
+    logger.info("Running scenario: %s", scenario_name)
+    output = func(scenario_name, market_name, num_iter=num_iter, local=local)
+    logger.info("Completed scenario: %s", scenario_name)
+    return output
