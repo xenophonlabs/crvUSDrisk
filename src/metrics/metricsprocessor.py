@@ -195,8 +195,10 @@ class MetricsProcessor:
         res.append(sum(scenario.llamma.bands_y.values()))
 
         # Controller
-        res.append(controller_system_health(scenario.controller))
-        res.append(controller_bad_debt(scenario.controller))
+        healths = controller_healths(scenario.controller)
+        debts = controller_debts(scenario.controller)
+        res.append(controller_system_health(healths, debts))
+        res.append(controller_bad_debt(healths, debts))
         res.append(scenario.controller.n_loans)
         res.append(scenario.controller.total_debt())
 
@@ -237,33 +239,34 @@ class MetricsProcessor:
         return MetricsResult(self.df)
 
 
-def controller_system_health(controller: SimController) -> int:
+def controller_healths(controller: SimController) -> np.ndarray:
+    """Return array of healths of controller users."""
+    return np.array(
+        [controller.health(user, full=True) for user in controller.loan.keys()]
+    )
+
+
+def controller_debts(controller: SimController) -> np.ndarray:
+    """Return array of debts of controller users."""
+    return np.array([l.initial_debt for l in controller.loan.values()])
+
+
+def controller_system_health(healths: np.ndarray, debts: np.ndarray) -> int:
     """
     Calculate the system health of a controller.
     We calculate this as a weighted average of user
     health, where weights are each user's initial debt.
-    TODO use current debt instead of initial debt
+    TODO use current debt instead of initial debt <- rate
     """
-    return (
-        np.array(
-            [
-                controller.health(user, full=True) * loan.initial_debt
-                for user, loan in controller.loan.items()
-            ]
-        ).sum()
-        / controller.total_debt()
-    )
+    return (healths * debts).sum() / debts.sum()
 
 
-def controller_bad_debt(controller: SimController) -> int:
+def controller_bad_debt(healths: np.ndarray, debts: np.ndarray) -> int:
     """
     Calculate net bad debt in controller.
     We define bad debt as the debt of users with
     health < 0.
-    TODO use current debt instead of initial debt
+    TODO use current debt instead of initial debt <- rate
     """
-    bad_debt = 0
-    for user, loan in controller.loan.items():
-        if controller.health(user, full=True) < 0:
-            bad_debt += loan.initial_debt
-    return bad_debt
+    users = np.where(healths < 0)
+    return debts[users].sum()

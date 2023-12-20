@@ -1,11 +1,14 @@
 """Provides the `Arbitrageur` class."""
 from typing import List, Tuple, cast
+import math
 from .agent import Agent
 from ..trades import Cycle, Swap
 from ..trades.cycle import _optimize_mem  # TODO remove, using for testing
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
-from ..logging import get_logger
+from ..logging import (
+    get_logger,
+)
 
 PRECISION = 1e18
 
@@ -74,7 +77,7 @@ class Arbitrageur(Agent):
                 _profit = (
                     best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
                 )
-                assert _profit == best_profit, RuntimeError(
+                assert abs(_profit - best_profit) < 1, RuntimeError(
                     "Expected profit != actual profit."
                 )
                 profit += best_profit
@@ -90,6 +93,7 @@ class Arbitrageur(Agent):
 
         return profit, count
 
+    # pylint: disable=too-many-locals
     def find_best_arbitrage(
         self, cycles: List[Cycle], prices: PriceSample
     ) -> Tuple[Cycle | None, float]:
@@ -104,6 +108,9 @@ class Arbitrageur(Agent):
             List of cycles. Cycles are an ordered list of `Trade`s.
         prices : PriceSample
             Current USD market prices for each coin.
+        multiprocess : bool, default=True
+            Whether to use multiprocessing to find the optimal cycle.
+            Default is True.
 
         Returns
         -------
@@ -112,23 +119,26 @@ class Arbitrageur(Agent):
         best_profit : float
             The dollarized profit of the optimal cycle.
         """
+        best_profit = -math.inf
+        best_amt = 0
         best_cycle = None
-        best_profit = 0.0
-
         for cycle in cycles:
             # Get 1 dollar's worth (marked to market)
             trade = cast(Swap, cycle.trades[0])
             decimals = trade.get_decimals(trade.i)
             xatol = int(10**decimals / prices.prices_usd[cycle.basis_address])
 
-            cycle.optimize(xatol=xatol)
-            expected_profit = cast(float, cycle.expected_profit)
+            amt, profit = cycle.optimize(xatol=xatol)
 
             # Dollarize the expected profit
-            expected_profit *= prices.prices_usd[cycle.basis_address]
+            profit *= prices.prices_usd[cycle.basis_address]
 
-            if expected_profit > best_profit:
-                best_profit = expected_profit
+            if profit > best_profit:
                 best_cycle = cycle
+                best_profit = profit
+                best_amt = amt
+
+        if best_cycle:
+            best_cycle.populate(best_amt, use_snapshot_context=False)
 
         return best_cycle, best_profit

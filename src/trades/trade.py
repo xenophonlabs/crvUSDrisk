@@ -4,7 +4,7 @@ as well as the `Trade` interface.
 """
 
 from abc import ABC
-from typing import Tuple
+from typing import Tuple, cast, Any
 from contextlib import nullcontext
 from dataclasses import dataclass
 from curvesim.pool.sim_interface import SimCurvePool
@@ -35,7 +35,9 @@ class Trade(ABC):
         """Get the decimals of token `i`."""
         raise NotImplementedError
 
-    def do(self, use_snapshot_context=False):
+    def execute(
+        self, amt_in: int, use_snapshot_context: bool = True
+    ) -> Tuple[int, int]:
         """Perform the trade."""
         raise NotImplementedError
 
@@ -62,46 +64,52 @@ class Swap(Trade):
         """Get the decimals of token `i`."""
         return self.pool.coin_decimals[i]
 
-    def do(self, use_snapshot_context: bool = False) -> Tuple[int, int]:
+    def execute(
+        self, amt_in: int, use_snapshot_context: bool = True
+    ) -> Tuple[int, int]:
         """
-        Perform the swap.
+        Execute the swap.
 
         Parameters
         ----------
-        use_snapshot_context : bool, optional
-            Whether to use a snapshot context manager, by default False
+        amt_in : int
+            The amount of token `i` to swap in.
+        use_snapshot_context : bool, default=True
+            Whether or not to mutate the pool and trade state.
 
         Returns
         -------
         Tuple[int, int]
-            The amount of token `j` received, and the decimals of token `j`.
+            The amount of collateral received, and its decimals.
         """
         pool = self.pool
-        amt_in = self.amt
 
-        context_manager = (
-            pool.use_snapshot_context()
-            if use_snapshot_context and not isinstance(pool, ExternalMarket)
-            else nullcontext()
-        )
-
-        with context_manager:
-            result = pool.trade(self.i, self.j, amt_in)
-
-        # Unpack result
-        if isinstance(pool, ExternalMarket):
-            amt_out = result
-        elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
-            # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
-            in_amount_done, amt_out, _ = result
-            if in_amount_done != amt_in:
-                logger.warning(
-                    "LLAMMA amt_in %d != in_amount_done %d.", amt_in, in_amount_done
+        if use_snapshot_context:
+            if isinstance(pool, ExternalMarket):
+                amt_out = pool.trade(self.i, self.j, amt_in)
+            elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
+                amt_out = pool.get_dy(self.i, self.j, amt_in)
+            else:
+                raise NotImplementedError(
+                    f"Trade not implemented for type {type(pool)}."
                 )
-        elif isinstance(pool, SimCurvePool):
-            amt_out, _ = result
         else:
-            raise NotImplementedError
+            self.amt = amt_in
+            result = cast(Any, pool.trade(self.i, self.j, amt_in))
+            # Unpack result
+            if isinstance(pool, ExternalMarket):
+                amt_out = result
+            elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
+                # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
+                in_amount_done, amt_out, _ = result
+                if in_amount_done != amt_in:
+                    logger.warning(
+                        "LLAMMA amt_in %d != in_amount_done %d.", amt_in, in_amount_done
+                    )
+            elif isinstance(pool, SimCurvePool):
+                amt_out, _ = result
+            else:
+                raise NotImplementedError
 
         return amt_out, self.get_decimals(self.j)
 
@@ -140,14 +148,16 @@ class Liquidation(Trade):
             return self.controller.STABLECOIN.decimals
         return self.controller.COLLATERAL_TOKEN.decimals
 
-    def do(self, use_snapshot_context=False) -> Tuple[int, int]:
+    def execute(self, amt_in: int, use_snapshot_context=False) -> Tuple[int, int]:
         """
         Perform the liquidation.
 
         Parameters
         ----------
-        use_snapshot_context : bool, optional
-            Whether to use a snapshot context manager, by default False
+        amt_in : int
+            The amount of stablecoin to repay.
+        use_snapshot_context : bool, default=True
+            Whether or not to mutate the pool and trade state.
 
         Returns
         -------

@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from itertools import permutations
 from functools import cached_property
-from typing import Any, Tuple, Dict, TYPE_CHECKING
+from typing import Tuple, Dict, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
@@ -119,7 +119,7 @@ class ExternalMarket:
             model.fit(x, y)
             self.models[i][j] = model
 
-    def trade(self, i: int, j: int, size: int) -> Any:
+    def trade(self, i: int, j: int, size: int) -> int:
         """
         Execute a trade on the external market using
         the current price.

@@ -12,7 +12,7 @@ from .trade import Swap, Liquidation
 from ..logging import get_logger
 from ..modules import ExternalMarket
 
-TOLERANCE = 1e-6
+TOLERANCE = 1e-6  # TODO should make this smaller
 
 logger = get_logger(__name__)
 
@@ -56,16 +56,26 @@ class Cycle:
 
         trade = self.trades[0]
         amt_in = trade.amt
+        amt = amt_in
 
         for i, trade in enumerate(self.trades):
             logger.info("Executing trade %s.", trade)
+            amt_out, decimals = trade.execute(amt, use_snapshot_context=False)
             if i != self.n - 1:
-                amt_out, decimals = trade.do()
+                amt = amt_out
+                # TODO move this to test file
+                next_trade = self.trades[i + 1]
+                next_trade_amt = next_trade.amt
+                # Check that cycle was populated correctly
+                if amt_out == 0 or isinstance(next_trade, Swap):
+                    cond = amt_out == next_trade_amt
+                else:  # liquidation
+                    cond = (
+                        abs(amt_out - next_trade_amt) / next_trade_amt < TOLERANCE
+                    )  # pool.get_dx() is not exact
                 assert (
-                    abs(amt_out - self.trades[i + 1].amt) / 10**decimals < TOLERANCE
-                ), f"Trade {i+1} output {amt_out} != Trade {i+2} input {self.trades[i+1].amt}."
-            else:
-                amt_out, decimals = trade.do()
+                    cond
+                ), f"Trade {i + 1} output {amt_out} != Trade {i + 2,} input {next_trade_amt}."
 
         profit = (amt_out - amt_in) / 10**decimals
         if abs(profit - self.expected_profit) > TOLERANCE:
@@ -75,17 +85,13 @@ class Cycle:
 
         return profit
 
-    def optimize(self, xatol: int | None = None) -> None:
+    def optimize(self, xatol: int | None = None) -> Tuple[int, float]:
         """
         Optimize the `amt_in` for the first trade in the cycle.
         """
-        amt, expected_profit = _optimize_mem(self.state_key, xatol=xatol)
-        self.populate(amt)
-        # TODO remove assert for testing
-        if expected_profit and self.expected_profit:
-            assert abs(self.expected_profit - expected_profit) / expected_profit < 1e-6
+        return _optimize_mem(self.state_key, xatol=xatol)
 
-    def populate(self, amt_in: float | int) -> float:
+    def populate(self, amt_in: float | int, use_snapshot_context: bool = True) -> float:
         """
         Populate the amt_in to all trades in cycle, and the expected_profit.
 
@@ -103,17 +109,24 @@ class Cycle:
             return -math.inf
 
         amt_in = int(amt_in)  # cast float to int
-
+        amt = amt_in
         trade = self.trades[0]
-        trade.amt = amt_in
+
+        if not use_snapshot_context:
+            trade.amt = amt_in
 
         for i, trade in enumerate(self.trades):
-            amt_out, decimals = trade.do(use_snapshot_context=True)
+            amt_out, decimals = trade.execute(amt, use_snapshot_context=True)
             if i != self.n - 1:
-                self.trades[i + 1].amt = amt_out
+                amt = amt_out
+                if not use_snapshot_context:
+                    self.trades[i + 1].amt = amt
 
         expected_profit = float((amt_out - amt_in) / 10**decimals)
-        self.expected_profit = expected_profit
+
+        if not use_snapshot_context:
+            self.expected_profit = expected_profit
+
         return expected_profit
 
     def __repr__(self) -> str:
@@ -199,7 +212,7 @@ class StateKey:
         return hash(tuple(hashes))
 
 
-@lru_cache(maxsize=1000)  # TODO might need to be larger when considering many pools
+@lru_cache(maxsize=100)  # TODO might need to increase for more cycles
 def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, float]:
     """
     Memoized optimization for the `amt_in` for the
@@ -213,33 +226,18 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, f
     have found `bounded` to perform much faster than `brent`
     for our use case.
 
-    Deprecated
-    ----------
-    The `frac` parameter will scale down the upper
-    bound for the optimization. In general,
-    `get_max_trade_size` will return an extremely
-    large amount. For the vast majority of cases, the
-    optimal will be several orders of magnitude below
-    this value. Based on the analysis in `notebooks.analyze.ipynb`,
-    we determined that a frac of 1e-8 provides the best
-    speed up to this function's execution.
-
-    If `frac` reduces the upper bound too much, then
-    the function will default to frac=1.
-
     Note
     ----
     All trades in `Cycle` MUST BE of type `Swap`.
     """
     cycle = state_key.cycle
-    trades = cast(Sequence[Swap], cycle.trades)  # for mypy
+    trades = cast(Sequence[Swap], cycle.trades)
     trade = trades[0]
     low = 0
-    high = float(trade.pool.get_max_trade_size(trade.i, trade.j))  # * frac
+    high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
 
     if high == 0:
         logger.info("No liquidity for %s.", str(cycle))
-        cycle.populate(0)
         return 0, 0.0
 
     kwargs: Dict[str, Any] = {
