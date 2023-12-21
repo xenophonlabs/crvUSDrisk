@@ -72,7 +72,7 @@ class Arbitrageur(Agent):
             best_cycle, best_profit = self.find_best_arbitrage(cycles, prices)
 
             if best_cycle and best_profit > self.tolerance:
-                logger.info("Executing arbitrage: %s.", best_cycle)
+                logger.debug("Executing arbitrage: %s.", best_cycle)
                 # Dollarize profit
                 _profit = (
                     best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
@@ -83,10 +83,10 @@ class Arbitrageur(Agent):
                 profit += best_profit
                 count += 1
             else:
-                logger.info("No more profitable arbitrages.")
+                logger.debug("No more profitable arbitrages.")
                 break
 
-        logger.info("Cache info: %s", _optimize_mem.cache_info())
+        logger.debug("Cache info: %s", _optimize_mem.cache_info())
 
         self._profit += profit
         self._count += count

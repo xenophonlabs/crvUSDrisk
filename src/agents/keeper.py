@@ -62,13 +62,13 @@ class Keeper(Agent):
                 assert _profit > 0, "Update not profitable."
                 profit += _profit
                 count += 1
-                logger.info(
+                logger.debug(
                     "Updating %s Peg Keeper with profit %d.",
                     get_pk_symbols(pk),
                     round(profit / PRECISION),
                 )
             else:
-                logger.info(
+                logger.debug(
                     "Not updating %s Peg Keeper.",
                     get_pk_symbols(pk),
                 )

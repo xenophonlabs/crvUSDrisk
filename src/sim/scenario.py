@@ -1,7 +1,11 @@
-"""Provides the `Scenario` class for running simulations."""
+"""
+Provides the `Scenario` class for running simulations.
+"""
+
 from typing import List, Tuple, Set
 from itertools import combinations
 from datetime import datetime, timedelta
+import pandas as pd
 from crvusdsim.pool import get  # type: ignore
 from ..prices import PricePaths, PriceSample
 from ..configs import TOKEN_DTOs, get_scenario_config, CRVUSD_DTO
@@ -41,7 +45,7 @@ class Scenario:
         self.timestamp = sample.timestamp
         self.curr_price = sample
 
-    def generate_markets(self) -> None:
+    def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
         offset = timedelta(seconds=self.config["quotes"]["offset"])
         period = timedelta(seconds=self.config["quotes"]["period"])
@@ -49,18 +53,20 @@ class Scenario:
         end = datetime.now() - offset
         start = end - period
 
-        self.quotes = quotes = get_quotes(
+        quotes = get_quotes(
             int(start.timestamp()),
             int(end.timestamp()),
             self.coins,
         )
-        logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
+        logger.debug("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
 
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)
             market.fit(quotes)
             self.markets[pair] = market
+
+        return quotes
 
     def generate_pricepaths(self) -> None:
         """
@@ -85,6 +91,15 @@ class Scenario:
         self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
+        # For convenience
+        self.agents = [
+            self.arbitrageur,
+            self.liquidator,
+            self.keeper,
+            self.borrower,
+            self.liquidity_provider,
+        ]
+
     def generate_sim_market(self) -> None:
         """
         Generate the crvusd modules to simulate, including
@@ -93,6 +108,10 @@ class Scenario:
         # TODO handle generation of multiple markets
         logger.info("Fetching sim_market from subgraph.")
         sim_market = get(self.market_name, bands_data="controller")
+
+        # NOTE huge memory consumption
+        del sim_market.pool.metadata["bands"]
+        del sim_market.pool.metadata["userStates"]  # TODO compare these before deleting
 
         self.llamma = sim_market.pool
         self.controller = sim_market.controller

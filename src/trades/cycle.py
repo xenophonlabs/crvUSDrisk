@@ -52,14 +52,14 @@ class Cycle:
 
     def execute(self) -> float:
         """Execute trades."""
-        logger.info("Executing cycle %s.", self)
+        logger.debug("Executing cycle %s.", self)
 
         trade = self.trades[0]
         amt_in = trade.amt
         amt = amt_in
 
         for i, trade in enumerate(self.trades):
-            logger.info("Executing trade %s.", trade)
+            logger.debug("Executing trade %s.", trade)
             amt_out, decimals = trade.execute(amt, use_snapshot_context=False)
             if i != self.n - 1:
                 amt = amt_out
@@ -122,7 +122,7 @@ class Cycle:
                 if not use_snapshot_context:
                     self.trades[i + 1].amt = amt
 
-        expected_profit = float((amt_out - amt_in) / 10**decimals)
+        expected_profit = (amt_out - amt_in) / 10**decimals
 
         if not use_snapshot_context:
             self.expected_profit = expected_profit
@@ -237,7 +237,7 @@ def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, f
     high = float(trade.pool.get_max_trade_size(trade.i, trade.j))
 
     if high == 0:
-        logger.info("No liquidity for %s.", str(cycle))
+        logger.debug("No liquidity for %s.", str(cycle))
         return 0, 0.0
 
     kwargs: Dict[str, Any] = {

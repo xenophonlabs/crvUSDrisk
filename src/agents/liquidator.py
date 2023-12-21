@@ -117,7 +117,7 @@ class Liquidator(Agent):
         """
         to_liquidate = controller.users_to_liquidate()
 
-        logger.info("There are %d users to liquidate.", len(to_liquidate))
+        logger.debug("There are %d users to liquidate.", len(to_liquidate))
 
         if len(to_liquidate) == 0:
             return 0.0, 0
@@ -135,7 +135,7 @@ class Liquidator(Agent):
         self._profit += profit
         self._count += count
 
-        logger.info("There are %d users left to liquidate", len(to_liquidate) - count)
+        logger.debug("There are %d users left to liquidate", len(to_liquidate) - count)
 
         return profit, count
 
@@ -224,15 +224,15 @@ class Liquidator(Agent):
                 best_expected_profit = expected_profit
 
         if best and best_expected_profit > self.tolerance:
-            logger.info(
+            logger.debug(
                 "Liquidating user %s with expected profit: %f.",
                 user,
                 best_expected_profit,
             )
             profit = best.execute()
-            logger.info("Liquidated user %s with profit: %f.", user, profit)
+            logger.debug("Liquidated user %s with profit: %f.", user, profit)
             return profit
-        logger.info(
+        logger.debug(
             "Missed liquidation for user %s. Health: %f. Expected profit: %f.",
             user,
             health,
