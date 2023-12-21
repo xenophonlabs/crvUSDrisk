@@ -4,6 +4,7 @@ Provides the `SingleSimResults` dataclass.
 
 from typing import List
 from dataclasses import dataclass
+from functools import cached_property
 import pandas as pd
 import matplotlib.pyplot as plt
 from ...metrics import Metric
@@ -57,8 +58,11 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         """Plot the prices."""
         plot_prices(self.pricepaths.prices)
 
-    def summarize(self) -> pd.DataFrame:
-        """Summarize metrics."""
+    @cached_property
+    def agg_config(self):
+        """
+        Config for aggregating metrics.
+        """
         agg = {}
         for metric in self.metrics:
             cfg = metric.config["functions"]["summary"]
@@ -66,7 +70,11 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
                 if funcs:
                     funcs = [f if f != "last" else "max" for f in funcs]
                     agg.update({col: funcs})
-        summary = self.df.agg(agg)
+        return agg
+
+    def summarize(self) -> pd.DataFrame:
+        """Summarize metrics."""
+        summary = self.df.agg(self.agg_config)
         summary = (
             summary.reset_index()
             .pivot(columns=["index"], values=summary.columns)

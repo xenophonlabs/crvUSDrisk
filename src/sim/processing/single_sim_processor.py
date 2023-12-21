@@ -53,10 +53,10 @@ class SingleSimProcessor:
         self.cols = cols
         self.results: pd.DataFrame = pd.DataFrame(columns=self.cols)
 
-        # Initial state
-        self.initial_state = self.update(scenario.timestamp)
-
         self.pricepaths = scenario.pricepaths
+
+        # Initial state
+        self.initial_state = self.update(scenario.pricepaths[0].timestamp)
 
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """

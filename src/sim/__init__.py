@@ -21,6 +21,7 @@ The basic model for a scenario is to:
 5. Aggregate results. The results from each simulation are aggregated together
     and plots/tables are generated to display statistically significant results.
 """
+import multiprocessing as mp
 from ..logging import get_logger
 from .scenarios import SCENARIO_MAP
 from .results import MonteCarloResults
@@ -29,7 +30,11 @@ logger = get_logger(__name__)
 
 
 def run_scenario(
-    scenario_name: str, market_name: str, num_iter: int = 1, local: str = ""
+    scenario_name: str,
+    market_name: str,
+    num_iter: int = 1,
+    local: str = "",
+    ncpu: int = mp.cpu_count(),
 ) -> MonteCarloResults:
     """
     Core function for running simulation scenarios.
@@ -37,6 +42,6 @@ def run_scenario(
     # TODO consider multiple markets
     func = SCENARIO_MAP[scenario_name]
     logger.info("Running scenario: %s", scenario_name)
-    output = func(scenario_name, market_name, num_iter=num_iter, local=local)
+    output = func(scenario_name, market_name, num_iter=num_iter, local=local, ncpu=ncpu)
     logger.info("Completed scenario: %s", scenario_name)
     return output

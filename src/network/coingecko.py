@@ -11,9 +11,9 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
-from ..configs import COINGECKO_URL
 from ..logging import get_logger
 
+COINGECKO_URL = "https://api.coingecko.com/api/v3/"
 
 logger = get_logger(__name__)
 
@@ -158,7 +158,9 @@ def address_from_coin_id(coin_id, chain="ethereum"):
     if chain == "ethereum" and coin_id in KNOWN_IDS_MAP:
         return KNOWN_IDS_MAP[coin_id]
 
-    logger.info("Fetching %s address from Coingecko API.", coin_id)
+    logger.warning(
+        "Fetching %s address from Coingecko API. Add to KNOWN_IDS_MAP", coin_id
+    )
     url = COINGECKO_URL + f"coins/{coin_id}"
     params = {
         "localization": "false",

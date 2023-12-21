@@ -10,8 +10,7 @@ from itertools import permutations
 from collections import defaultdict
 import pandas as pd
 from .utils import gen_cor_prices, get_gran, get_factor
-from ..configs import get_price_config
-from ..network.coingecko import address_from_coin_id, get_current_prices
+from ..network.coingecko import address_from_coin_id
 
 if TYPE_CHECKING:
     from ..types import PairwisePricesType
@@ -63,13 +62,12 @@ class PricePaths:
     and implements an iterator over `PriceSample`s.
     """
 
-    def __init__(self, freq: str, num_steps: int):
+    def __init__(self, num_steps: int, config: dict):
         """
         Generate price paths from config file.
         TODO integrate with curvesim PriceSampler?
         """
-        self.config = config = get_price_config(freq)
-
+        self.config = config
         freq = config["freq"]
         coin_ids = list(config["params"].keys())
         annual_factor = get_factor(freq)
@@ -80,7 +78,7 @@ class PricePaths:
             coin_ids,  # List of coin IDs (coingecko)
             T,  # Time horizon in years
             dt,  # Time step in years
-            get_current_prices(coin_ids),
+            config["curr_prices"],
             pd.DataFrame.from_dict(config["cov"]),
             config["params"],
             timestamps=True,

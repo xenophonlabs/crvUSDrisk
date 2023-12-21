@@ -4,8 +4,9 @@ permutation of modeled tokens. These are based off the
 1inch quotes we store in our postgres database.
 """
 from src.logging import get_logger
-from src.sim import Scenario
+from src.sim.scenario import Scenario
 from src.plotting import plot_regression, plot_predictions
+from src.prices import PricePaths
 
 PATH = "figs/price_impacts"
 FN_REGR = f"{PATH}/regressions/" + "{}_{}.png"

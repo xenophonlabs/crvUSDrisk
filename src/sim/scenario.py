@@ -7,8 +7,8 @@ from itertools import combinations
 from datetime import datetime, timedelta
 import pandas as pd
 from crvusdsim.pool import get  # type: ignore
-from ..prices import PricePaths, PriceSample
-from ..configs import TOKEN_DTOs, get_scenario_config, CRVUSD_DTO
+from ..prices import PriceSample, PricePaths
+from ..configs import TOKEN_DTOs, get_scenario_config, get_price_config, CRVUSD_DTO
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -36,14 +36,12 @@ class Scenario:
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
 
+        self.price_config = get_price_config(self.freq)
+
         self.generate_sim_market()  # must be first
         self.generate_pricepaths()
         self.generate_markets()
         self.generate_agents()
-
-        sample = self.pricepaths[0]
-        self.timestamp = sample.timestamp
-        self.curr_price = sample
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -72,7 +70,7 @@ class Scenario:
         """
         Generate the pricepaths for the scenario.
         """
-        self.pricepaths: PricePaths = PricePaths(self.freq, self.num_steps)
+        self.pricepaths: PricePaths = PricePaths(self.num_steps, self.price_config)
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""

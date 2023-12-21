@@ -5,11 +5,11 @@ Master config with basic constants.
 import os
 import json
 from .tokens import ADDRESSES, TOKEN_DTOs, STABLE_CG_IDS, CRVUSD_DTO
+from ..network.coingecko import get_current_prices
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 __all__ = [
-    "COINGECKO_URL",
     "ADDRESSES",
     "TOKEN_DTOs",
     "ADDRESS_TO_SYMBOL",
@@ -17,8 +17,6 @@ __all__ = [
     "STABLE_CG_IDS",
     "CRVUSD_DTO",
 ]
-
-COINGECKO_URL = "https://api.coingecko.com/api/v3/"
 
 # Convenience maps
 ADDRESS_TO_SYMBOL = {k: v.symbol for k, v in TOKEN_DTOs.items()}
@@ -45,4 +43,6 @@ def get_price_config(freq: str) -> dict:
     fn = sorted(files, reverse=True)[0]
     with open(fn, "r", encoding="utf-8") as f:
         config = json.load(f)
+    coin_ids = list(config["params"].keys())
+    config["curr_prices"] = get_current_prices(coin_ids)
     return config
