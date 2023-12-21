@@ -28,8 +28,7 @@ def plot(quotes, market, i, j, scale="log", fn_regr=None, fn_pred=None):
 def main():
     """Generate price impact plots for each token pair."""
     scenario = Scenario("baseline")
-    pricepaths = PricePaths(scenario.num_steps, scenario.price_config)
-    scenario.update_market_prices(pricepaths[0])
+    scenario.update_market_prices(scenario.pricepaths[0])
     quotes = scenario.quotes
 
     # This takes a while to plot

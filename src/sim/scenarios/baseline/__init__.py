@@ -7,9 +7,7 @@ from typing import List, Type
 from copy import deepcopy
 import pickle
 import multiprocessing as mp
-from pympler import asizeof
 from .strategy import BaselineStrategy
-from ....prices import PricePaths
 from ...processing import MonteCarloProcessor
 from ...results import MonteCarloResults
 from ...scenario import Scenario
@@ -85,8 +83,6 @@ def simulate(
             wrapped_args_list = [
                 (strategy, logging_queue, *args) for args in strategy_args_list
             ]
-
-            logger.info("Size of args: %s", asizeof.asizesof(wrapped_args_list))
 
             with mp.Pool(ncpu) as pool:
                 results = pool.starmap(worker, wrapped_args_list)

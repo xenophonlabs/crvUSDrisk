@@ -33,7 +33,7 @@ class BaselineStrategy:
         """
         logger.info("STARTING new simulation %d", i)
 
-        scenario.generate_pricepaths()
+        scenario.generate_pricepaths()  # produce new stochastic prices
         scenario.prepare_for_run()
 
         processor = SingleSimProcessor(scenario, self.metrics)
@@ -44,8 +44,6 @@ class BaselineStrategy:
             # scenario.after_trades()
             processor.update(sample.timestamp, inplace=True)
 
-        results = processor.process()
-
         logger.info("DONE with simulation %d", i)
 
-        return results
+        return processor.process()
