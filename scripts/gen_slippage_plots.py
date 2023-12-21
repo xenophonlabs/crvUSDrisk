@@ -4,8 +4,9 @@ permutation of modeled tokens. These are based off the
 1inch quotes we store in our postgres database.
 """
 from src.logging import get_logger
-from src.sim import Scenario
+from src.sim.scenario import Scenario
 from src.plotting import plot_regression, plot_predictions
+from src.prices import PricePaths
 
 PATH = "figs/price_impacts"
 FN_REGR = f"{PATH}/regressions/" + "{}_{}.png"
@@ -27,7 +28,8 @@ def plot(quotes, market, i, j, scale="log", fn_regr=None, fn_pred=None):
 def main():
     """Generate price impact plots for each token pair."""
     scenario = Scenario("baseline")
-    scenario.update_market_prices(scenario.pricepaths[0])
+    pricepaths = PricePaths(scenario.num_steps, scenario.price_config)
+    scenario.update_market_prices(pricepaths[0])
     quotes = scenario.quotes
 
     # This takes a while to plot

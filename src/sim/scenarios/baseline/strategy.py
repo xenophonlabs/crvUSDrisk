@@ -6,6 +6,9 @@ from ...scenario import Scenario
 from ...processing import SingleSimProcessor
 from ...results import SingleSimResults
 from ....metrics import Metric
+from ....logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # pylint: disable=too-few-public-methods
@@ -18,12 +21,19 @@ class BaselineStrategy:
     def __init__(self, metrics: List[Type[Metric]]):
         self.metrics = metrics
 
-    def __call__(self, scenario: Scenario, parameters: dict) -> SingleSimResults:
+    def __call__(
+        self,
+        scenario: Scenario,
+        parameters: dict,
+        i: int | None = None,
+    ) -> SingleSimResults:
         """
         Takes in a mutable scenario object and executes
         the baseline risk strategy on it.
         """
-        scenario.generate_pricepaths()  # produce new stochastic prices
+        logger.info("STARTING new simulation %d", i)
+
+        scenario.generate_pricepaths()
         scenario.prepare_for_run()
 
         processor = SingleSimProcessor(scenario, self.metrics)
@@ -34,4 +44,8 @@ class BaselineStrategy:
             # scenario.after_trades()
             processor.update(sample.timestamp, inplace=True)
 
-        return processor.process()
+        results = processor.process()
+
+        logger.info("DONE with simulation %d", i)
+
+        return results
