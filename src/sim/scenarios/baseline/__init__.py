@@ -54,9 +54,6 @@ def simulate(
             scenario_template = pickle.load(f)
     else:
         scenario_template = Scenario(config, market_name)
-        # TODO remove, using for testing
-        with open("./data/scenarios/test.pkl", "wb") as f:
-            pickle.dump(scenario_template, f)
 
     logger.info(
         "Running simulation for %d steps at frequency %s",

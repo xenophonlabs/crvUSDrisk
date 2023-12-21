@@ -22,27 +22,30 @@ class StableSwapMetrics(Metric):
 
     @cached_property
     def config(self) -> dict:
-        summary: Dict[str, str] = {}
+        summary: Dict[str, List[str]] = {}
+        plot: Dict[str, dict] = {}
         for spool in self.spools:
-            # TODO summary statistics methodology
             spool_str = entity_str(spool, "stableswap")
-            summary[spool_str + "_price"] = "mean"
-            summary[spool_str + "_ma_price"] = "mean"
-            summary[spool_str + "_lp_supply"] = "mean"
-            summary[spool_str + "_virtual_price"] = "mean"
+            summary[spool_str + "_price"] = []
+            summary[spool_str + "_ma_price"] = []
+            summary[spool_str + "_lp_supply"] = []
+            summary[spool_str + "_virtual_price"] = ["max"]
+            plot[spool_str + "_virtual_price"] = {
+                "title": f"{spool_str} Virtual Price",
+                "kind": "line",
+            }
             for symbol in spool.assets.symbols:
-                summary["_".join([spool_str, symbol, "bal"])] = "mean"
-        # TODO plot config
-        return {"functions": {"summary": summary}}
+                summary["_".join([spool_str, symbol, "bal"])] = []
+        return {"functions": {"summary": summary}, "plot": plot}
 
     def compute(self) -> Dict[str, Union[int, float]]:
         res = []
         for spool in self.spools:
             i = get_crvusd_index(spool)
-            res.append(spool.price(i ^ 1, i))
-            res.append(spool.price_oracle())
-            res.append(spool.totalSupply)
-            res.append(spool.get_virtual_price())
+            res.append(spool.price(i ^ 1, i) / 1e18)
+            res.append(spool.price_oracle() / 1e18)
+            res.append(spool.totalSupply / 1e18)
+            res.append(spool.get_virtual_price() / 1e18)
             for i in range(len(spool.assets.symbols)):
-                res.append(spool.balances[i])
+                res.append(spool.balances[i] / 1e18)
         return dict(zip(self.cols, res))

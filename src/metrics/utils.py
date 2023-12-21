@@ -15,7 +15,7 @@ def entity_str(entity: Any, type_: str):
     if type_ == "stablecoin":
         return "stablecoin"
     if type_ == "agent":
-        return entity.name
+        return entity.name.lower()
 
     if type_ == "llamma":
         name = entity.name.replace("Curve.fi Stablecoin ", "")

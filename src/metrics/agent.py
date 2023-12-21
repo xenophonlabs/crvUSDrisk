@@ -21,18 +21,28 @@ class AgentMetrics(Metric):
 
     @cached_property
     def config(self) -> dict:
-        summary: Dict[str, str] = {}
+        summary: Dict[str, List[str]] = {}
+        plot: Dict[str, dict] = {}
         for agent in self.agents:
-            # TODO summary statistics methodology
             agent_str = entity_str(agent, "agent")
-            summary[agent_str + "_profit"] = "mean"
-            summary[agent_str + "_count"] = "mean"
-        # TODO plot config
-        return {"functions": {"summary": summary}}
+            summary[agent_str + "_profit"] = ["max"]  # proxy for `last`
+            plot[agent_str + "_profit"] = {
+                "title": f"{agent.name} Profit",
+                "kind": "line",
+            }
+            summary[agent_str + "_volume"] = ["max"]  # proxy for `last`
+            plot[agent_str + "_volume"] = {
+                "title": f"{agent.name} Volume",
+                "kind": "line",
+            }
+            summary[agent_str + "_count"] = []
+
+        return {"functions": {"summary": summary}, "plot": plot}
 
     def compute(self) -> Dict[str, Union[int, float]]:
         res = []
         for agent in self.agents:
             res.append(agent.profit)
+            res.append(agent.volume)
             res.append(agent.count)
         return dict(zip(self.cols, res))
