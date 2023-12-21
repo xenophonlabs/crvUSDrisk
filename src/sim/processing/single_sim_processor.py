@@ -56,6 +56,8 @@ class SingleSimProcessor:
         # Initial state
         self.initial_state = self.update(scenario.timestamp)
 
+        self.pricepaths = scenario.pricepaths
+
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """
         Collect metrics for the current timestep of the sim.
@@ -72,4 +74,4 @@ class SingleSimProcessor:
 
     def process(self) -> SingleSimResults:
         """Process timeseries df into metrics result."""
-        return SingleSimResults(self.results, self.metrics)
+        return SingleSimResults(self.results, self.pricepaths, self.metrics)

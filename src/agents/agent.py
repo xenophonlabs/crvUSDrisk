@@ -30,4 +30,4 @@ class Agent(ABC):
     @cached_property
     def name(self) -> str:
         """Agent name."""
-        return type(self).__name__.lower()
+        return type(self).__name__

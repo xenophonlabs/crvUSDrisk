@@ -12,7 +12,7 @@ if __name__ == "__main__":
     with cProfile.Profile() as pr:
         try:
             # local for testing
-            run_scenario("baseline", "wsteth", local="./data/scenarios/test.pkl")
+            run_scenario("baseline", "wstETH")  # , local="./data/scenarios/test.pkl")
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)
