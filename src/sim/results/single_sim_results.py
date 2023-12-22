@@ -2,9 +2,8 @@
 Provides the `SingleSimResults` dataclass.
 """
 
-from typing import List
+from typing import List, Any
 from dataclasses import dataclass
-from functools import cached_property
 import pandas as pd
 import matplotlib.pyplot as plt
 from ...metrics import Metric
@@ -33,32 +32,51 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         """Return the metric map."""
         return {type(metric).__name__: i for i, metric in enumerate(self.metrics)}
 
-    def plot_metric(self, metric_index: int, show: bool = True):
+    def plot_metric(self, metric_index: int, axs: Any = None, show: bool = True):
         """Plot metric."""
-        # TODO pass in axs
         metric = self.metrics[metric_index]
         plot_config = metric.config["plot"]
-        cols = plot_config.keys()
-        _df = self.df[cols]
+        cols = list(plot_config.keys())
+        titles = [x["title"] for x in list(plot_config.values())]
         n, m = make_square(len(cols))
-        _df.plot(
-            subplots=True,
-            layout=(n, m),
-            legend=False,
-            figsize=FIGSIZE,
-            title=[x["title"] for x in list(plot_config.values())],
-            sharex=False,
-            rot=45,
-        )
+
+        if axs is None:
+            _, axs = plt.subplots(n, m, figsize=FIGSIZE)
+
+        if n == 1 and m == 1:
+            axs.plot(self.df[cols[0]])
+            axs.set_title(titles[0])
+            axs.tick_params(axis="x", rotation=45)
+        elif n == 1:
+            for i in range(m):
+                axs[i].plot(self.df[cols[i]])
+                axs[i].set_title(titles[i])
+                axs[i].tick_params(axis="x", rotation=45)
+        else:
+            # TODO refactor this
+            # pylint: disable=duplicate-code
+            for i in range(n):
+                for j in range(m):
+                    if cols:
+                        col = cols.pop(0)
+                        title = titles.pop(0)
+                        axs[i, j].plot(self.df[col])
+                        axs[i, j].set_title(title)
+                        axs[i, j].tick_params(axis="x", rotation=45)
+                    else:
+                        break
+
         if show:
             plt.tight_layout()
             plt.show()
+
+        return axs
 
     def plot_prices(self):
         """Plot the prices."""
         plot_prices(self.pricepaths.prices)
 
-    @cached_property
+    @property
     def agg_config(self):
         """
         Config for aggregating metrics.
@@ -72,7 +90,8 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
                     agg.update({col: funcs})
         return agg
 
-    def summarize(self) -> pd.DataFrame:
+    @property
+    def summary(self) -> pd.DataFrame:
         """Summarize metrics."""
         summary = self.df.agg(self.agg_config)
         summary = (
