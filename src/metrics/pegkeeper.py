@@ -41,5 +41,5 @@ class PegKeeperMetrics(Metric):
         res = []
         for pk in self.pks:
             res.append(pk.debt / 1e18)
-            res.append(pk.calc_profit())
+            res.append(pk.calc_profit() / 1e18)
         return dict(zip(self.cols, res))
