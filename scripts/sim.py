@@ -2,6 +2,7 @@ import cProfile
 import pstats
 import pdb
 from datetime import datetime
+from multiprocessing import cpu_count
 from src.sim import run_scenario
 from src.logging import get_logger
 
@@ -32,6 +33,5 @@ def without_analysis(num_iter, ncpu):
 
 if __name__ == "__main__":
     num_iter = 10
-    ncpu = 5
-    with_analysis(num_iter, ncpu)
+    with_analysis(num_iter, cpu_count())
     # without_analysis(num_iter, ncpu)

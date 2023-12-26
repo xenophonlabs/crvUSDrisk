@@ -61,6 +61,7 @@ def simulate(
             scenario_template = pickle.load(f)
     else:
         scenario_template = Scenario(config, market_name)
+        scenario_template.prepare_for_run()
 
     logger.info(
         "Running %d simulations with %d steps at frequency %s",

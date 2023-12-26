@@ -56,7 +56,7 @@ class Scenario:
             int(end.timestamp()),
             self.coins,
         )
-        logger.debug("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
+        logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
 
         self.markets: MarketsType = {}
         for pair in self.pairs:
@@ -176,7 +176,7 @@ class Scenario:
         # Equilibrate pool prices
         arbitrageur = Arbitrageur()  # diff arbitrageur
         profit, count = arbitrageur.arbitrage(self.cycles, sample)
-        logger.debug(
+        logger.info(
             "Equilibrated prices with %d arbitrages with total profit %d", count, profit
         )
 
@@ -185,13 +185,13 @@ class Scenario:
         to_liquidate = controller.users_to_liquidate()
         n = len(to_liquidate)
         if n > 0:
-            logger.debug("%d users were loaded underwater.", n)
+            logger.info("%d users were loaded underwater.", n)
 
         # Check that only a small portion of debt is liquidatable at start
         damage = 0
         for pos in to_liquidate:
             damage += pos.debt
-            logger.debug("Liquidating %s: with debt %d.", pos.user, pos.debt)
+            logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
         pct = round(damage / controller.total_debt() * 100, 2)
         args = (
             "%.2f%% of debt was incorrectly loaded with sub-zero health (%d crvUSD)",
@@ -201,7 +201,7 @@ class Scenario:
         if pct > 1:
             logger.warning(*args)
         else:
-            logger.debug(*args)
+            logger.info(*args)
 
         controller.after_trades(do_liquidate=True)  # liquidations
 

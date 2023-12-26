@@ -34,7 +34,6 @@ class BaselineStrategy:
         logger.info("STARTING new simulation %d", i)
 
         scenario.generate_pricepaths()  # produce new stochastic prices
-        scenario.prepare_for_run()
 
         processor = SingleSimProcessor(scenario, self.metrics)
 
