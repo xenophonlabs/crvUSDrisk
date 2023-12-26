@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from .single_sim_results import SingleSimResults
 
 
-FIGSIZE = (30, 30)
+FIGSIZE = (20, 20)
 
 
 @dataclass
@@ -23,6 +23,11 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
     """
 
     data: List[SingleSimResults]
+
+    @property
+    def metric_map(self):
+        """Map metric ids to names."""
+        return self.data[0].metric_map
 
     def plot_runs(self, metric_id: int):
         """Plot metric for each run."""
@@ -35,7 +40,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
 
     def plot_summary(self, cols: List[str] | None = None, show: bool = True):
         """Plot histogram of summary metrics."""
-        cols = cols or self.summary.columns
+        cols = cols or list(self.summary.columns)
 
         n, m = make_square(len(cols))
 
@@ -51,7 +56,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
         else:
             for i in range(n):
                 for j in range(m):
-                    if cols:
+                    if len(cols):
                         col = cols.pop(0)
                         axs[i, j].hist(self.summary[col], bins=self.summary.shape[0])
                         axs[i, j].set_title(col)

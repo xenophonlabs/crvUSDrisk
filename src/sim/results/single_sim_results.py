@@ -72,9 +72,12 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
 
         return axs
 
-    def plot_prices(self):
+    def plot_prices(self, show: bool = True):
         """Plot the prices."""
         plot_prices(self.pricepaths.prices)
+        if show:
+            # plt.tight_layout()
+            plt.show()
 
     @property
     def agg_config(self):
