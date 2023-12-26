@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from itertools import permutations
 from collections import defaultdict
 import pandas as pd
+from pandas import Timestamp
 from .utils import gen_cor_prices, get_gran, get_factor
 from ..network.coingecko import address_from_coin_id
 
@@ -32,7 +33,7 @@ class PriceSample:
     Stores USD and pairwise prices at a given timestep.
     """
 
-    def __init__(self, ts: int, prices_usd: Dict[str, float]):
+    def __init__(self, ts: Timestamp, prices_usd: Dict[str, float]):
         self.timestamp = ts
         self.prices_usd = prices_usd  # USD
         self.prices = get_pairwise_prices(prices_usd)

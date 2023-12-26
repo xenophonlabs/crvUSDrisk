@@ -107,6 +107,20 @@ class Scenario:
         logger.info("Fetching sim_market from subgraph.")
         sim_market = get(self.market_name, bands_data="controller")
 
+        metadata = sim_market.pool.metadata
+
+        logger.info(
+            "Market snapshot as %s", datetime.fromtimestamp(int(metadata["timestamp"]))
+        )
+        logger.info(
+            "Bands snapshot as %s",
+            datetime.fromtimestamp(int(metadata["bands"][0]["timestamp"])),
+        )
+        logger.info(
+            "Users snapshot as %s",
+            datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
+        )
+
         # NOTE huge memory consumption
         del sim_market.pool.metadata["bands"]
         del sim_market.pool.metadata["userStates"]  # TODO compare these before deleting
@@ -143,24 +157,73 @@ class Scenario:
             self.markets[pair].update_price(sample.prices)
 
     def prepare_for_run(self) -> None:
-        """TODO Prepare all modules for a simulation run."""
-        # We need oracles/aggregators/etc to agree on price at the
-        # start of the simulation. EXCEPT: we aren't currently simulating
-        # crvUSD price explicitly! This means that the simulated pools
-        # are TELLING us what the price is, not the other way around.
-        prices = self.pricepaths.prices
-        # All `prepare_for_run` methods mostly set the timestamp and initial price
-        # of pools/oracles to the first price/timestamp of the price sampler.
-        self.llamma.prepare_for_run(prices, keep_price=True)
-        self.controller.prepare_for_run(prices)
-        self.aggregator.prepare_for_run(self.pricepaths, keep_price=True)
-        # self.policy.prepare_for_run(prices)
-        # self.factory.prepare_for_run(prices)
-        # self.price_oracle.prepare_for_run(prices)
+        """
+        Prepare all modules for a simulation run.
+
+        Perform initial setup in this order:
+        1. Run a single step of price arbitrages.
+        2. Liquidate users that were loaded underwater.
+        """
+        sample = self.pricepaths[0]
+        ts = int(sample.timestamp.timestamp())
+
+        # Setup timestamp related attrs for all modules
+        self._increment_timestamp(ts)
+
+        # Set external market prices
+        self.prepare_for_trades(sample)
+
+        # Equilibrate pool prices
+        arbitrageur = Arbitrageur()  # diff arbitrageur
+        profit, count = arbitrageur.arbitrage(self.cycles, sample)
+        logger.debug(
+            "Equilibrated prices with %d arbitrages with total profit %d", count, profit
+        )
+
+        # Liquidate users that were loaded underwater
+        controller = self.controller
+        to_liquidate = controller.users_to_liquidate()
+        n = len(to_liquidate)
+        if n > 0:
+            logger.debug("%d users were loaded underwater.", n)
+
+        # Check that only a small portion of debt is liquidatable at start
+        damage = 0
+        for pos in to_liquidate:
+            damage += pos.debt
+            logger.debug("Liquidating %s: with debt %d.", pos.user, pos.debt)
+        pct = round(damage / controller.total_debt() * 100, 2)
+        args = (
+            "%.2f%% of debt was incorrectly loaded with sub-zero health (%d crvUSD)",
+            pct,
+            damage / 1e18,
+        )
+        if pct > 1:
+            logger.warning(*args)
+        else:
+            logger.debug(*args)
+
+        controller.after_trades(do_liquidate=True)  # liquidations
+
+    def _increment_timestamp(self, ts: int) -> None:
+        """Increment the timestamp for all modules."""
+        self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
+        self.aggregator.last_timestamp = ts
+
+        self.llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
+        self.llamma.prev_p_o_time = ts
+        self.llamma.rate_time = ts
+        self.price_oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
+        self.price_oracle.last_prices_timestamp = ts
+
+        self.controller._increment_timestamp(ts)  #  pylint: disable=protected-access
+
         for spool in self.stableswap_pools:
-            spool.prepare_for_run(prices, keep_price=True)
-        for peg_keeper in self.peg_keepers:
-            peg_keeper.prepare_for_run(prices)
+            spool._increment_timestamp(ts)  #  pylint: disable=protected-access
+            spool.ma_last_time = ts
+
+        for pk in self.peg_keepers:
+            pk._increment_timestamp(ts)  #  pylint: disable=protected-access
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
@@ -177,9 +240,6 @@ class Scenario:
         self.llamma.prepare_for_trades(ts)
         self.controller.prepare_for_trades(ts)
         self.aggregator.prepare_for_trades(ts)
-        # self.policy.prepare_for_trades(ts)
-        # self.factory.prepare_for_trades(ts)
-        # self.price_oracle.prepare_for_trades(ts)
         for spool in self.stableswap_pools:
             spool.prepare_for_trades(ts)
         for peg_keeper in self.peg_keepers:
@@ -187,14 +247,11 @@ class Scenario:
 
     def after_trades(self) -> None:
         """Perform post processing for all modules at the end of a time step."""
-        # TODO any post processing required?
-        # NOTE controller.after_trades() forces liquidations,
-        # we do NOT want to do this.
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
-        _, _ = self.liquidator.perform_liquidations(self.controller)
         _, _ = self.arbitrageur.arbitrage(self.cycles, prices)
+        _, _ = self.liquidator.perform_liquidations(self.controller)
         _, _ = self.keeper.update(self.peg_keepers)
         # TODO what is the right order for the actions?
         # TODO need to incorporate non-PK pools for arbs (e.g. TriCRV)

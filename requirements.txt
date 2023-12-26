@@ -12,7 +12,7 @@ charset-normalizer==3.3.2
 click==8.1.7
 comm==0.2.0
 contourpy==1.2.0
-crvusdsim @ git+https://github.com/Tcintra/crvusdsim@fab4904688a4a2867d8a1d51f1da0b810464ce50
+crvusdsim @ git+https://github.com/Tcintra/crvusdsim@dev
 curvesim @ git+https://github.com/curveresearch/curvesim.git@5e0a36b0b99065a695894d8c87b575d3111aa3d2
 cycler==0.12.1
 cytoolz==0.12.2

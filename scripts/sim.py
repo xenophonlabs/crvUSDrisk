@@ -31,7 +31,7 @@ def without_analysis(num_iter, ncpu):
 
 
 if __name__ == "__main__":
-    num_iter = 100
-    ncpu = 12
+    num_iter = 10
+    ncpu = 5
     with_analysis(num_iter, ncpu)
     # without_analysis(num_iter, ncpu)
