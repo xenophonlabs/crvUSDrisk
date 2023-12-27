@@ -74,6 +74,8 @@ The results for 1000 runs of the `baseline` scenario are shown below. These are 
 
 # Conceptual Overview
 
+**Research paper:** [link](https://xenophonlabs.com/papers/_INTERNAL__An_ABS_Engine_for_crvUSD.pdf)
+
 One of the primary purposes of crvUSD Risk simulations is to analyze the impact of available crvUSD liquidity on crvUSD liquidations. We explicitly simulate arbitrageurs and liquidators trading against the relevant LLAMMAs and Curve pools using the [curvesim](https://github.com/curveresearch/curvesim/tree/main) and [crvusdsim](https://github.com/0xreviews/crvusdsim) packages. This allows us to understand the impact of liquidity and liquidations themselves on the health of the crvUSD system.
 
 ![Liquidation Model](./figs/samples/sample4.png)
