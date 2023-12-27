@@ -93,3 +93,6 @@ class ControllerMetrics(Metric):
         Calculate the number of users to liquidate.
         """
         return len(np.where(healths < 0))
+
+    def prune(self) -> None:
+        del self.controllers

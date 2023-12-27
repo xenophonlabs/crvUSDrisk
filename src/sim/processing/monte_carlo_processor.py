@@ -13,7 +13,8 @@ class MonteCarloProcessor:
     for many simulations.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, metadata: dict | None = None) -> None:
+        self.metadata = metadata
         self.results: List[SingleSimResults] = []
 
     def collect(self, single_sim_results: SingleSimResults) -> None:
@@ -22,8 +23,16 @@ class MonteCarloProcessor:
         """
         self.results.append(single_sim_results)
 
-    def process(self) -> MonteCarloResults:
+    def process(self, prune: bool = True) -> MonteCarloResults:
         """
         Process single sim results into aggregate metrics.
         """
-        return MonteCarloResults(self.results)
+        if prune:
+            self.prune()
+        return MonteCarloResults(self.results, self.metadata)
+
+    def prune(self):
+        """Prune size."""
+        for run in self.results:
+            for metric in run.metrics:
+                metric.prune()

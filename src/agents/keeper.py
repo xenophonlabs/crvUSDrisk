@@ -58,7 +58,7 @@ class Keeper(Agent):
         for pk in pks:
             estimate = pk.estimate_caller_profit()
             if estimate > self.tolerance:
-                _profit = pk.update(self.address)
+                _profit = pk.update(self.address) / 1e18
                 assert _profit > 0, "Update not profitable."
                 profit += _profit
                 count += 1

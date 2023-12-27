@@ -5,7 +5,7 @@
     "N": 168,
     "quotes": {
         "period": 604800,
-        "offset": 3600
+        "offset": 1296000
     },
     "arb_cycle_length": 3
 }

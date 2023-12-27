@@ -46,3 +46,6 @@ class AgentMetrics(Metric):
             res.append(agent.volume)
             res.append(agent.count)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.agents

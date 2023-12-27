@@ -51,3 +51,6 @@ class LLAMMAMetrics(Metric):
             res.append(sum(llamma.bands_x.values()) / 1e18)
             res.append(sum(llamma.bands_y.values()) / 1e18)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.llammas

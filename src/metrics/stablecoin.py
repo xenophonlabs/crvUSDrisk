@@ -35,3 +35,6 @@ class StablecoinMetrics(Metric):
         res = []
         res.append(self.stablecoin.totalSupply / 1e18)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.stablecoin

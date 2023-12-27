@@ -43,3 +43,6 @@ class PegKeeperMetrics(Metric):
             res.append(pk.debt / 1e18)
             res.append(pk.calc_profit() / 1e18)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.pks

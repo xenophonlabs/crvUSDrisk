@@ -23,6 +23,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
     """
 
     data: List[SingleSimResults]
+    metadata: dict | None = None
 
     @property
     def metric_map(self):

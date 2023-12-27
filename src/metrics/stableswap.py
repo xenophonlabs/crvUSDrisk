@@ -49,3 +49,6 @@ class StableSwapMetrics(Metric):
             for i in range(len(spool.assets.symbols)):
                 res.append(spool.balances[i] / 1e18)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.spools

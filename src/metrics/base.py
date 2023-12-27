@@ -43,3 +43,11 @@ class Metric(ABC):
         by the child class.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def prune(self) -> None:
+        """
+        Method for pruning the metric, implemented
+        by the child class.
+        """
+        raise NotImplementedError

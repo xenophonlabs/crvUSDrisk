@@ -35,3 +35,6 @@ class AggregatorMetrics(Metric):
         res = []
         res.append(self.aggregator.price() / 1e18)
         return dict(zip(self.cols, res))
+
+    def prune(self) -> None:
+        del self.aggregator

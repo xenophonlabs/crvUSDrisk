@@ -63,6 +63,13 @@ def simulate(
         scenario_template = Scenario(config, market_name)
         scenario_template.prepare_for_run()
 
+    metadata = {
+        "scenario": config,
+        "num_iter": num_iter,
+        "markets": [market_name],
+        "market_metadata": scenario_template.llamma.metadata,
+    }
+
     logger.info(
         "Running %d simulations with %d steps at frequency %s",
         num_iter,
@@ -70,7 +77,7 @@ def simulate(
         scenario_template.freq,
     )
     strategy = BaselineStrategy(metrics)
-    mcaggregator = MonteCarloProcessor()
+    mcaggregator = MonteCarloProcessor(metadata)
 
     # TODO for other scenarios: apply shocks, etc.
 
