@@ -1,6 +1,7 @@
 # Custom
 *.prof
 data/*
+logs/*
 *sample_output.pkl
 
 # Byte-compiled / optimized / DLL files
