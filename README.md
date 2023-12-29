@@ -28,11 +28,12 @@ We use a simple python `venv` for package management. Due to a minor dependency 
 
 ```
 python3 -m venv venv
-python -m pip install --upgrade pip
-grep -v 'crvusdsim' requirements.txt > temp_requirements.txt
-python -m pip install -r temp_requirements.txt
-python -m pip install git+https://github.com/Tcintra/crvusdsim@dev --no-deps
 source venv/bin/activate
+python3 -m pip install --upgrade pip
+grep -v 'crvusdsim' requirements.txt > temp_requirements.txt
+python3 -m pip install -r temp_requirements.txt
+python3 -m pip install git+https://github.com/Tcintra/crvusdsim@dev --no-deps
+rm temp_requirements.txt
 ```
 
 Only Python3.11 is guaranteed support.
