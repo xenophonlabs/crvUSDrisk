@@ -39,9 +39,16 @@ class Cycle:
         self.expected_profit = expected_profit
         self.basis_address: str = trades[0].get_address(trades[0].i)
         self.state_key: StateKey = StateKey(self)  # for memoization
+        self.oracles = []
 
         # check that this is a cycle
         for i, trade in enumerate(trades):
+            # Get any oracles
+            if isinstance(trade, Swap) and hasattr(trade.pool, "price_oracle_contract"):
+                self.oracles.append(trade.pool.price_oracle_contract)
+            elif isinstance(trade, Liquidation):
+                self.oracles.append(trade.controller.AMM.price_oracle_contract)
+
             if i != self.n - 1:
                 next_trade = trades[i + 1]
             else:
@@ -50,17 +57,39 @@ class Cycle:
             token_in = next_trade.get_address(next_trade.i)
             assert token_in == token_out, "Trades do not form a cycle."
 
+    def freeze_oracles(self):
+        """
+        Freeze oracle prices.
+
+        FIXME hack to prevent oracle price from changing
+        between trades since we don't account for this at
+        optimization
+        """
+        for oracle in self.oracles:
+            oracle.price_w()  # Ensure we use updated prices
+            oracle.freeze()
+
+    def unfreeze_oracles(self):
+        """
+        Unfreeze oracle prices and write latest prices.
+        """
+        for oracle in self.oracles:
+            oracle.unfreeze()
+            oracle.price_w()  # Ensure trade updates prices
+
     def execute(self) -> float:
         """Execute trades."""
         logger.debug("Executing cycle %s.", self)
+
+        self.freeze_oracles()
 
         trade = self.trades[0]
         amt_in = trade.amt
         amt = amt_in
 
         for i, trade in enumerate(self.trades):
-            logger.debug("Executing trade %s.", trade)
             amt_out, decimals = trade.execute(amt, use_snapshot_context=False)
+            logger.debug("Executed trade %s. Amt out: %d", trade, amt_out)
             if i != self.n - 1:
                 amt = amt_out
                 # TODO move this to test file
@@ -83,13 +112,18 @@ class Cycle:
                 "Expected profit %f != actual profit %f.", self.expected_profit, profit
             )
 
+        self.unfreeze_oracles()
+
         return profit
 
     def optimize(self, xatol: int | None = None) -> Tuple[int, float]:
         """
         Optimize the `amt_in` for the first trade in the cycle.
         """
-        return _optimize_mem(self.state_key, xatol=xatol)
+        self.freeze_oracles()  # Freeze for performance reasons (avoid recomputing)
+        res = _optimize_mem(self.state_key, xatol=xatol)
+        self.unfreeze_oracles()
+        return res
 
     def populate(self, amt_in: float | int, use_snapshot_context: bool = True) -> float:
         """
@@ -188,6 +222,8 @@ class StateKey:
                             pool.old_p_o,  # TODO is this updated?
                             tuple(pool.bands_x.items()),
                             tuple(pool.bands_y.items()),
+                            pool.price_oracle_contract.price(),
+                            pool.price_oracle_contract.price_w(),
                         )
                     )
                 elif isinstance(pool, (SimCurveStableSwapPool, SimCurvePool)):

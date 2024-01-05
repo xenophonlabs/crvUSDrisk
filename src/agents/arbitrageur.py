@@ -77,10 +77,10 @@ class Arbitrageur(Agent):
                 _profit = (
                     best_cycle.execute() * prices.prices_usd[best_cycle.basis_address]
                 )
-                assert abs(_profit - best_profit) < 1, RuntimeError(
-                    "Expected profit != actual profit."
+                assert _profit == best_profit, RuntimeError(
+                    "Expected profit %f != actual profit %f.", best_profit, _profit
                 )
-                profit += best_profit
+                profit += _profit
                 count += 1
             else:
                 logger.debug("No more profitable arbitrages.")

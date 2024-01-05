@@ -115,7 +115,9 @@ class Liquidator(Agent):
 
         TODO liquidations should be ordered by profitability
         """
+        controller.AMM.price_oracle_contract.freeze()
         to_liquidate = controller.users_to_liquidate()
+        controller.AMM.price_oracle_contract.unfreeze()
 
         logger.debug("There are %d users to liquidate.", len(to_liquidate))
 

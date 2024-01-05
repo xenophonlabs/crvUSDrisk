@@ -58,10 +58,16 @@ class SingleSimProcessor:
         # Initial state
         self.initial_state = self.update(scenario.pricepaths[0].timestamp)
 
+        self.oracles = [scenario.price_oracle]
+
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """
         Collect metrics for the current timestep of the sim.
         """
+
+        for oracle in self.oracles:
+            oracle.freeze()
+
         res: Dict[str, Union[float, int]] = {"timestamp": ts}
 
         for metric in self.metrics:
@@ -69,6 +75,9 @@ class SingleSimProcessor:
 
         if inplace:
             self.results.loc[len(self.results)] = res
+
+        for oracle in self.oracles:
+            oracle.unfreeze()
 
         return res
 
