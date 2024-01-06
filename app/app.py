@@ -7,9 +7,10 @@ Optionally run the simulation before creating the app.
 from datetime import datetime
 import pickle
 import json
+import base64
 from multiprocessing import cpu_count
 import pandas as pd
-from dash import Dash, html, dcc, callback, Output, Input, dash_table
+from dash import Dash, html, dcc, callback, Output, Input, dash_table, no_update
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -62,7 +63,12 @@ initial_modal = dbc.Modal(
                     className="mr-1",
                     disabled=True,
                 ),
-                dbc.Button("Load Results", id="load-results-button", className="mr-1"),
+                dcc.Upload(
+                    id="upload-results",
+                    children=dbc.Button(
+                        "Load Results", id="load-results-button", className="mr-1"
+                    ),
+                ),
             ],
         ),
     ],
@@ -80,17 +86,15 @@ app.layout = html.Div(
 
 @app.callback(
     [Output("initial-modal", "is_open"), Output("main-content", "children")],
-    [Input("load-results-button", "n_clicks")],
+    [Input("upload-results", "contents")],
 )
-def load_results(n_clicks: int):
-    if n_clicks:
+def load_results(contents):
+    if contents is not None:
         global output
-        with open("sample_output.pkl", "rb") as f:
-            output = pickle.load(f)
+        output = pickle.loads(base64.b64decode(contents.split(",")[1]))
         content = _generate_content(output)
         return False, content
-    else:
-        return True, []
+    return no_update
 
 
 def _generate_content(output: MonteCarloResults):
@@ -128,10 +132,15 @@ def _generate_content(output: MonteCarloResults):
                                     ]
                                 ),
                                 html.Li(
-                                    html.Span(
-                                        f"Simulation Horizon: {metadata['num_steps']} steps of {metadata['freq']}",
-                                        style={"font-weight": "bold"},
-                                    ),
+                                    [
+                                        html.Span(
+                                            f"Simulation Horizon: ",
+                                            style={"font-weight": "bold"},
+                                        ),
+                                        metadata["num_steps"],
+                                        " steps of ",
+                                        metadata["freq"],
+                                    ]
                                 ),
                                 html.Li(
                                     [
@@ -353,11 +362,15 @@ def update_run_graph(value):
 
 @callback(Output("run-data", "data"), Input("run-dropdown", "value"))
 def update_run_data_table(value: int):
+    if not output:
+        return no_update
     return output.data[value - 1].df.to_dict(orient="records")
 
 
 @callback(Output("run-prices", "figure"), Input("run-dropdown", "value"))
 def update_run_prices(value: int):
+    if not output:
+        return no_update
     df = output.data[value - 1].pricepaths.prices
     cols = [col for col in df.columns if col != "timestamp"]
     titles = [ADDRESS_TO_SYMBOL[col] for col in cols]
@@ -399,7 +412,7 @@ def sim(num_iter: int) -> MonteCarloResults:
 if __name__ == "__main__":
     ### UNCOMMENT TO RUN LOCAL SIM ###
     # output: MonteCarloResults = sim(num_iter=10)
-    # with open("sample_output.pkl", "wb") as f:
+    # with open(f"{output.metadata.scenario}.pkl", "wb") as f:
     #     pickle.dump(output, f)
 
     app.run()
