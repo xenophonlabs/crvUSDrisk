@@ -54,11 +54,10 @@ class SingleSimProcessor:
         self.results: pd.DataFrame = pd.DataFrame(columns=self.cols)
 
         self.pricepaths = scenario.pricepaths
+        self.oracles = [scenario.price_oracle]
 
         # Initial state
         self.initial_state = self.update(scenario.pricepaths[0].timestamp)
-
-        self.oracles = [scenario.price_oracle]
 
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """

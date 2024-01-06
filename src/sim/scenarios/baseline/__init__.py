@@ -67,7 +67,10 @@ def simulate(
         "scenario": config,
         "num_iter": num_iter,
         "markets": [market_name],
-        "market_metadata": scenario_template.llamma.metadata,
+        "num_steps": scenario_template.num_steps,
+        "freq": scenario_template.freq,
+        "description": scenario_template.description,
+        "template": scenario_template,
     }
 
     logger.info(

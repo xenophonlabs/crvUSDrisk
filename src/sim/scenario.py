@@ -60,6 +60,9 @@ class Scenario:
         )
         logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
 
+        self.quotes_start = start
+        self.quotes_end = end
+
         self.markets: MarketsType = {}
         for pair in self.pairs:
             market = ExternalMarket(pair)

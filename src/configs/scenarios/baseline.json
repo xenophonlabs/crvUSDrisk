@@ -1,6 +1,6 @@
 {
     "name": "Baseline",
-    "description": "Baseline scenario.",
+    "description": "Baseline scenario. No additional shocks applied.",
     "freq": "1h",
     "N": 168,
     "quotes": {

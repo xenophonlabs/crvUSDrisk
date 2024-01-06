@@ -3,6 +3,7 @@
 data/*
 logs/*
 *sample_output.pkl
+*dev.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
