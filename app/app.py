@@ -10,7 +10,7 @@ import json
 import base64
 from multiprocessing import cpu_count
 import pandas as pd
-from dash import Dash, html, dcc, callback, Output, Input, dash_table, no_update
+from dash import Dash, html, dcc, callback, Output, Input, no_update
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -25,14 +25,23 @@ from .utils import load_markdown_file, clean_metadata
 
 logger = get_logger(__name__)
 
-TABLE_KWARGS = {
-    "page_size": 10,
-    "style_header": {"fontWeight": "bold"},
-    "style_table": {"overflowX": "scroll", "tableLayout": "fixed"},
+DECIMALS = 3  # number of decimal places to round to
+
+DBC_TABLE_KWARGS = {
+    "responsive": True,
+    "striped": True,
+    "size": "lg",
+    "hover": True,
+    "color": "primary",
 }
 
 DIV_KWARGS = {
     "style": {"padding": "1%", "display": "inline-block", "width": "100%"},
+}
+
+SCROLL_DIV_KWARGS = {"style": {"maxHeight": "500px", "overflow": "scroll"}}
+SCROLL_DIV_KWARGS_50 = {
+    "style": {"maxHeight": "500px", "overflow": "scroll", "width": "50%"}
 }
 
 TAB_KWARGS = {"label_style": {"color": "black"}}
@@ -99,7 +108,32 @@ def load_results(contents):
 
 def _generate_content(output: MonteCarloResults):
     metadata = clean_metadata(output.metadata)
-    price_config = metadata["template"].pricepaths.config
+    price_config = metadata["template"].pricepaths.config.copy()
+    for k, v in price_config["params"].items():
+        v.update({"start_price": price_config["curr_prices"][k]})
+
+    aggregate_columns = [
+        {"label": "Key Metrics", "value": "Key Metrics", "disabled": True},
+        *[{"label": col, "value": col} for col in output.key_agg_cols],
+        {"label": "Other", "value": "Other", "disabled": True},
+        *[
+            {"label": col, "value": col}
+            for col in output.summary.columns
+            if col not in output.key_agg_cols
+        ],
+    ]
+
+    run = output.data[0]
+    per_run_columns = [
+        {"label": "Key Metrics", "value": "Key Metrics", "disabled": True},
+        *[{"label": col, "value": col} for col in run.key_metrics],
+        {"label": "Other", "value": "Other", "disabled": True},
+        *[
+            {"label": col, "value": col}
+            for col in run.cols
+            if col not in run.key_metrics
+        ],
+    ]
 
     layout = html.Div(
         [
@@ -184,16 +218,25 @@ def _generate_content(output: MonteCarloResults):
                                     style={"textAlign": "center"},
                                 ),
                                 html.H4("Metric Histograms"),
-                                dcc.Dropdown(
-                                    output.summary.columns,
-                                    "arbitrageur_profit_max",
-                                    id="aggregate-metric-dropdown",
+                                html.Div(
+                                    dbc.Select(
+                                        options=aggregate_columns,
+                                        id="aggregate-metric-dropdown",
+                                        value="System Health Mean",
+                                    ),
+                                    style={"textAlign": "center"},
                                 ),
                                 dcc.Graph(id="aggregate-graph"),
                                 html.H4("Aggregate Data"),
-                                dash_table.DataTable(
-                                    data=output.summary.to_dict("records"),
-                                    **TABLE_KWARGS,
+                                html.Div(
+                                    dbc.Table.from_dataframe(
+                                        output.summary.reset_index(
+                                            names=["Run ID"]
+                                        ).round(DECIMALS),
+                                        **DBC_TABLE_KWARGS,
+                                        id="aggregate-data",
+                                    ),
+                                    **SCROLL_DIV_KWARGS,
                                 ),
                             ],
                             **DIV_KWARGS,
@@ -207,11 +250,18 @@ def _generate_content(output: MonteCarloResults):
                                 html.H2(
                                     "Per Simulated Run", style={"textAlign": "center"}
                                 ),
+                                html.P(
+                                    "Timeseries plots, metrics data, and prices for each simulated run.",
+                                    style={"textAlign": "center"},
+                                ),
                                 html.H4("Per Simulated Run Plots"),
-                                dcc.Dropdown(
-                                    output.data[0].df.columns,
-                                    "arbitrageur_profit",
-                                    id="run-metric-dropdown",
+                                html.Div(
+                                    dbc.Select(
+                                        options=per_run_columns,
+                                        id="run-metric-dropdown",
+                                        value="System Health",
+                                    ),
+                                    style={"textAlign": "center"},
                                 ),
                                 dcc.Graph(id="run-graph"),
                                 html.H4("Per Simulated Run Data"),
@@ -225,7 +275,8 @@ def _generate_content(output: MonteCarloResults):
                                     value=0,
                                 ),
                                 html.Br(),
-                                dash_table.DataTable(id="run-data", **TABLE_KWARGS),
+                                html.Div(id="run-data-container", **SCROLL_DIV_KWARGS),
+                                html.Br(),
                                 html.H4("Per Run Prices"),
                                 dcc.Graph(id="run-prices"),
                             ],
@@ -257,37 +308,50 @@ def _generate_content(output: MonteCarloResults):
                                     style={"textAlign": "center"},
                                 ),
                                 html.H4("Price Parameters"),
-                                html.H5(
+                                html.P(
                                     f"Generative parameters for each stochastic process. Trained from {datetime.fromtimestamp(price_config['start'])} to {datetime.fromtimestamp(price_config['end'])}"
                                 ),
-                                dash_table.DataTable(
-                                    data=pd.DataFrame.from_dict(
-                                        price_config["params"],
-                                        orient="index",
-                                    ).to_dict(orient="records"),
-                                    **TABLE_KWARGS,
+                                html.Div(
+                                    dbc.Table.from_dataframe(
+                                        pd.DataFrame.from_dict(
+                                            price_config["params"],
+                                            orient="index",
+                                        )
+                                        .reset_index(names="Name")
+                                        .round(DECIMALS),
+                                        **DBC_TABLE_KWARGS,
+                                    ),
+                                    **SCROLL_DIV_KWARGS_50,
                                 ),
                                 html.Br(),
                                 html.H5("Asset covariances"),
-                                dash_table.DataTable(
-                                    data=pd.DataFrame.from_dict(
-                                        price_config["cov"],
-                                        orient="index",
-                                    )
-                                    .reset_index(names="")
-                                    .to_dict(orient="records"),
-                                    **TABLE_KWARGS,
+                                html.Div(
+                                    dbc.Table.from_dataframe(
+                                        pd.DataFrame.from_dict(
+                                            price_config["cov"],
+                                            orient="index",
+                                        )
+                                        .reset_index(names="Name")
+                                        .round(DECIMALS),
+                                        **DBC_TABLE_KWARGS,
+                                    ),
+                                    **SCROLL_DIV_KWARGS,
                                 ),
                                 html.Br(),
-                                html.H5("Start Prices"),
-                                dash_table.DataTable(
-                                    data=pd.DataFrame.from_dict(
-                                        price_config["curr_prices"],
-                                        orient="index",
-                                        columns=["Start Price"],
-                                    ).to_dict(orient="records"),
-                                    **TABLE_KWARGS,
-                                ),
+                                # html.H5("Start Prices"),
+                                # html.Div(
+                                #     dbc.Table.from_dataframe(
+                                #         pd.DataFrame.from_dict(
+                                #             price_config["curr_prices"],
+                                #             orient="index",
+                                #             columns=["Start Price"],
+                                #         )
+                                #         .reset_index(names="Name")
+                                #         .round(DECIMALS),
+                                #         **DBC_TABLE_KWARGS,
+                                #     ),
+                                #     **SCROLL_DIV_KWARGS_50,
+                                # ),
                                 html.H4("External Liquidity Curves"),
                                 html.P(
                                     f"Quotes from {metadata['template'].quotes_start} to {metadata['template'].quotes_end}."
@@ -297,9 +361,14 @@ def _generate_content(output: MonteCarloResults):
                                     id="fetch-liquidity-button",
                                     className="mr-1",
                                 ),  # TODO
+                                html.Br(),
+                                html.Br(),
                                 html.H4("Module Metadata"),
-                                dcc.Markdown(
-                                    f"```json\n{json.dumps(metadata['template'].llamma.metadata, indent=4)}\n```"
+                                html.Div(
+                                    dcc.Markdown(
+                                        f"```json\n{json.dumps(metadata['template'].llamma.metadata, indent=4)}\n```"
+                                    ),
+                                    **SCROLL_DIV_KWARGS,
                                 ),
                             ],
                             **DIV_KWARGS,
@@ -336,6 +405,8 @@ def _generate_content(output: MonteCarloResults):
     Output("aggregate-graph", "figure"), Input("aggregate-metric-dropdown", "value")
 )
 def update_aggregate_graph(value):
+    # if not value:
+    #     value = "System Health Mean"
     dff = output.summary[value]
     return px.histogram(dff)
 
@@ -360,11 +431,14 @@ def update_run_graph(value):
     return fig
 
 
-@callback(Output("run-data", "data"), Input("run-dropdown", "value"))
+@callback(Output("run-data-container", "children"), Input("run-dropdown", "value"))
 def update_run_data_table(value: int):
     if not output:
         return no_update
-    return output.data[value - 1].df.to_dict(orient="records")
+    return dbc.Table.from_dataframe(
+        output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),
+        **DBC_TABLE_KWARGS,
+    )  # .to_dict(orient="records")
 
 
 @callback(Output("run-prices", "figure"), Input("run-dropdown", "value"))
@@ -401,6 +475,7 @@ def update_run_prices(value: int):
 
 
 def sim(num_iter: int) -> MonteCarloResults:
+    # TODO user must be able to choose scenario, market, num_iter, mp, and be able to save the result
     start = datetime.now()
     output = run_scenario("baseline", "wstETH", num_iter=num_iter, ncpu=cpu_count())
     end = datetime.now()
@@ -412,7 +487,7 @@ def sim(num_iter: int) -> MonteCarloResults:
 if __name__ == "__main__":
     ### UNCOMMENT TO RUN LOCAL SIM ###
     # output: MonteCarloResults = sim(num_iter=10)
-    # with open(f"{output.metadata.scenario}.pkl", "wb") as f:
+    # with open(f"results/{output.metadata['scenario']}.pkl", "wb") as f:
     #     pickle.dump(output, f)
 
     app.run()

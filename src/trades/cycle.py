@@ -3,8 +3,8 @@ Provides the `Cycle` class for optimizing and
 exeucuting a sequence of trades.
 """
 import math
-from typing import Sequence, cast, Dict, Any, Tuple
-from functools import lru_cache
+from typing import Sequence, cast, Dict, Any, Tuple, List
+from functools import lru_cache, cached_property
 from scipy.optimize import minimize_scalar
 from crvusdsim.pool import SimLLAMMAPool, SimCurveStableSwapPool
 from curvesim.pool import SimCurvePool
@@ -56,6 +56,17 @@ class Cycle:
             token_out = trade.get_address(trade.j)
             token_in = next_trade.get_address(next_trade.i)
             assert token_in == token_out, "Trades do not form a cycle."
+
+    @cached_property
+    def llamma_trades(self) -> List[int]:
+        """Get indices of swaps involving LLAMMAs."""
+        trades = []
+        for i, trade in enumerate(self.trades):
+            if isinstance(trade, Swap) and isinstance(trade.pool, SimLLAMMAPool):
+                trades.append(i)
+            elif isinstance(trade, Liquidation):
+                trades.append(i)
+        return trades
 
     def freeze_oracles(self):
         """

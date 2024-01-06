@@ -3,6 +3,8 @@ Provides utils for metrics processing.
 """
 
 from typing import Any
+import numpy as np
+from crvusdsim.pool.sim_interface import SimController
 
 
 def entity_str(entity: Any, type_: str):
@@ -30,3 +32,15 @@ def entity_str(entity: Any, type_: str):
         raise ValueError("Invalid type_.")
 
     return "_".join([type_, name])
+
+
+def controller_healths(controller: SimController) -> np.ndarray:
+    """Return array of healths of controller users."""
+    return np.array(
+        [controller.health(user, full=True) for user in controller.loan.keys()]
+    )
+
+
+def controller_debts(controller: SimController) -> np.ndarray:
+    """Return array of debts of controller users."""
+    return np.array([l.initial_debt for l in controller.loan.values()])

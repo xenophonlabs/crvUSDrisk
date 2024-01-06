@@ -3,7 +3,7 @@ from typing import List, Tuple, cast
 import math
 from .agent import Agent
 from ..trades import Cycle, Swap
-from ..trades.cycle import _optimize_mem  # TODO remove, using for testing
+from ..trades.cycle import _optimize_mem
 from ..prices import PriceSample
 from ..configs import DEFAULT_PROFIT_TOLERANCE
 from ..logging import (
@@ -20,11 +20,7 @@ class Arbitrageur(Agent):
     Arbitrageur performs cyclic arbitrages between the following
     Curve pools:
         - StableSwap pools
-        - TriCrypto-ng pools TODO
         - LLAMMAs.
-    TODO need to investigate which pools to include in arbitrage
-    search (e.g. TriCRV, other crvusd pools, etc..). Otherwise, we
-    are artificially constraining the available crvusd liquidity.
     """
 
     def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
@@ -32,10 +28,11 @@ class Arbitrageur(Agent):
         assert tolerance > 0  # default is one dollah
 
         self.tolerance: float = tolerance
-        self._profit: float = 0
+        self._profit: float = 0.0
         self._count: int = 0
+        self._borrower_loss: float = 0.0
 
-    def arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> Tuple[float, int]:
+    def arbitrage(self, cycles: List[Cycle], prices: PriceSample):
         """
         Identify optimal arbitrages involving crvusd of the form:
 
@@ -44,31 +41,16 @@ class Arbitrageur(Agent):
         LLAMMA Example: WETH/crvusd -> USDC/crvusd -> USDC/WETH
         StableSwap Example: USDC/crvusd -> USDT/crvusd -> USDT/USDC
 
+        Updates Arbitrageur state.
+
         Parameters
         ----------
         cycles : List[Cycle]
             List of cycles. Cycles are an ordered list of `Trade`s.
         prices : PriceSample
             Current USD market prices for each coin.
-
-        Returns
-        -------
-        profit : float
-            Total profit from arbitrage.
-        count : int
-            Number of arbitrages executed.
-
-        Note
-        ----
-        TODO need to handle longer cycles
-        TODO need to handle different cycle formats?
-        TODO need to track pool-specific metrics
         """
-        profit = 0.0
-        count = 0
-
         while True:
-            # TODO should we require that the basis token be USDC, USDT, WETH?
             best_cycle, best_profit = self.find_best_arbitrage(cycles, prices)
 
             if best_cycle and best_profit > self.tolerance:
@@ -80,18 +62,18 @@ class Arbitrageur(Agent):
                 assert _profit == best_profit, RuntimeError(
                     "Expected profit %f != actual profit %f.", best_profit, _profit
                 )
-                profit += _profit
-                count += 1
+
+                # Update state
+                self._profit += _profit
+                self._count += 1
+
+                self.update_borrower_losses(best_cycle, prices)
+
             else:
                 logger.debug("No more profitable arbitrages.")
                 break
 
         logger.debug("Cache info: %s", _optimize_mem.cache_info())
-
-        self._profit += profit
-        self._count += count
-
-        return profit, count
 
     # pylint: disable=too-many-locals
     def find_best_arbitrage(
@@ -100,7 +82,6 @@ class Arbitrageur(Agent):
         """
         Find the optimal liquidity-constrained cyclic arbitrages.
         Dollarize the profit by marking it to current USD market price.
-        TODO does this dollarization make sense?
 
         Parameters
         ----------

@@ -41,7 +41,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
 
     def plot_summary(self, cols: List[str] | None = None, show: bool = True):
         """Plot histogram of summary metrics."""
-        cols = cols or list(self.summary.columns)
+        cols = cols or self.key_agg_cols
 
         n, m = make_square(len(cols))
 
@@ -68,9 +68,15 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
             f.tight_layout()
             plt.show()
 
+    @property
+    def key_agg_cols(self):
+        """Key columns."""
+        return self.data[0].key_agg_cols
+
     @cached_property
     def summary(self):
         """Summarize metrics."""
         summary = pd.concat([x.summary for x in self.data])
         summary.index = range(len(summary))
+        summary.index.name = "Run ID"
         return summary

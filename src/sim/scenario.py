@@ -183,9 +183,11 @@ class Scenario:
 
         # Equilibrate pool prices
         arbitrageur = Arbitrageur()  # diff arbitrageur
-        profit, count = arbitrageur.arbitrage(self.cycles, sample)
+        arbitrageur.arbitrage(self.cycles, sample)
         logger.info(
-            "Equilibrated prices with %d arbitrages with total profit %d", count, profit
+            "Equilibrated prices with %d arbitrages with total profit %d",
+            arbitrageur.count,
+            arbitrageur.profit,
         )
 
         # Liquidate users that were loaded underwater
@@ -277,14 +279,16 @@ class Scenario:
         for peg_keeper in self.peg_keepers:
             peg_keeper.prepare_for_trades(ts)
 
+        sample.prices_usd[CRVUSD_DTO.address] = self.aggregator.price() / 1e18
+
     def after_trades(self) -> None:
         """Perform post processing for all modules at the end of a time step."""
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
-        _, _ = self.arbitrageur.arbitrage(self.cycles, prices)
-        _, _ = self.liquidator.perform_liquidations(self.controller)
-        _, _ = self.keeper.update(self.peg_keepers)
+        self.arbitrageur.arbitrage(self.cycles, prices)
+        self.liquidator.perform_liquidations(self.controller, prices)
+        self.keeper.update(self.peg_keepers)
         # TODO what is the right order for the actions?
         # TODO need to incorporate LPs add/remove liquidity
         # ^ currently USDT pool has more liquidity and this doesn't change since we
