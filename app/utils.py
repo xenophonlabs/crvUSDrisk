@@ -1,4 +1,5 @@
 """Provides utility functions for the application."""
+from copy import deepcopy
 
 
 def load_markdown_file(filename):
@@ -11,6 +12,7 @@ def load_markdown_file(filename):
 
 def clean_metadata(metadata):
     """Clean metadata for display."""
+    metadata = deepcopy(metadata)
     metadata_ = metadata["template"].llamma.metadata
     metadata["bands_x"] = metadata_["llamma_params"]["bands_x"].copy()
     del metadata_["llamma_params"]["bands_x"]
