@@ -278,6 +278,7 @@ def _generate_content(output: MonteCarloResults):
                                 html.Div(id="run-data-container", **SCROLL_DIV_KWARGS),
                                 html.Br(),
                                 html.H4("Per Run Prices"),
+                                dbc.Checkbox(label="Show All", value=True, id="price-checkbox"),
                                 dcc.Graph(id="run-prices"),
                             ],
                             **DIV_KWARGS,
@@ -441,8 +442,8 @@ def update_run_data_table(value: int):
     )  # .to_dict(orient="records")
 
 
-@callback(Output("run-prices", "figure"), Input("run-dropdown", "value"))
-def update_run_prices(value: int):
+@callback(Output("run-prices", "figure"), Input("run-dropdown", "value"), Input("price-checkbox", "value"))
+def update_run_prices(value: int, show_all: bool):
     if not output:
         return no_update
     df = output.data[value - 1].pricepaths.prices
@@ -455,11 +456,20 @@ def update_run_prices(value: int):
         for j in range(m):
             if len(cols):
                 col = cols.pop(0)
-                fig.add_trace(
-                    go.Scatter(x=df.index, y=df[col], mode="lines"),
-                    row=i + 1,
-                    col=j + 1,
-                )
+                if show_all:
+                    for _df in output.data:
+                        prices = _df.pricepaths.prices
+                        fig.add_trace(
+                            go.Scatter(x=prices.index, y=prices[col], mode="lines"),
+                            row=i + 1,
+                            col=j + 1,
+                        )
+                else:
+                    fig.add_trace(
+                        go.Scatter(x=df.index, y=df[col], mode="lines"),
+                        row=i + 1,
+                        col=j + 1,
+                    )
             else:
                 break
 
