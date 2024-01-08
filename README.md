@@ -6,20 +6,19 @@ crvusd Risk Modeling
 [![CI](https://github.com/xenophonlabs/crvUSDrisk/actions/workflows/CI.yml/badge.svg)](https://github.com/xenophonlabs/crvUSDrisk/actions/workflows/CI.yml/badge.svg)
 ![Plotly](https://img.shields.io/badge/Plotly-%233F4F75.svg?style=flat&logo=plotly&logoColor=white)
 
-
 **Under construction 👷🏽‍♂️**
 
-crvUSD Risk is a tool for Curve’s researchers and developers to test the resiliency of the crvUSD ecosystem under a variety of market conditions.
+crvUSD Risk is a tool for Curve’s researchers and developers to test the resiliency of the crvUSD ecosystem under a variety of market conditions. 
 
-For a quick introduction to the key agents in our agent-based model and the overall simulation architecture, please refer to the `./notebooks/demo_*` notebooks! 
+### Quick Start
 
-To view the risk dashboard, follow the steps in [Setup](#setup). Then, run:
+To view the risk dashboard, follow the steps in [Setup](#setup). Then, download some sample results from [this Google Drive folder](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing), and run the app:
 
 ```python
 python3 -m app.app
 ```
 
-Download sample results to view in the dashboard [here](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing), or run your own simulation as instructed in [Usage](#usage).
+You may also run your own simulations as instructed in [Usage](#usage).
 
 ### Table of Contents
 
@@ -114,6 +113,8 @@ The results for 1000 runs of the `Baseline Macro` scenario (in the Google Drive)
 **Research paper:** [link](https://xenophonlabs.com/papers/_INTERNAL__An_ABS_Engine_for_crvUSD.pdf)
 
 One of the primary purposes of crvUSD Risk simulations is to analyze the impact of available crvUSD liquidity on crvUSD liquidations. We explicitly simulate arbitrageurs and liquidators trading against the relevant LLAMMAs and Curve pools using the [curvesim](https://github.com/curveresearch/curvesim/tree/main) and [crvusdsim](https://github.com/0xreviews/crvusdsim) packages. This allows us to understand the impact of liquidity and liquidations themselves on the health of the crvUSD system.
+
+For a quick introduction to the key agents in our agent-based model and the overall simulation architecture, please refer to the `./notebooks/demo_*` notebooks!
 
 ![Liquidation Model](./figs/samples/oracle_risk.png)
 *Liquidation Model*
