@@ -13,13 +13,13 @@ crvUSD Risk is a tool for Curve’s researchers and developers to test the resil
 
 For a quick introduction to the key agents in our agent-based model and the overall simulation architecture, please refer to the `./notebooks/demo_*` notebooks! 
 
-To view the risk dashboard, please run:
+To view the risk dashboard, follow the steps in [Setup](#setup). Then, run:
 
 ```python
 python3 -m app.app
 ```
 
-Download sample results to view in the dashboard [here](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing), or run your own simulation as instructued in [Usage](#usage).
+Download sample results to view in the dashboard [here](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing), or run your own simulation as instructed in [Usage](#usage).
 
 ### Table of Contents
 
@@ -65,6 +65,14 @@ Simply select to load a results file (`.pkl`), or run your own simulation.
 We provide sample simulation results for the `baseline` scenario in [this](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing) google drive. Please download it into the root directory and ensure you are using local results in `./app/app.py`.
 
 ## Running Simulations
+
+### In the Dashboard
+
+Select a `scenario`, `market`, and number of iterations (model runs) for you scenario and click the simulate button. Your terminal will begin to print the logs for the simulation. 
+
+*Simulations may take a long time to finalize; by default, multiprocessing will be applied using all your machine's processors*.
+
+### In a Script
 
 Alternatively, you may run a simulation via the `scripts/sim.py` script as follows:
 
