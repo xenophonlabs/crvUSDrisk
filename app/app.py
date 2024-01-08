@@ -3,13 +3,11 @@ Provides a plotly Dash app to visualize simulation results.
 
 Optionally run the simulation before creating the app.
 """
-import time
 from datetime import datetime
 import pickle
 import json
-import base64
-from multiprocessing import cpu_count
 import pandas as pd
+import matplotlib.pyplot as plt
 from dash import (
     Dash,
     html,
@@ -26,12 +24,21 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import load_figure_template
-from src.sim import run_scenario
 from src.sim.results import MonteCarloResults
 from src.logging import get_logger
 from src.plotting.utils import make_square
-from src.configs import ADDRESS_TO_SYMBOL, LLAMMA_ALIASES
-from .utils import load_markdown_file, clean_metadata
+from src.configs import ADDRESS_TO_SYMBOL, LLAMMA_ALIASES, TOKEN_DTOs
+from src.utils import get_quotes
+from .utils import (
+    load_markdown_file,
+    clean_metadata,
+    load_results,
+    run_sim,
+    plot_quotes,
+    plot_regression,
+)
+
+plt.switch_backend("Agg")
 
 logger = get_logger(__name__)
 
@@ -157,27 +164,7 @@ app.layout = html.Div(
 )
 
 
-def load_results(contents) -> MonteCarloResults:
-    """
-    Load the file contents using pickle and return the output object.
-    """
-    output = pickle.loads(base64.b64decode(contents.split(",")[1]))
-    return output
-
-
-def run_sim(scenario, markets, num_iter) -> MonteCarloResults:
-    """
-    Run the simulation with the input parameters and return the output object
-    """
-    start = datetime.now()
-    output = run_scenario(scenario, markets[0], num_iter=num_iter, ncpu=cpu_count())
-    end = datetime.now()
-    diff = end - start
-    logger.info("Done. Total runtime: %s", diff)
-    return output
-
-
-@app.callback(
+@callback(
     [
         Output("initial-modal", "is_open"),
         Output("main-content", "children"),
@@ -251,6 +238,11 @@ def _generate_content(output: MonteCarloResults):
             for col in run.cols
             if col not in run.key_metrics
         ],
+    ]
+
+    assets = [
+        {"label": ADDRESS_TO_SYMBOL[asset], "value": asset}
+        for asset in [c.address for c in metadata["template"].coins]
     ]
 
     layout = html.Div(
@@ -499,11 +491,53 @@ def _generate_content(output: MonteCarloResults):
                                 html.P(
                                     f"Quotes from {metadata['template'].quotes_start} to {metadata['template'].quotes_end}."
                                 ),
-                                dbc.Button(
-                                    "Fetch and show liquidity curve.",
-                                    id="fetch-liquidity-button",
-                                    className="mr-1",
-                                ),  # TODO
+                                html.Div(
+                                    [
+                                        dbc.Row(
+                                            [
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Label(
+                                                            "Select In Asset",
+                                                            html_for="select-in-asset",
+                                                        ),
+                                                        dbc.Select(
+                                                            options=assets,
+                                                            id="select-in-asset",
+                                                            value=assets[0]["value"],
+                                                        ),
+                                                    ],
+                                                    width=3,
+                                                ),
+                                                dbc.Col(
+                                                    [
+                                                        dbc.Label(
+                                                            "Select Out Asset",
+                                                            html_for="select-out-asset",
+                                                        ),
+                                                        dbc.Select(
+                                                            options=assets,
+                                                            id="select-out-asset",
+                                                            value=assets[-1]["value"],
+                                                        ),
+                                                    ],
+                                                    width=3,
+                                                ),
+                                            ],
+                                            justify="center",
+                                        ),
+                                        html.Br(),
+                                        dbc.Button(
+                                            "Fetch and Show Liquidity Curve",
+                                            id="fetch-liquidity-button",
+                                            className="mr-1",
+                                        ),
+                                        html.Div(
+                                            id="fetch-liquidity-output",
+                                        ),
+                                    ],
+                                    style={"textAlign": "center"},
+                                ),
                                 html.Br(),
                                 html.Br(),
                                 html.H4("Module Metadata"),
@@ -544,7 +578,7 @@ def _generate_content(output: MonteCarloResults):
     return layout
 
 
-@app.callback(
+@callback(
     Output("download-output", "data"),
     Input("download-button", "n_clicks"),
     prevent_initial_call=True,
@@ -593,6 +627,50 @@ def update_run_data_table(value: int):
         output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),
         **DBC_TABLE_KWARGS,
     )
+
+
+@callback(
+    Output("fetch-liquidity-output", "children"),
+    Input("fetch-liquidity-button", "n_clicks"),
+    [
+        State("select-in-asset", "value"),
+        State("select-out-asset", "value"),
+    ],
+)
+def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
+    if not n_clicks:
+        return no_update
+    else:
+        start = output.metadata["template"].quotes_start
+        end = output.metadata["template"].quotes_end
+        in_asset_dto = TOKEN_DTOs[in_asset]
+        out_asset_dto = TOKEN_DTOs[out_asset]
+        pair = tuple(sorted((in_asset_dto, out_asset_dto)))
+        quotes = get_quotes(
+            int(start.timestamp()),
+            int(end.timestamp()),
+            pair,
+        )
+        i = pair.index(in_asset_dto)
+        j = pair.index(out_asset_dto)
+        market = output.metadata["template"].markets[pair]
+        df = quotes.loc[in_asset_dto.address, out_asset_dto.address]
+        return html.Div(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dcc.Graph(
+                                figure=plot_quotes(df, in_asset_dto, out_asset_dto)
+                            ),
+                        ),
+                        dbc.Col(
+                            dcc.Graph(figure=plot_regression(df, i, j, market)),
+                        ),
+                    ]
+                )
+            ]
+        )
 
 
 @callback(
