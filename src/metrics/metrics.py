@@ -166,7 +166,7 @@ class LiquidationsMetric(Metric):
         return {
             "Collateral Liquidated": ["max"],
             "Debt Repaid": ["max"],
-            "Count": ["max"],
+            "Liquidation Count": ["max"],
         }
 
     def compute(self, **kwargs):
@@ -174,7 +174,7 @@ class LiquidationsMetric(Metric):
         return {
             "Collateral Liquidated": self.scenario.liquidator.collateral_liquidated,
             "Debt Repaid": self.scenario.liquidator.debt_repaid,
-            "Count": self.scenario.liquidator.count,
+            "Liquidation Count": self.scenario.liquidator.count,
         }
 
 
@@ -200,3 +200,28 @@ class PegKeeperMetric(Metric):
             val[f"{entity_str(pk, 'pk')} Debt"] = pk.debt / 1e18
         val["PK Debt"] = sum(val.values())
         return val
+
+
+class MiscMetric(Metric):
+    """
+    Miscellaneous metrics that are useful to look at and sanity check.
+    """
+
+    key_metric = "crvUSD Total Supply"
+
+    def _config(self):
+        return {
+            "crvUSD Total Supply": ["max"],
+            f"{entity_str(self.scenario.llamma, 'llamma')} Price": ["mean"],
+            f"{entity_str(self.scenario.llamma, 'llamma')} Oracle Price": ["mean"],
+        }
+
+    def compute(self, **kwargs):
+        """Compute miscellaneous metrics."""
+        llamma = self.scenario.llamma
+        return {
+            "crvUSD Total Supply": self.scenario.stablecoin.totalSupply / 1e18,
+            f"{entity_str(llamma, 'llamma')} Price": llamma.get_p() / 1e18,
+            f"{entity_str(llamma, 'llamma')} Oracle Price": llamma.price_oracle()
+            / 1e18,
+        }

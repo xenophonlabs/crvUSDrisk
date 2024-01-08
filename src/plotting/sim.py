@@ -41,7 +41,7 @@ def plot_prices(
 
             if df2 is not None:
                 ax.plot(
-                    df.index,
+                    df2.index,
                     df2[COINGECKO_IDS_[col]],
                     lw=1,
                     c="indianred",

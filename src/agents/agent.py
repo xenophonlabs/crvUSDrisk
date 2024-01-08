@@ -3,8 +3,9 @@ from __future__ import annotations
 from abc import ABC
 from functools import cached_property
 from typing import TYPE_CHECKING
-import pickle
-from copy import deepcopy
+from ..logging import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from ..prices import PriceSample
@@ -50,7 +51,6 @@ class Agent(ABC):
         Update the borrower loss. Applicable to
         the Liquidator and Arbitrageur child classes.
         """
-        cycle_cp = deepcopy(cycle)
         for i in cycle.llamma_trades:
             trade = cycle.trades[i]
             token_in = (
@@ -64,8 +64,8 @@ class Agent(ABC):
                 * prices.prices_usd[trade.get_address(trade.j)]
             )
             borrower_loss = token_out - token_in
-            if borrower_loss < 0:  # FIXME testing, remove this
-                with open("sample.pkl", "wb") as f:
-                    pickle.dump(cycle_cp, f)
-            assert borrower_loss >= 0
+            if borrower_loss < 0:
+                logger.warning(
+                    "Borrower loss was positive for cycle %s: %f", cycle, borrower_loss
+                )
             self._borrower_loss += borrower_loss

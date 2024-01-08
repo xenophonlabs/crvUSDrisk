@@ -12,6 +12,7 @@ from .metrics import (
     PegStrengthMetric,
     LiquidationsMetric,
     PegKeeperMetric,
+    MiscMetric,
 )
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ DEFAULT_METRICS = [
     PegStrengthMetric,
     LiquidationsMetric,
     PegKeeperMetric,
+    MiscMetric,
 ]
 
 __all__ = [

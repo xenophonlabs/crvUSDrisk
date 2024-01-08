@@ -96,9 +96,16 @@ initial_modal = dbc.Modal(
                                 dcc.Dropdown(
                                     id="select-scenario",
                                     options=[
-                                        {"label": "Baseline", "value": "baseline"},
+                                        {
+                                            "label": "Baseline Macro",
+                                            "value": "baseline_macro",
+                                        },
+                                        {
+                                            "label": "Baseline Micro",
+                                            "value": "baseline_micro",
+                                        },
                                     ],
-                                    value="baseline",
+                                    value="baseline_macro",
                                 ),
                                 dbc.Label("Select Markets", html_for="select-markets"),
                                 dcc.Dropdown(
@@ -106,7 +113,7 @@ initial_modal = dbc.Modal(
                                         {"label": alias, "value": alias}
                                         for alias in LLAMMA_ALIASES.keys()
                                     ],
-                                    ["wsteth"],
+                                    "wsteth",
                                     # multi=True,  # TODO
                                     id="select-markets",
                                 ),
@@ -766,8 +773,8 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
         out_asset_dto = TOKEN_DTOs[out_asset]
         pair = tuple(sorted((in_asset_dto, out_asset_dto)))
         quotes = get_quotes(
-            int(start.timestamp()),
-            int(end.timestamp()),
+            start,
+            end,
             pair,
         )
         i = pair.index(in_asset_dto)

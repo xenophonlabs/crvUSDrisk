@@ -22,7 +22,7 @@ import os
 import argparse
 from datetime import datetime, timedelta
 from src.prices.utils import gen_price_config
-from src.configs import ADDRESSES
+from src.configs import ADDRESSES, get_scenario_config
 from src.logging import get_logger
 
 
@@ -38,17 +38,18 @@ logger = get_logger(__name__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate price config for sim.")
+    parser.add_argument("scenario", type=str, help="Scenario to simulate")
     parser.add_argument(
         "-p", "--plot", action="store_true", help="Plot sample sim?", required=False
     )
     args = parser.parse_args()
     plot = args.plot
 
-    freq = "1h"
-    end = int(
-        (datetime.now() - timedelta(hours=1)).timestamp()
-    )  # Offset by an hour to prevent missing data
-    start = int((datetime.now() - timedelta(days=60)).timestamp())
+    scenario_cfg = get_scenario_config(args.scenario)
+
+    freq = scenario_cfg["freq"]
+    start = scenario_cfg["prices"]["start"]
+    end = scenario_cfg["prices"]["end"]
 
     config_dir_w_freq = os.path.join(CONFIG_DIR, freq)
     plot_dir_w_freq = os.path.join(PLOTS_DIR, freq)
@@ -59,4 +60,8 @@ if __name__ == "__main__":
     fn = os.path.join(config_dir_w_freq, f"{start}_{end}.json")
     plot_fn = os.path.join(plot_dir_w_freq, f"{start}_{end}.png")
 
-    gen_price_config(fn, ADDRESSES, start, end, freq=freq, plot=plot, plot_fn=plot_fn)
+    logger.info(
+        "Generating price config for %s scenario with freq %s", args.scenario, freq
+    )
+
+    gen_price_config(fn, ADDRESSES, start, end, freq, plot=plot, plot_fn=plot_fn)

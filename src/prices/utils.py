@@ -26,7 +26,7 @@ def gen_price_config(
     coins: List[str],
     start: int,
     end: int,
-    freq: str = "1h",
+    freq: str,
     plot: bool = False,
     plot_fn: str | None = None,
 ) -> dict:
@@ -50,7 +50,7 @@ def gen_price_config(
     end : int
         Unix timestamp in milliseconds.
     freq : str
-        Frequency of price data. Default is hourly.
+        Frequency of price data.
     plot : bool
         Whether to plot simulated prices.
 
@@ -64,7 +64,6 @@ def gen_price_config(
     TODO Add configs for jumps.
     """
     assert fn, "Must provide filename to write to."
-    assert freq in ["1h", "1d"], f"Frequency must be 1h or 1d, not {freq}."
 
     logger.info("Fetching price data.")
     df = get_prices_df(coins, start, end, freq)
@@ -97,7 +96,17 @@ def gen_price_config(
         T = df.shape[0] / annual_factor
         dt = 1 / annual_factor
         S0s = df[coin_ids].iloc[0].to_dict()  # Get first row of prices
-        prices = gen_cor_prices(coin_ids, T, dt, S0s, cov, params)
+        prices = gen_cor_prices(
+            coin_ids,
+            T,
+            dt,
+            S0s,
+            cov,
+            params,
+            timestamps=True,
+            gran=get_gran(freq),
+            now=df.index[0],
+        )
         _ = plot_prices(df[coin_ids], df2=prices, fn=plot_fn)
 
     return config
@@ -108,19 +117,27 @@ def gen_price_config(
 
 def get_factor(freq: str) -> int:
     """Annualizing factor."""
-    if freq == "1d":
-        return 365
+    if freq == "1min":
+        return 365 * 24 * 60
+    if freq == "5min":
+        return 365 * 24 * 12
     if freq == "1h":
         return 365 * 24
+    if freq == "1d":
+        return 365
     raise ValueError(f"Invalid frequency: {freq}")
 
 
 def get_gran(freq: str) -> int:
     """Granularity in seconds"""
-    if freq == "1d":
-        return 60 * 60 * 24
+    if freq == "1min":
+        return 60
+    if freq == "5min":
+        return 60 * 5
     if freq == "1h":
         return 60 * 60
+    if freq == "1d":
+        return 60 * 60 * 24
     raise ValueError(f"Invalid frequency: {freq}")
 
 
@@ -374,6 +391,7 @@ def gen_cor_prices(
     params: dict,
     timestamps: bool = False,
     gran: int | None = None,
+    now: pd.Timestamp | None = None,
 ):
     """
     Generate a matrix of correlated GBMs using
@@ -442,9 +460,10 @@ def gen_cor_prices(
 
     if timestamps:
         assert gran
-        now = int(datetime.now().timestamp())
+        now = now or datetime.now()
+        ts = int(now.timestamp())
         df.index = pd.Index(
-            pd.to_datetime(list(range(now, now + N * gran, gran)), unit="s")
+            pd.to_datetime(list(range(ts, ts + N * gran, gran)), unit="s")
         )
 
     return df

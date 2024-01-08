@@ -17,6 +17,7 @@ from ....logging import (
     configure_multiprocess_logging,
 )
 from ....metrics import DEFAULT_METRICS, Metric
+from ....configs import STABLE_CG_IDS
 
 
 logger = get_logger(__name__)
@@ -83,6 +84,12 @@ def simulate(
     mcaggregator = MonteCarloProcessor(metadata)
 
     # TODO for other scenarios: apply shocks, etc.
+    # TODO parameter sampling
+
+    # Remove drift from collateral assets to enforce random walk
+    for k, v in scenario_template.price_config["params"].items():
+        if k not in STABLE_CG_IDS:
+            v["mu"] = 0
 
     if ncpu > 1:
         logger.info("Running simulation in parallel on %d cores", ncpu)
@@ -103,21 +110,11 @@ def simulate(
             for result in results:
                 mcaggregator.collect(result)
     else:
-        # TODO parameter sampling
         for i in range(num_iter):
             scenario = deepcopy(scenario_template)
             mcaggregator.collect(strategy(scenario, {}, i + 1))  # run scenario
 
     return mcaggregator.process()
-
-    # TODO
-    # - Try tighter granularity on simulation, e.g. 1 minute?
-    # - See how dependent the results are on this param.
-    # - Include gas
-    # - Speed this up
-    # - Include multiple LLAMMAs
-    # - Include borrower actions
-    # - Include LP actions
 
 
 def worker(strategy, logging_queue, *args):

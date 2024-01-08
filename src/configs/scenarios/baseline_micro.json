@@ -1,0 +1,15 @@
+{
+    "name": "Baseline Micro",
+    "description": "Baseline scenario running on a short timescale. Price drifts for collateral assets are set to 0.",
+    "freq": "5min",
+    "N": 288,
+    "quotes": {
+        "start": 1700438400,
+        "end": 1703030400
+    },
+    "prices": {
+        "start": 1697068800,
+        "end": 1704585600
+    },
+    "arb_cycle_length": 3
+}

@@ -13,7 +13,6 @@ logger = get_logger(__name__)
 
 # pylint: disable=too-few-public-methods
 class BaselineStrategy:
-    # TODO base strategy?
     """
     Strategy for simulating the baseline scenario.
     """

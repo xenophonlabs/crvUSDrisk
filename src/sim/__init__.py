@@ -7,11 +7,11 @@ The basic model for a scenario is to:
     This includes Curve assets (like LLAMMAs, Controllers,
     Stableswap pools), as well as External Markets, and Agents 
     (e.g. Liquidator, Arbitrageur).
-2. Apply the pre-processing required for the `Scenario`. For example, the "baseline"
+2. Apply the pre-processing required for the `Scenario`. For example, the "baseline_micro"
     scenario will apply basic pre-processing (equilibrate pool prices via
     an initial arbitrage), whereas the "liquidity crunch" scneario will
     stochastically remove liquidity from the system.
-3. Generate prices for the `Scenario`. For example, the "baseline" scenario
+3. Generate prices for the `Scenario`. For example, the "baseline_micro" scenario
     will generate prices based on recent historical price data using GBMs and OU
     processes. The "bear" scenario will depress each token's "drift" parameter,
     whereas the "high volatility" scenario will augment the "volatility" parameter,

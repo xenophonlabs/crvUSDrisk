@@ -4,8 +4,12 @@ Master config with basic constants.
 
 import os
 import json
+from datetime import datetime
 from .tokens import ADDRESSES, TOKEN_DTOs, STABLE_CG_IDS, CRVUSD_DTO
 from ..network.coingecko import get_current_prices
+from ..logging import get_logger
+
+logger = get_logger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,15 +60,35 @@ def get_scenario_config(scenario: str) -> dict:
     return config
 
 
-def get_price_config(freq: str) -> dict:
-    """Return the latest price config dict."""
+def get_price_config(freq: str, start: int, end: int) -> dict:
+    """
+    Return the latest price config dict.
+    """
     dir_ = os.path.join(BASE_DIR, "prices", freq)
     files = [os.path.join(dir_, f) for f in os.listdir(dir_)]
+
     if not files:
-        raise ValueError(f"Price configs not generated for {freq}.")
-    fn = sorted(files, reverse=True)[0]
+        raise ValueError(f"No price configs generated for {freq}.")
+
+    fn = f"{start}_{end}.json"
+
+    if fn not in files:
+        fn = sorted(files, reverse=True)[0]
+
     with open(fn, "r", encoding="utf-8") as f:
         config = json.load(f)
+
     coin_ids = list(config["params"].keys())
     config["curr_prices"] = get_current_prices(coin_ids)
+
+    if fn not in files:
+        logger.warning(
+            "No price config found from %s to %s. Using config from %s to %s instead.\
+            Please run `gen_price_config` to generate the requested config.",
+            datetime.fromtimestamp(start),
+            datetime.fromtimestamp(end),
+            datetime.fromtimestamp(config["start"]),
+            datetime.fromtimestamp(config["end"]),
+        )
+
     return config

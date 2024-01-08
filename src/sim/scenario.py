@@ -4,7 +4,7 @@ Provides the `Scenario` class for running simulations.
 
 from typing import List, Tuple, Set, cast
 from itertools import combinations
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from crvusdsim.pool import get  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
@@ -38,7 +38,9 @@ class Scenario:
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
 
-        self.price_config = get_price_config(self.freq)
+        self.price_config = get_price_config(
+            self.freq, self.config["prices"]["start"], self.config["prices"]["end"]
+        )
 
         self.generate_sim_market()  # must be first
         self.generate_pricepaths()
@@ -47,18 +49,20 @@ class Scenario:
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
-        offset = timedelta(seconds=self.config["quotes"]["offset"])
-        period = timedelta(seconds=self.config["quotes"]["period"])
-
-        end = datetime.now() - offset
-        start = end - period
+        start = self.config["quotes"]["start"]
+        end = self.config["quotes"]["end"]
 
         quotes = get_quotes(
-            int(start.timestamp()),
-            int(end.timestamp()),
+            start,
+            end,
             self.coins,
         )
-        logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
+        logger.info(
+            "Using %d 1Inch quotes from %s to %s",
+            quotes.shape[0],
+            datetime.fromtimestamp(start),
+            datetime.fromtimestamp(end),
+        )
 
         self.quotes_start = start
         self.quotes_end = end
