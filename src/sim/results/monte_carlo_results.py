@@ -68,7 +68,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
             f.tight_layout()
             plt.show()
 
-    @property
+    @cached_property
     def key_agg_cols(self):
         """Key columns."""
         return self.data[0].key_agg_cols

@@ -19,6 +19,7 @@ from dash import (
     no_update,
     callback_context,
 )
+from dash import dash_table
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -217,6 +218,8 @@ def generate_content(
 
 
 def _generate_content(output: MonteCarloResults):
+    output.summary  # force compute and cache
+
     metadata = clean_metadata(output.metadata)
     price_config = metadata["template"].pricepaths.config.copy()
     for k, v in price_config["params"].items():
@@ -279,9 +282,9 @@ def _generate_content(output: MonteCarloResults):
 
     depeg_str = html.Div(
         [
-            html.H5(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.2f}"),
+            html.H5(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.3f}"),
             html.H5(
-                f"Worst Depeg in StableSwap: {worst_depeg_spool_val:,.2f} in {worst_depeg_spool}"
+                f"Worst Depeg in StableSwap: {worst_depeg_spool_val:,.3f} in {worst_depeg_spool}"
             ),
         ]
     )
@@ -314,7 +317,7 @@ def _generate_content(output: MonteCarloResults):
                                                 "Number of Iterations: ",
                                                 style={"font-weight": "bold"},
                                             ),
-                                            metadata["num_iter"],
+                                            len(output.data),
                                         ]
                                     ),
                                     html.Li(
@@ -465,18 +468,48 @@ def _generate_content(output: MonteCarloResults):
                                     ),
                                     justify="center",
                                 ),
-                                dcc.Graph(id="aggregate-graph"),
+                                dbc.Spinner(
+                                    dcc.Graph(id="aggregate-graph"),
+                                ),
                                 html.H4(
                                     "Aggregate Data", style={"textAlign": "center"}
                                 ),
                                 html.Br(),
                                 html.Div(
-                                    dbc.Table.from_dataframe(
-                                        output.summary.reset_index(
+                                    dash_table.DataTable(
+                                        columns=[
+                                            {"name": i, "id": i}
+                                            for i in output.summary.columns
+                                        ],
+                                        data=output.summary.reset_index(
                                             names=["Run ID"]
-                                        ).round(DECIMALS),
-                                        **DBC_TABLE_KWARGS,
+                                        )
+                                        .round(DECIMALS)
+                                        .to_dict("records"),
+                                        # sort_action="native",
+                                        page_action="native",
+                                        page_size=10,
                                         id="aggregate-data",
+                                        style_table={"overflowX": "auto"},
+                                        style_cell={
+                                            "padding": "10px",
+                                            "color": "white",
+                                        },
+                                        style_header={
+                                            "fontWeight": "bold",
+                                            "color": "white",
+                                            "backgroundColor": "#2c3d4f",
+                                        },
+                                        style_data_conditional=[
+                                            {
+                                                "if": {"row_index": "odd"},
+                                                "backgroundColor": "#364858",
+                                            },
+                                            {
+                                                "if": {"row_index": "even"},
+                                                "backgroundColor": "#2c3d4f",
+                                            },
+                                        ],
                                     ),
                                     **SCROLL_DIV_KWARGS,
                                 ),
@@ -511,7 +544,9 @@ def _generate_content(output: MonteCarloResults):
                                     ),
                                     justify="center",
                                 ),
-                                dcc.Graph(id="run-graph"),
+                                dbc.Spinner(
+                                    dcc.Graph(id="run-graph"),
+                                ),
                                 html.H4(
                                     "Per Simulated Run Data",
                                     style={"textAlign": "center"},
@@ -543,14 +578,16 @@ def _generate_content(output: MonteCarloResults):
                                     dbc.Col(
                                         dbc.Checkbox(
                                             label="Show All",
-                                            value=True,
+                                            value=False,
                                             id="price-checkbox",
                                         ),
                                         width=1,
                                     ),
                                     justify="center",
                                 ),
-                                dcc.Graph(id="run-prices"),
+                                dbc.Spinner(
+                                    dcc.Graph(id="run-prices"),
+                                ),
                             ],
                             **DIV_KWARGS,
                         ),
@@ -656,8 +693,10 @@ def _generate_content(output: MonteCarloResults):
                                             id="fetch-liquidity-button",
                                             className="mr-1",
                                         ),
-                                        html.Div(
-                                            id="fetch-liquidity-output",
+                                        dbc.Spinner(
+                                            html.Div(
+                                                id="fetch-liquidity-output",
+                                            ),
                                         ),
                                     ],
                                     style={"textAlign": "center"},
@@ -725,6 +764,9 @@ def update_aggregate_graph(value):
     return px.histogram(dff)
 
 
+N = 3  # keep every N rows for run graphs
+
+
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))
 def update_run_graph(value):
     """
@@ -733,8 +775,8 @@ def update_run_graph(value):
     fig = go.Figure()
 
     for run in output.data:
-        dff = run.df[value]
-        fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines+markers"))
+        dff = run.df[value].iloc[::N]
+        fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines"))
 
     fig.update_layout(
         title=f"Plot of {value} for all Runs",
@@ -764,39 +806,37 @@ def update_run_data_table(value: int):
     ],
 )
 def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
-    if not n_clicks:
-        return no_update
-    else:
-        start = output.metadata["template"].quotes_start
-        end = output.metadata["template"].quotes_end
-        in_asset_dto = TOKEN_DTOs[in_asset]
-        out_asset_dto = TOKEN_DTOs[out_asset]
-        pair = tuple(sorted((in_asset_dto, out_asset_dto)))
-        quotes = get_quotes(
-            start,
-            end,
-            pair,
-        )
-        i = pair.index(in_asset_dto)
-        j = pair.index(out_asset_dto)
-        market = output.metadata["template"].markets[pair]
-        df = quotes.loc[in_asset_dto.address, out_asset_dto.address]
-        return html.Div(
-            [
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            dcc.Graph(
-                                figure=plot_quotes(df, in_asset_dto, out_asset_dto)
-                            ),
-                        ),
-                        dbc.Col(
-                            dcc.Graph(figure=plot_regression(df, i, j, market)),
-                        ),
-                    ]
-                )
-            ]
-        )
+    # if not n_clicks:
+    #     return no_update
+    # else:
+    start = output.metadata["template"].quotes_start
+    end = output.metadata["template"].quotes_end
+    in_asset_dto = TOKEN_DTOs[in_asset]
+    out_asset_dto = TOKEN_DTOs[out_asset]
+    pair = tuple(sorted((in_asset_dto, out_asset_dto)))
+    quotes = get_quotes(
+        start,
+        end,
+        pair,
+    )
+    i = pair.index(in_asset_dto)
+    j = pair.index(out_asset_dto)
+    market = output.metadata["template"].markets[pair]
+    df = quotes.loc[in_asset_dto.address, out_asset_dto.address]
+    return html.Div(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        dcc.Graph(figure=plot_quotes(df, in_asset_dto, out_asset_dto)),
+                    ),
+                    dbc.Col(
+                        dcc.Graph(figure=plot_regression(df, i, j, market)),
+                    ),
+                ]
+            )
+        ]
+    )
 
 
 @callback(
@@ -819,15 +859,16 @@ def update_run_prices(value: int, show_all: bool):
                 col = cols.pop(0)
                 if show_all:
                     for _df in output.data:
-                        prices = _df.pricepaths.prices
+                        prices = _df.pricepaths.prices.iloc[::N, :]
                         fig.add_trace(
-                            go.Scatter(x=prices.index, y=prices[col], mode="lines+markers"),
+                            go.Scatter(x=prices.index, y=prices[col], mode="lines"),
                             row=i + 1,
                             col=j + 1,
                         )
                 else:
+                    _df = df.iloc[::N, :]
                     fig.add_trace(
-                        go.Scatter(x=df.index, y=df[col], mode="lines+markers"),
+                        go.Scatter(x=_df.index, y=_df[col], mode="lines"),
                         row=i + 1,
                         col=j + 1,
                     )
