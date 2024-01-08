@@ -60,7 +60,7 @@ class Keeper(Agent):
             if estimate > self.tolerance:
                 _profit = pk.update(self.address) / 1e18
                 assert _profit > 0, "Update not profitable."
-                profit += _profit
+                profit += _profit * pk.POOL.get_virtual_price() / 1e18
                 count += 1
                 logger.debug(
                     "Updating %s Peg Keeper with profit %d.",

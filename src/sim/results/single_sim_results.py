@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from ...metrics import Metric
 from ...prices import PricePaths
 from ...plotting.sim import plot_prices
-from ...plotting.utils import make_square
 
 FIGSIZE = (10, 10)
 
@@ -32,39 +31,26 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         """Return the metric map."""
         return {type(metric).__name__: i for i, metric in enumerate(self.metrics)}
 
-    def plot_metric(self, metric_index: int, axs: Any = None, show: bool = True):
-        """Plot metric."""
+    def plot_metric(
+        self, metric_index: int, axs: Any = None, show: bool = True, i: int = -1
+    ):
+        """
+        Plot the ith metric of `self.metrics[metric_index]`.
+        If `i` is -1, plot the key metric.
+        """
         metric = self.metrics[metric_index]
-        plot_config = metric.config["plot"]
-        cols = list(plot_config.keys())
-        titles = [x["title"] for x in list(plot_config.values())]
-        n, m = make_square(len(cols))
 
-        if axs is None:
-            _, axs = plt.subplots(n, m, figsize=FIGSIZE)
-
-        if n == 1 and m == 1:
-            axs.plot(self.df[cols[0]])
-            axs.set_title(titles[0])
-            axs.tick_params(axis="x", rotation=45)
-        elif n == 1:
-            for i in range(m):
-                axs[i].plot(self.df[cols[i]])
-                axs[i].set_title(titles[i])
-                axs[i].tick_params(axis="x", rotation=45)
+        if i == -1:
+            submetric = metric.key_metric
         else:
-            # TODO refactor this
-            # pylint: disable=duplicate-code
-            for i in range(n):
-                for j in range(m):
-                    if cols:
-                        col = cols.pop(0)
-                        title = titles.pop(0)
-                        axs[i, j].plot(self.df[col])
-                        axs[i, j].set_title(title)
-                        axs[i, j].tick_params(axis="x", rotation=45)
-                    else:
-                        break
+            submetric = list(metric.config.keys())[i]
+
+        if not axs:
+            _, axs = plt.subplots(figsize=FIGSIZE)
+
+        axs.plot(self.df[submetric])
+        axs.set_title(submetric)
+        axs.tick_params(axis="x", rotation=45)
 
         if show:
             plt.tight_layout()
@@ -76,7 +62,6 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         """Plot the prices."""
         plot_prices(self.pricepaths.prices)
         if show:
-            # plt.tight_layout()
             plt.show()
 
     @property
@@ -86,12 +71,31 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         """
         agg = {}
         for metric in self.metrics:
-            cfg = metric.config["functions"]["summary"]
+            cfg = metric.config
             for col, funcs in cfg.items():
                 if funcs:
-                    funcs = [f if f != "last" else "max" for f in funcs]
                     agg.update({col: funcs})
         return agg
+
+    @property
+    def cols(self) -> List[str]:
+        """Column names."""
+        return list(self.agg_config.keys())
+
+    @property
+    def key_metrics(self) -> List[str]:
+        """Key metrics."""
+        return [m.key_metric for m in self.metrics]
+
+    @property
+    def key_agg_cols(self) -> List[str]:
+        """Key agg columns."""
+        cols = []
+        for metric in self.key_metrics:
+            cols.extend(
+                [" ".join([metric, func]).title() for func in self.agg_config[metric]]
+            )
+        return cols
 
     @property
     def summary(self) -> pd.DataFrame:
@@ -105,5 +109,7 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
             .to_frame()
             .T
         )
-        summary.columns = ["_".join(col).strip() for col in summary.columns.values]
+        summary.columns = [
+            " ".join(col).strip().title() for col in summary.columns.values
+        ]
         return summary

@@ -131,12 +131,12 @@ def get_prices_df(
     """
     dfs = []
     for i, coin in enumerate(coins):
-        logger.info(
-            "Fetching Coingecko price data for %s...%d/%d", coin, i + 1, len(coins)
-        )
         if "0x" in coin:
             # Convert Ethereum address to Coingecko coin id
             coin = coin_ids_from_addresses_sync([coin], "mainnet")[0]
+        logger.info(
+            "Fetching Coingecko price data for %s...%d/%d", coin, i + 1, len(coins)
+        )
         prices = get_historical_prices(coin, start, end)
         cdf = pd.DataFrame(prices, columns=["timestamp", coin])
         cdf.index = pd.Index(pd.to_datetime(cdf["timestamp"], unit="ms"))

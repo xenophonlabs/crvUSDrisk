@@ -19,6 +19,7 @@ import pandas as pd
 from ..results import SingleSimResults
 from ..scenario import Scenario
 from ...metrics import Metric, init_metrics
+from ...metrics.utils import controller_debts, controller_healths
 
 
 class SingleSimProcessor:
@@ -30,20 +31,7 @@ class SingleSimProcessor:
     """
 
     def __init__(self, scenario: Scenario, metrics: List[Type[Metric]]):
-        # Unpack scenario into kwargs
-        kwargs = {
-            "agents": scenario.agents,
-            "aggregator": scenario.aggregator,
-            "controllers": [
-                scenario.controller
-            ],  # TODO incorporate multiple controllers
-            "llammas": [scenario.llamma],  # TODO incorporate multiple LLAMMAs
-            "pegkeepers": scenario.peg_keepers,
-            "stablecoin": scenario.stablecoin,
-            "spools": scenario.stableswap_pools,
-        }
-
-        self.metrics = init_metrics(metrics, **kwargs)
+        self.metrics = init_metrics(metrics, scenario)
 
         cols: List[str] = ["timestamp"]
 
@@ -54,6 +42,8 @@ class SingleSimProcessor:
         self.results: pd.DataFrame = pd.DataFrame(columns=self.cols)
 
         self.pricepaths = scenario.pricepaths
+        self.oracles = [scenario.price_oracle]
+        self.scenario = scenario
 
         # Initial state
         self.initial_state = self.update(scenario.pricepaths[0].timestamp)
@@ -62,16 +52,41 @@ class SingleSimProcessor:
         """
         Collect metrics for the current timestep of the sim.
         """
+
+        for oracle in self.oracles:
+            oracle.freeze()
+
         res: Dict[str, Union[float, int]] = {"timestamp": ts}
+        kwargs = self.metric_kwargs()
 
         for metric in self.metrics:
-            res.update(metric.compute())
+            res.update(metric.compute(**kwargs))
 
         if inplace:
             self.results.loc[len(self.results)] = res
 
+        for oracle in self.oracles:
+            oracle.unfreeze()
+
         return res
+
+    def metric_kwargs(self):
+        """
+        Get kwargs for all metrics. This prevents
+        us from repeating expensive operations like
+        calculating healths.
+        """
+        return {
+            "healths": controller_healths(self.scenario.controller),
+            "debts": controller_debts(self.scenario.controller),
+        }
 
     def process(self) -> SingleSimResults:
         """Process timeseries df into metrics result."""
+        self.prune()
         return SingleSimResults(self.results, self.pricepaths, self.metrics)
+
+    def prune(self) -> None:
+        """Prune size."""
+        del self.scenario
+        del self.oracles

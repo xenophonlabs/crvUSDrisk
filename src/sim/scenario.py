@@ -2,13 +2,15 @@
 Provides the `Scenario` class for running simulations.
 """
 
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, cast
 from itertools import combinations
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from crvusdsim.pool import get  # type: ignore
+from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
 from ..prices import PriceSample, PricePaths
 from ..configs import TOKEN_DTOs, get_scenario_config, get_price_config, CRVUSD_DTO
+from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -36,7 +38,9 @@ class Scenario:
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
 
-        self.price_config = get_price_config(self.freq)
+        self.price_config = get_price_config(
+            self.freq, self.config["prices"]["start"], self.config["prices"]["end"]
+        )
 
         self.generate_sim_market()  # must be first
         self.generate_pricepaths()
@@ -45,18 +49,23 @@ class Scenario:
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
-        offset = timedelta(seconds=self.config["quotes"]["offset"])
-        period = timedelta(seconds=self.config["quotes"]["period"])
-
-        end = datetime.now() - offset
-        start = end - period
+        start = self.config["quotes"]["start"]
+        end = self.config["quotes"]["end"]
 
         quotes = get_quotes(
-            int(start.timestamp()),
-            int(end.timestamp()),
+            start,
+            end,
             self.coins,
         )
-        logger.info("Using %d 1Inch quotes from %s to %s", quotes.shape[0], start, end)
+        logger.info(
+            "Using %d 1Inch quotes from %s to %s",
+            quotes.shape[0],
+            datetime.fromtimestamp(start),
+            datetime.fromtimestamp(end),
+        )
+
+        self.quotes_start = start
+        self.quotes_end = end
 
         self.markets: MarketsType = {}
         for pair in self.pairs:
@@ -105,7 +114,9 @@ class Scenario:
         """
         # TODO handle generation of multiple markets
         logger.info("Fetching sim_market from subgraph.")
-        sim_market = get(self.market_name, bands_data="controller")
+        sim_market = get(
+            self.market_name, bands_data="controller", use_simple_oracle=False
+        )
 
         metadata = sim_market.pool.metadata
 
@@ -129,14 +140,15 @@ class Scenario:
         self.controller = sim_market.controller
         self.stableswap_pools = sim_market.stableswap_pools
         self.aggregator = sim_market.aggregator
-        self.price_oracle = sim_market.price_oracle
+        self.price_oracle = cast(Oracle, sim_market.price_oracle)
         self.peg_keepers = sim_market.peg_keepers
         self.policy = sim_market.policy
         self.factory = sim_market.factory
         self.stablecoin = sim_market.stablecoin
+        self.tricrypto = sim_market.tricrypto
 
         # Convenient reference to all pools
-        # TODO add other LLAMMAs or TriCrypto pools
+        # TODO add all crvUSD pools (tBTC TriCrypto!)
         self.pools = [self.llamma] + self.stableswap_pools
 
         self.coins: Set[TokenDTO] = set()
@@ -175,9 +187,11 @@ class Scenario:
 
         # Equilibrate pool prices
         arbitrageur = Arbitrageur()  # diff arbitrageur
-        profit, count = arbitrageur.arbitrage(self.cycles, sample)
+        arbitrageur.arbitrage(self.cycles, sample)
         logger.info(
-            "Equilibrated prices with %d arbitrages with total profit %d", count, profit
+            "Equilibrated prices with %d arbitrages with total profit %d",
+            arbitrageur.count,
+            arbitrageur.profit,
         )
 
         # Liquidate users that were loaded underwater
@@ -208,53 +222,78 @@ class Scenario:
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
         self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
-        self.aggregator.last_timestamp = ts
 
         self.llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
         self.llamma.prev_p_o_time = ts
         self.llamma.rate_time = ts
         self.price_oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
-        self.price_oracle.last_prices_timestamp = ts
 
         self.controller._increment_timestamp(ts)  #  pylint: disable=protected-access
 
         for spool in self.stableswap_pools:
             spool._increment_timestamp(ts)  #  pylint: disable=protected-access
             spool.ma_last_time = ts
-
+        for tpool in self.tricrypto:
+            tpool._increment_timestamp(ts)  #  pylint: disable=protected-access
+            tpool.last_prices_timestamp = ts
         for pk in self.peg_keepers:
             pk._increment_timestamp(ts)  #  pylint: disable=protected-access
+
+    def update_tricrypto_prices(self, sample: PriceSample) -> None:
+        """Update TriCrypto prices with a new sample."""
+        for tpool in self.tricrypto:
+            tpool.prepare_for_run(
+                pd.DataFrame(
+                    [
+                        [
+                            # Get pairwise prices for TriCrypto pool assets
+                            sample.prices[pair[0].lower()][pair[1].lower()]
+                            for pair in list(combinations(tpool.assets.addresses, 2))
+                        ]
+                    ]
+                )
+            )
+
+    def update_staked_prices(self, sample: PriceSample) -> None:
+        """Update staked prices with a new sample."""
+        # Need to know which assets (staked and base)
+        oracle = self.price_oracle
+        llamma = self.llamma  # TODO need to know which llamma is associated with oracle
+        if hasattr(oracle, "staked_oracle"):
+            derivative = llamma.COLLATERAL_TOKEN.address
+            base = WETH
+            assert derivative in [WSTETH, SFRXETH]
+            p_staked = int(sample.prices[derivative][base] * 10**18)
+            oracle.staked_oracle.update(p_staked)
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
         self.update_market_prices(sample)
+        self.update_tricrypto_prices(sample)
+        self.update_staked_prices(sample)
 
-        # FIXME Manually update LLAMMA oracle price
-        _p = int(
-            sample.prices_usd[self.llamma.COLLATERAL_TOKEN.address]
-            * 10**self.llamma.COLLATERAL_TOKEN.decimals
-        )
-        self.price_oracle.set_price(_p)
-
-        self.llamma.prepare_for_trades(ts)
+        self.llamma.prepare_for_trades(ts)  # this increments oracle timestamp
         self.controller.prepare_for_trades(ts)
         self.aggregator.prepare_for_trades(ts)
         for spool in self.stableswap_pools:
             spool.prepare_for_trades(ts)
+        for tpool in self.tricrypto:
+            tpool.prepare_for_trades(ts)
         for peg_keeper in self.peg_keepers:
             peg_keeper.prepare_for_trades(ts)
+
+        sample.prices_usd[CRVUSD_DTO.address] = self.aggregator.price() / 1e18
 
     def after_trades(self) -> None:
         """Perform post processing for all modules at the end of a time step."""
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
-        _, _ = self.arbitrageur.arbitrage(self.cycles, prices)
-        _, _ = self.liquidator.perform_liquidations(self.controller)
-        _, _ = self.keeper.update(self.peg_keepers)
+        self.arbitrageur.arbitrage(self.cycles, prices)
+        self.liquidator.perform_liquidations(self.controller, prices)
+        self.keeper.update(self.peg_keepers)
         # TODO what is the right order for the actions?
-        # TODO need to incorporate non-PK pools for arbs (e.g. TriCRV)
         # TODO need to incorporate LPs add/remove liquidity
         # ^ currently USDT pool has more liquidity and this doesn't change since we
         # only model swaps.

@@ -53,6 +53,7 @@ class Swap(Trade):
     i: int
     j: int
     amt: int
+    out: int = 0
 
     def get_address(self, i: int):
         """Get the address of token `i`."""
@@ -111,6 +112,8 @@ class Swap(Trade):
             else:
                 raise NotImplementedError
 
+            self.out = amt_out
+
         return amt_out, self.get_decimals(self.j)
 
     def __repr__(self):
@@ -135,6 +138,7 @@ class Liquidation(Trade):
     frac: float = 10**18  # does nothing
     i: int = 0  # repay stablecoin
     j: int = 1  # receive collateral
+    out: int = 0
 
     def get_address(self, i: int):
         """Get the address of token `i`."""
@@ -179,5 +183,7 @@ class Liquidation(Trade):
 
         amt_out = new_bal - bal
         assert amt_out > 0
+
+        self.out = amt_out
 
         return amt_out, self.get_decimals(self.j)

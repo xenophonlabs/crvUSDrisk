@@ -1,8 +1,7 @@
 """Provides the `Liquidator` class."""
 import math
-from typing import List, Tuple
+from typing import List
 from dataclasses import dataclass
-from scipy.optimize import root_scalar
 from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
@@ -11,6 +10,7 @@ from ..modules import ExternalMarket
 from ..trades.cycle import Swap, Liquidation, Cycle
 from ..utils import get_crvusd_index
 from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE
+from ..prices import PriceSample
 from ..types import MarketsType
 from ..data_transfer_objects import TokenDTO
 from ..logging import get_logger
@@ -43,8 +43,6 @@ class Liquidator(Agent):
     1. Purchase crvUSD from the crvUSD/USDC pool.
     2. Liquidate the user in the Controller.
     3. Sell collateral for USDC in the USDC/collateral External Market.
-
-    TODO consider more general liquidation paths.
     """
 
     basis_tokens: List[TokenDTO] = [
@@ -59,6 +57,10 @@ class Liquidator(Agent):
         self.tolerance = tolerance
         self._profit: float = 0.0
         self._count: int = 0
+        self._borrower_loss: float = 0
+
+        self.collateral_liquidated: int = 0
+        self.debt_repaid: int = 0
 
     def set_paths(
         self,
@@ -97,7 +99,8 @@ class Liquidator(Agent):
     def perform_liquidations(
         self,
         controller: SimController,
-    ) -> Tuple[float, int]:
+        prices: PriceSample,
+    ) -> None:
         """
         Loops through all liquidatable users and liquidates if profitable.
 
@@ -112,39 +115,26 @@ class Liquidator(Agent):
             Profit in USD units from liquidations.
         count : int
             Count of liquidations performed.
-
-        TODO liquidations should be ordered by profitability
         """
+        controller.AMM.price_oracle_contract.freeze()
         to_liquidate = controller.users_to_liquidate()
+        controller.AMM.price_oracle_contract.unfreeze()
 
         logger.debug("There are %d users to liquidate.", len(to_liquidate))
 
-        if len(to_liquidate) == 0:
-            return 0.0, 0
-
-        profit = 0.0
         count = 0
-
         for position in to_liquidate:
-            profit_ = self.maybe_liquidate(position, controller)
-
-            if profit_ > self.tolerance:
-                profit += profit_
-                count += 1
-
-        self._profit += profit
-        self._count += count
+            count += self.maybe_liquidate(position, controller, prices)
 
         logger.debug("There are %d users left to liquidate", len(to_liquidate) - count)
-
-        return profit, count
 
     # pylint: disable=too-many-locals
     def maybe_liquidate(
         self,
         position: Position,
         controller: SimController,
-    ) -> float:
+        prices: PriceSample,
+    ) -> bool:
         """
         This is the hard liquidation:
         1. Liquidator checks the crvusd debt they'll have to repay.
@@ -158,17 +148,7 @@ class Liquidator(Agent):
         they perform the liquidations.
         or USDT) that gives them the most profit, if this profit > 0.
 
-        Parameters
-        ----------
-        controller : Controller
-            Controller object
-        position : Position
-            Position object to liquidate
-
-        Returns
-        -------
-        float
-            profit in basis token units
+        Updates internal Liquidator state.
 
         Note
         ----
@@ -176,12 +156,10 @@ class Liquidator(Agent):
         USDC and partly from USDT.
         TODO incorporate liquidations against other tokens (not just
         USDC and USDT).
-        TODO use the ERC20 dataclass for all token objects in codebase
         """
         user = position.user
         health = position.health
 
-        # TODO int casting should occur in controller
         to_repay = int(controller.tokens_to_liquidate(user))
         _, y = controller.AMM.get_sum_xy(user)
         y = int(y)
@@ -196,14 +174,10 @@ class Liquidator(Agent):
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
 
-            # TODO Abstract this into the `Cycle.populate` function
-            # TODO dollarize the profit based on current USD market prices
-
             # basis token -> crvusd
             j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
-            amt_in = crvusd_pool.get_dx(i, j, to_repay)  # FIXME
-            # amt_in = self.search(crvusd_pool, i, j, to_repay)
+            amt_in = crvusd_pool.get_dx(i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
             # crvusd -> collateral
@@ -231,51 +205,29 @@ class Liquidator(Agent):
             )
             profit = best.execute()
             logger.debug("Liquidated user %s with profit: %f.", user, profit)
-            return profit
+
+            # Update state
+            self._profit += profit
+            self._count += 1
+
+            external = best.trades[2]
+            liquidation = best.trades[1]
+            self.collateral_liquidated += external.amt / 10 ** external.get_decimals(
+                external.i
+            )
+            self.debt_repaid += liquidation.amt / 10 ** liquidation.get_decimals(
+                liquidation.i
+            )
+
+            self.update_borrower_losses(best, prices)
+
+            return True
+
         logger.debug(
             "Missed liquidation for user %s. Health: %f. Expected profit: %f.",
             user,
             health,
             best_expected_profit,
         )
-        return 0.0
 
-    def search(self, pool: SimCurveStableSwapPool, i: int, j: int, amt_out: int) -> int:
-        """
-        DEPRECATED: use `SimCurveStableSwapPool.get_dy` instead.
-
-        Find the amt_in required to get the desired
-        amt_out from a swap.
-
-        This is essentially a more optimized binary search
-        using Brent's method.
-        """
-        amt_out_float = float(amt_out)  # For scipy
-
-        assert isinstance(pool, SimCurveStableSwapPool)
-
-        def loss(amt_in: int, pool: SimCurveStableSwapPool, i: int, j: int):
-            """
-            Loss function for optimization. Very simple:
-            we just want to minimize the diff between the
-            desired amt_out, and the actual amt_out.
-            """
-            amt_in = int(amt_in)
-            with pool.use_snapshot_context():
-                _, amt_out_, _ = pool.trade(i, j, amt_in)
-            return amt_out_float - amt_out_
-
-        high = pool.get_max_trade_size(i, j)
-
-        res = root_scalar(
-            loss,
-            args=(pool, i, j),
-            bracket=(0, high),
-            xtol=1,  # Absolute error. This is 1e-18 in crvusd units TODO could make =$1 MTM
-            method="brentq",
-            # maxiter=1000,
-        )
-
-        if res.converged:
-            return int(res.root)
-        raise RuntimeError(res.flag)
+        return False

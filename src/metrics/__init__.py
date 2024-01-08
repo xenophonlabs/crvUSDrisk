@@ -1,58 +1,32 @@
 """
 Provides Metrics classes for each simulated entity.
-
-Metrics
--------
-Arbitrageur: Profit
-Arbitrageur: Count
-Arbitrageur: Volume TODO
-Liquidator:  Profit
-Liquidator:  Count
-Liquidator: Volume TODO
-Keeper: Profit
-Keeper: Count
-Keeper: Volume TODO
-LLAMMA: Price
-LLAMMA: Oracle price
-LLAMMA: Fees x
-LLAMMA: Fees y
-LLAMMA: Balances FIXME currently just sum over bands
-Controller: System Health
-Controller: Bad Debt
-Controller: Number of loans
-Controller: Debt
-Controller: Users to liquidate
-Controller: When are liquidations "bad"? TODO
-StableSwap: Price
-StableSwap: MA Price
-StableSwap: LP Token Supply
-StableSwap: Virtual Price
-StableSwap: Balances
-PK: Debt
-PK: Profit
-Aggregator: Price
-ERC20: Total Supply
-ERC20: Net unbacked crvusd TODO
 """
-
-from typing import List, Type
-from .agent import AgentMetrics
-from .aggregator import AggregatorMetrics
+from __future__ import annotations
+from typing import List, Type, TYPE_CHECKING
 from .base import Metric
-from .controller import ControllerMetrics
-from .llamma import LLAMMAMetrics
-from .pegkeeper import PegKeeperMetrics
-from .stablecoin import StablecoinMetrics
-from .stableswap import StableSwapMetrics
+from .metrics import (
+    BadDebtMetric,
+    SystemHealthMetric,
+    BorrowerLossMetric,
+    ValueLeakageMetric,
+    PegStrengthMetric,
+    LiquidationsMetric,
+    PegKeeperMetric,
+    MiscMetric,
+)
+
+if TYPE_CHECKING:
+    from ..sim.scenario import Scenario
 
 DEFAULT_METRICS = [
-    AgentMetrics,
-    AggregatorMetrics,
-    ControllerMetrics,
-    LLAMMAMetrics,
-    PegKeeperMetrics,
-    StablecoinMetrics,
-    StableSwapMetrics,
+    BadDebtMetric,
+    SystemHealthMetric,
+    BorrowerLossMetric,
+    ValueLeakageMetric,
+    PegStrengthMetric,
+    LiquidationsMetric,
+    PegKeeperMetric,
+    MiscMetric,
 ]
 
 __all__ = [
@@ -61,7 +35,7 @@ __all__ = [
 ]
 
 
-def init_metrics(metrics: List[Type[Metric]], **kwargs) -> List[Metric]:
+def init_metrics(metrics: List[Type[Metric]], scenario: Scenario) -> List[Metric]:
     """
     Initialize metrics.
 
@@ -75,4 +49,4 @@ def init_metrics(metrics: List[Type[Metric]], **kwargs) -> List[Metric]:
     List[Metric]
         List of metric instances.
     """
-    return [metric(**kwargs) for metric in metrics]
+    return [metric(scenario) for metric in metrics]
