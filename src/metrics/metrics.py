@@ -212,7 +212,9 @@ class MiscMetric(Metric):
     def _config(self):
         return {
             "crvUSD Total Supply": ["max"],
-            f"{entity_str(self.scenario.controller, 'controller')} Total Debt": ["mean"],
+            f"{entity_str(self.scenario.controller, 'controller')} Total Debt": [
+                "mean"
+            ],
             f"{entity_str(self.scenario.llamma, 'llamma')} Price": ["mean"],
             f"{entity_str(self.scenario.llamma, 'llamma')} Oracle Price": ["mean"],
         }
