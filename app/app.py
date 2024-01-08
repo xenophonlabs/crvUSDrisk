@@ -29,6 +29,7 @@ from src.logging import get_logger
 from src.plotting.utils import make_square
 from src.configs import ADDRESS_TO_SYMBOL, LLAMMA_ALIASES, TOKEN_DTOs
 from src.utils import get_quotes
+from src.metrics.utils import entity_str
 from .utils import (
     load_markdown_file,
     clean_metadata,
@@ -57,9 +58,6 @@ DIV_KWARGS = {
 }
 
 SCROLL_DIV_KWARGS = {"style": {"maxHeight": "500px", "overflow": "scroll"}}
-SCROLL_DIV_KWARGS_50 = {
-    "style": {"maxHeight": "500px", "overflow": "scroll", "width": "50%"}
-}
 
 TAB_KWARGS = {"label_style": {"color": "black"}}
 
@@ -109,7 +107,7 @@ initial_modal = dbc.Modal(
                                         for alias in LLAMMA_ALIASES.keys()
                                     ],
                                     ["wsteth"],
-                                    multi=True,
+                                    # multi=True,  # TODO
                                     id="select-markets",
                                 ),
                                 dbc.Label("Number of Iterations", html_for="num-iter"),
@@ -245,6 +243,42 @@ def _generate_content(output: MonteCarloResults):
         for asset in [c.address for c in metadata["template"].coins]
     ]
 
+    worst_depeg_agg = output.summary.loc[
+        output.summary[["Peg Strength Min", "Peg Strength Max"]]
+        .subtract(1)
+        .abs()
+        .stack()
+        .idxmax()
+    ]
+
+    spools = [
+        entity_str(spool, "stableswap").title()
+        for spool in metadata["template"].stableswap_pools
+    ]
+    worst_depeg_spool = None
+    worst_depeg_spool_val = None
+    for spool in spools:
+        val = output.summary.loc[
+            output.summary[[f"{spool} Price Max", f"{spool} Price Min"]]
+            .subtract(1)
+            .abs()
+            .stack()
+            .idxmax()
+        ]
+        if worst_depeg_spool_val is None or val > worst_depeg_spool_val:
+            worst_depeg_spool = "/".join(spool.split("_")[1:]).upper()
+            worst_depeg_spool_val = val
+    worst_depeg_spool, worst_depeg_spool_val
+
+    depeg_str = html.Div(
+        [
+            html.H5(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.2f}"),
+            html.H5(
+                f"Worst Depeg in StableSwap: {worst_depeg_spool_val:,.2f} in {worst_depeg_spool}"
+            ),
+        ]
+    )
+
     layout = html.Div(
         [
             html.H1(
@@ -256,94 +290,72 @@ def _generate_content(output: MonteCarloResults):
                     [
                         html.H3("Overview", style={"textAlign": "center"}),
                         html.Div(
-                            dbc.Row(
+                            html.Ul(
                                 [
-                                    dbc.Col(
-                                        html.Ul(
-                                            [
-                                                html.Li(
-                                                    [
-                                                        html.Span(
-                                                            "Scenario Name: ",
-                                                            style={
-                                                                "font-weight": "bold"
-                                                            },
-                                                        ),
-                                                        metadata["scenario"],
-                                                    ]
-                                                ),
-                                                html.Li(
-                                                    [
-                                                        html.Span(
-                                                            "Number of Iterations: ",
-                                                            style={
-                                                                "font-weight": "bold"
-                                                            },
-                                                        ),
-                                                        metadata["num_iter"],
-                                                    ]
-                                                ),
-                                                html.Li(
-                                                    [
-                                                        html.Span(
-                                                            f"Simulation Horizon: ",
-                                                            style={
-                                                                "font-weight": "bold"
-                                                            },
-                                                        ),
-                                                        metadata["num_steps"],
-                                                        " steps of ",
-                                                        metadata["freq"],
-                                                    ]
-                                                ),
-                                                html.Li(
-                                                    [
-                                                        html.Span(
-                                                            "Markets: ",
-                                                            style={
-                                                                "font-weight": "bold"
-                                                            },
-                                                        ),
-                                                        str(metadata["markets"]),
-                                                    ]
-                                                ),
-                                                html.Li(
-                                                    [
-                                                        html.Span(
-                                                            "Brief description: ",
-                                                            style={
-                                                                "font-weight": "bold"
-                                                            },
-                                                        ),
-                                                        str(metadata["description"]),
-                                                    ]
-                                                ),
-                                            ]
-                                        ),
-                                        width=9,
-                                    ),
-                                    dbc.Col(
+                                    html.Li(
                                         [
-                                            html.Div(
-                                                [
-                                                    dbc.Button(
-                                                        "Download Output",
-                                                        id="download-button",
-                                                        color="secondary",
-                                                    ),
-                                                    dcc.Download(id="download-output"),
-                                                ],
-                                                style={"textAlign": "center"},
-                                            )
-                                        ],
-                                        width=3,
+                                            html.Span(
+                                                "Scenario Name: ",
+                                                style={"font-weight": "bold"},
+                                            ),
+                                            metadata["scenario"],
+                                        ]
                                     ),
-                                ],
-                            )
+                                    html.Li(
+                                        [
+                                            html.Span(
+                                                "Number of Iterations: ",
+                                                style={"font-weight": "bold"},
+                                            ),
+                                            metadata["num_iter"],
+                                        ]
+                                    ),
+                                    html.Li(
+                                        [
+                                            html.Span(
+                                                f"Simulation Horizon: ",
+                                                style={"font-weight": "bold"},
+                                            ),
+                                            metadata["num_steps"],
+                                            " steps of ",
+                                            metadata["freq"],
+                                        ]
+                                    ),
+                                    html.Li(
+                                        [
+                                            html.Span(
+                                                "Markets: ",
+                                                style={"font-weight": "bold"},
+                                            ),
+                                            str(metadata["markets"]),
+                                        ]
+                                    ),
+                                    html.Li(
+                                        [
+                                            html.Span(
+                                                "Brief description: ",
+                                                style={"font-weight": "bold"},
+                                            ),
+                                            str(metadata["description"]),
+                                        ]
+                                    ),
+                                ]
+                            ),
                         ),
                         html.H5("Disclaimers", style={"textAlign": "center"}),
                         html.P(
                             "Not financial advice. All assumptions and limitations documented in the INFO tab.",
+                            style={"textAlign": "center"},
+                        ),
+                        html.Div(
+                            [
+                                dbc.Button(
+                                    "Download Output",
+                                    id="download-button",
+                                    color="secondary",
+                                ),
+                                dcc.Download(id="download-output"),
+                            ],
                             style={"textAlign": "center"},
                         ),
                     ],
@@ -356,24 +368,101 @@ def _generate_content(output: MonteCarloResults):
                     dbc.Tab(
                         html.Div(
                             [
-                                html.H2(
-                                    "Aggregated Data", style={"textAlign": "center"}
-                                ),
+                                html.H2("Summary", style={"textAlign": "center"}),
                                 html.P(
-                                    "Aggregated histograms and raw data across all model runs.",
+                                    "Summarized metrics, histograms, and raw data across all model runs.",
                                     style={"textAlign": "center"},
                                 ),
-                                html.H4("Metric Histograms"),
-                                html.Div(
-                                    dbc.Select(
-                                        options=aggregate_columns,
-                                        id="aggregate-metric-dropdown",
-                                        value="System Health Mean",
+                                dbc.CardGroup(
+                                    [
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H4(
+                                                        "Value at Risk",
+                                                        className="card-title",
+                                                    ),
+                                                    html.P(
+                                                        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time."
+                                                    ),
+                                                    html.H5(
+                                                        f"VaR: {output.summary['Bad Debt Max'].quantile(0.99):,.0f} crvUSD"
+                                                    ),
+                                                ],
+                                            ),
+                                            style={"textAlign": "center"},
+                                        ),
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H4(
+                                                        "Liquidations at Risk",
+                                                        className="card-title",
+                                                    ),
+                                                    html.P(
+                                                        "Liquidations at Risk (LaR) is the p99 maximum collateral liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated collateral under the input assumptions will only ever exceed LaR 1% of the time."
+                                                    ),
+                                                    html.H5(
+                                                        f"LaR: {output.summary['Collateral Liquidated Max'].quantile(0.99):,.0f} {ADDRESS_TO_SYMBOL[metadata['template'].llamma.COLLATERAL_TOKEN.address]}"
+                                                    ),
+                                                ],
+                                            ),
+                                            style={"textAlign": "center"},
+                                        ),
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H4(
+                                                        "Borrower Losses at Risk",
+                                                        className="card-title",
+                                                    ),
+                                                    html.P(
+                                                        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time."
+                                                    ),
+                                                    html.H5(
+                                                        f"BLaR: {output.summary['Borrower Loss Max'].quantile(0.99):,.0f} crvUSD"
+                                                    ),
+                                                ],
+                                            ),
+                                            style={"textAlign": "center"},
+                                        ),
+                                        dbc.Card(
+                                            dbc.CardBody(
+                                                [
+                                                    html.H4(
+                                                        "Worst Depeg",
+                                                        className="card-title",
+                                                    ),
+                                                    html.P(
+                                                        "The worst depeg (up or down) observed over the simulated runs for the Aggregator or any StableSwap pool."
+                                                    ),
+                                                    html.H5(depeg_str),
+                                                ],
+                                            ),
+                                            style={"textAlign": "center"},
+                                        ),
+                                    ]
+                                ),
+                                html.Br(),
+                                html.H4(
+                                    "Metric Histograms", style={"textAlign": "center"}
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        dbc.Select(
+                                            options=aggregate_columns,
+                                            id="aggregate-metric-dropdown",
+                                            value="System Health Mean",
+                                        ),
+                                        width=4,
                                     ),
-                                    style={"textAlign": "center"},
+                                    justify="center",
                                 ),
                                 dcc.Graph(id="aggregate-graph"),
-                                html.H4("Aggregate Data"),
+                                html.H4(
+                                    "Aggregate Data", style={"textAlign": "center"}
+                                ),
+                                html.Br(),
                                 html.Div(
                                     dbc.Table.from_dataframe(
                                         output.summary.reset_index(
@@ -387,7 +476,7 @@ def _generate_content(output: MonteCarloResults):
                             ],
                             **DIV_KWARGS,
                         ),
-                        label="Aggregate Data",
+                        label="Summary",
                         **TAB_KWARGS,
                     ),
                     dbc.Tab(
@@ -400,32 +489,59 @@ def _generate_content(output: MonteCarloResults):
                                     "Timeseries plots, metrics data, and prices for each simulated run.",
                                     style={"textAlign": "center"},
                                 ),
-                                html.H4("Per Simulated Run Plots"),
-                                html.Div(
-                                    dbc.Select(
-                                        options=per_run_columns,
-                                        id="run-metric-dropdown",
-                                        value="System Health",
-                                    ),
+                                html.H4(
+                                    "Per Simulated Run Plots",
                                     style={"textAlign": "center"},
                                 ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        dbc.Select(
+                                            options=per_run_columns,
+                                            id="run-metric-dropdown",
+                                            value="System Health",
+                                        ),
+                                        width=4,
+                                    ),
+                                    justify="center",
+                                ),
                                 dcc.Graph(id="run-graph"),
-                                html.H4("Per Simulated Run Data"),
-                                dbc.Label("Select a run:"),
-                                dbc.Input(
-                                    id="run-dropdown",
-                                    type="number",
-                                    min=1,
-                                    max=len(output.data),
-                                    step=1,
-                                    value=0,
+                                html.H4(
+                                    "Per Simulated Run Data",
+                                    style={"textAlign": "center"},
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        [
+                                            dbc.Label("Select a run:"),
+                                            dbc.Input(
+                                                id="run-dropdown",
+                                                type="number",
+                                                min=1,
+                                                max=len(output.data),
+                                                step=1,
+                                                value=0,
+                                            ),
+                                        ],
+                                        width=3,
+                                    ),
+                                    justify="center",
                                 ),
                                 html.Br(),
                                 html.Div(id="run-data-container", **SCROLL_DIV_KWARGS),
                                 html.Br(),
-                                html.H4("Per Run Prices"),
-                                dbc.Checkbox(
-                                    label="Show All", value=True, id="price-checkbox"
+                                html.H4(
+                                    "Per Run Prices", style={"textAlign": "center"}
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        dbc.Checkbox(
+                                            label="Show All",
+                                            value=True,
+                                            id="price-checkbox",
+                                        ),
+                                        width=1,
+                                    ),
+                                    justify="center",
                                 ),
                                 dcc.Graph(id="run-prices"),
                             ],
@@ -437,43 +553,40 @@ def _generate_content(output: MonteCarloResults):
                     dbc.Tab(
                         html.Div(
                             [
-                                html.H2("Summary", style={"textAlign": "center"}),
-                                html.P(
-                                    "Summarized metrics and insights.",
-                                    style={"textAlign": "center"},
-                                ),
-                            ],
-                            **DIV_KWARGS,
-                        ),
-                        label="Summary",
-                        **TAB_KWARGS,
-                    ),
-                    dbc.Tab(
-                        html.Div(
-                            [
                                 html.H2("Configuration", style={"textAlign": "center"}),
                                 html.P(
                                     "Simulation configuration.",
                                     style={"textAlign": "center"},
                                 ),
-                                html.H4("Price Parameters"),
-                                html.P(
-                                    f"Generative parameters for each stochastic process. Trained from {datetime.fromtimestamp(price_config['start'])} to {datetime.fromtimestamp(price_config['end'])}"
+                                html.H4(
+                                    "Price Parameters", style={"textAlign": "center"}
                                 ),
-                                html.Div(
-                                    dbc.Table.from_dataframe(
-                                        pd.DataFrame.from_dict(
-                                            price_config["params"],
-                                            orient="index",
-                                        )
-                                        .reset_index(names="Name")
-                                        .round(DECIMALS),
-                                        **DBC_TABLE_KWARGS,
+                                html.P(
+                                    f"Generative parameters for each stochastic process. Trained from {datetime.fromtimestamp(price_config['start'])} to {datetime.fromtimestamp(price_config['end'])}",
+                                    style={"textAlign": "center"},
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        html.Div(
+                                            dbc.Table.from_dataframe(
+                                                pd.DataFrame.from_dict(
+                                                    price_config["params"],
+                                                    orient="index",
+                                                )
+                                                .reset_index(names="Name")
+                                                .round(DECIMALS),
+                                                **DBC_TABLE_KWARGS,
+                                            ),
+                                            **SCROLL_DIV_KWARGS,
+                                        ),
+                                        width=6,
                                     ),
-                                    **SCROLL_DIV_KWARGS_50,
+                                    justify="center",
                                 ),
                                 html.Br(),
-                                html.H5("Asset covariances"),
+                                html.H4(
+                                    "Asset covariances", style={"textAlign": "center"}
+                                ),
                                 html.Div(
                                     dbc.Table.from_dataframe(
                                         pd.DataFrame.from_dict(
@@ -487,9 +600,13 @@ def _generate_content(output: MonteCarloResults):
                                     **SCROLL_DIV_KWARGS,
                                 ),
                                 html.Br(),
-                                html.H4("External Liquidity Curves"),
+                                html.H4(
+                                    "External Liquidity Curves",
+                                    style={"textAlign": "center"},
+                                ),
                                 html.P(
-                                    f"Quotes from {metadata['template'].quotes_start} to {metadata['template'].quotes_end}."
+                                    f"Quotes from {metadata['template'].quotes_start} to {metadata['template'].quotes_end}.",
+                                    style={"textAlign": "center"},
                                 ),
                                 html.Div(
                                     [
@@ -540,7 +657,9 @@ def _generate_content(output: MonteCarloResults):
                                 ),
                                 html.Br(),
                                 html.Br(),
-                                html.H4("Module Metadata"),
+                                html.H4(
+                                    "Module Metadata", style={"textAlign": "center"}
+                                ),
                                 html.Div(
                                     dcc.Markdown(
                                         f"```json\n{json.dumps(metadata['template'].llamma.metadata, indent=4)}\n```"
