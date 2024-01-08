@@ -43,7 +43,7 @@ plt.switch_backend("Agg")
 
 logger = get_logger(__name__)
 
-DECIMALS = 3  # number of decimal places to round to
+DECIMALS = 5  # number of decimal places to round to
 
 DBC_TABLE_KWARGS = {
     "responsive": True,
@@ -734,7 +734,7 @@ def update_run_graph(value):
 
     for run in output.data:
         dff = run.df[value]
-        fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines"))
+        fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines+markers"))
 
     fig.update_layout(
         title=f"Plot of {value} for all Runs",
@@ -821,13 +821,13 @@ def update_run_prices(value: int, show_all: bool):
                     for _df in output.data:
                         prices = _df.pricepaths.prices
                         fig.add_trace(
-                            go.Scatter(x=prices.index, y=prices[col], mode="lines"),
+                            go.Scatter(x=prices.index, y=prices[col], mode="lines+markers"),
                             row=i + 1,
                             col=j + 1,
                         )
                 else:
                     fig.add_trace(
-                        go.Scatter(x=df.index, y=df[col], mode="lines"),
+                        go.Scatter(x=df.index, y=df[col], mode="lines+markers"),
                         row=i + 1,
                         col=j + 1,
                     )

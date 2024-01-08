@@ -67,7 +67,7 @@ if __name__ == "__main__":
         ncpu = 1
 
     output = with_analysis(args.scenario, args.markets, args.num_iter, ncpu)
-    # without_analysis(args.scenario, args.markets, args.num_iter, ncpu)
+    # output = without_analysis(args.scenario, args.markets, args.num_iter, ncpu)
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
     with open(f"results/{args.scenario}.pkl", "wb") as f:
