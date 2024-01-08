@@ -212,6 +212,7 @@ class MiscMetric(Metric):
     def _config(self):
         return {
             "crvUSD Total Supply": ["max"],
+            f"{entity_str(self.scenario.controller, 'controller')} Total Debt": ["mean"],
             f"{entity_str(self.scenario.llamma, 'llamma')} Price": ["mean"],
             f"{entity_str(self.scenario.llamma, 'llamma')} Oracle Price": ["mean"],
         }
@@ -219,8 +220,11 @@ class MiscMetric(Metric):
     def compute(self, **kwargs):
         """Compute miscellaneous metrics."""
         llamma = self.scenario.llamma
+        controller = self.scenario.controller
+        debts = kwargs.get("debts")
         return {
             "crvUSD Total Supply": self.scenario.stablecoin.totalSupply / 1e18,
+            f"{entity_str(controller, 'controller')} Total Debt": debts.sum() / 1e18,
             f"{entity_str(llamma, 'llamma')} Price": llamma.get_p() / 1e18,
             f"{entity_str(llamma, 'llamma')} Oracle Price": llamma.price_oracle()
             / 1e18,

@@ -772,7 +772,9 @@ def save_output(n_clicks):
 )
 def update_aggregate_graph(value):
     dff = output.summary[value]
-    return px.histogram(dff)
+    fig = px.histogram(dff)
+    fig.update_layout(bargap=0.1)
+    return fig
 
 
 N = 3  # keep every N rows for run graphs
@@ -800,7 +802,7 @@ def update_run_graph(value):
 
 @callback(Output("run-data-container", "children"), Input("run-dropdown", "value"))
 def update_run_data_table(value: int):
-    if not output or not value:
+    if not output or value is None:
         return no_update
     return dbc.Table.from_dataframe(
         output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),
@@ -856,7 +858,7 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
     Input("price-checkbox", "value"),
 )
 def update_run_prices(value: int, show_all: bool):
-    if not output:
+    if not output or value is None:
         return no_update
     df = output.data[value - 1].pricepaths.prices
     cols = [col for col in df.columns if col != "timestamp"]

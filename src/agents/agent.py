@@ -12,6 +12,9 @@ if TYPE_CHECKING:
     from ..trades import Cycle
 
 
+TOLERANCE = -10  # USD
+
+
 # pylint: disable=too-few-public-methods
 class Agent(ABC):
     """Base class for agents."""
@@ -64,8 +67,8 @@ class Agent(ABC):
                 * prices.prices_usd[trade.get_address(trade.j)]
             )
             borrower_loss = token_out - token_in
-            if borrower_loss < 0:
-                logger.warning(
+            if borrower_loss < TOLERANCE:
+                logger.debug(
                     "Borrower loss was positive for cycle %s: %f", cycle, borrower_loss
                 )
             self._borrower_loss += borrower_loss
