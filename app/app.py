@@ -7,6 +7,7 @@ from datetime import datetime
 import pickle
 import json
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from dash import (
     Dash,
@@ -289,6 +290,14 @@ def _generate_content(output: MonteCarloResults):
         ]
     )
 
+    cov_matrix = pd.DataFrame(price_config["cov"])
+    std_devs = np.sqrt(np.diag(cov_matrix))
+    std_dev_matrix = np.outer(std_devs, std_devs)
+    corr_matrix = cov_matrix / std_dev_matrix
+    corr_matrix = pd.DataFrame(
+        corr_matrix, index=cov_matrix.index, columns=cov_matrix.columns
+    )
+
     layout = html.Div(
         [
             html.H1(
@@ -492,7 +501,10 @@ def _generate_content(output: MonteCarloResults):
                                         id="aggregate-data",
                                         style_table={"overflowX": "auto"},
                                         style_cell={
-                                            "padding": "10px",
+                                            "padding-left": "10px",
+                                            "padding-right": "10px",
+                                            "padding-top": "20px",
+                                            "padding-bottom": "20px",
                                             "color": "white",
                                         },
                                         style_header={
@@ -629,14 +641,11 @@ def _generate_content(output: MonteCarloResults):
                                 ),
                                 html.Br(),
                                 html.H4(
-                                    "Asset covariances", style={"textAlign": "center"}
+                                    "Asset Correlations", style={"textAlign": "center"}
                                 ),
                                 html.Div(
                                     dbc.Table.from_dataframe(
-                                        pd.DataFrame.from_dict(
-                                            price_config["cov"],
-                                            orient="index",
-                                        )
+                                        corr_matrix
                                         .reset_index(names="Name")
                                         .round(DECIMALS),
                                         **DBC_TABLE_KWARGS,

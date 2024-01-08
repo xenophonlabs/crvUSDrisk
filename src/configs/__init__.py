@@ -70,9 +70,14 @@ def get_price_config(freq: str, start: int, end: int) -> dict:
     if not files:
         raise ValueError(f"No price configs generated for {freq}.")
 
-    fn = f"{start}_{end}.json"
-
-    if fn not in files:
+    target = f"{start}_{end}.json"
+    fn = None
+    found = False
+    for fn_ in files:
+        if fn_.split("/")[-1] == target:
+            fn = fn_
+            found = True
+    if fn is None:
         fn = sorted(files, reverse=True)[0]
 
     with open(fn, "r", encoding="utf-8") as f:
@@ -81,7 +86,7 @@ def get_price_config(freq: str, start: int, end: int) -> dict:
     coin_ids = list(config["params"].keys())
     config["curr_prices"] = get_current_prices(coin_ids)
 
-    if fn not in files:
+    if not found:
         logger.warning(
             "No price config found from %s to %s. Using config from %s to %s instead.\
             Please run `gen_price_config` to generate the requested config.",
