@@ -109,6 +109,7 @@ initial_modal = dbc.Modal(
                                     ],
                                     value="baseline_macro",
                                 ),
+                                html.Br(),
                                 dbc.Label("Select Markets", html_for="select-markets"),
                                 dcc.Dropdown(
                                     [
@@ -119,6 +120,7 @@ initial_modal = dbc.Modal(
                                     # multi=True,  # TODO
                                     id="select-markets",
                                 ),
+                                html.Br(),
                                 dbc.Label("Number of Iterations", html_for="num-iter"),
                                 dbc.Input(
                                     id="num-iter",
@@ -439,7 +441,7 @@ def _generate_content(output: MonteCarloResults):
                                                         "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time."
                                                     ),
                                                     html.H5(
-                                                        f"BLaR: {output.summary['Borrower Loss Max'].quantile(0.99):,.0f} crvUSD"
+                                                        f"BLaR: {output.summary['Borrower Loss Max'].quantile(0.99):,.0f} USD"
                                                     ),
                                                 ],
                                             ),
