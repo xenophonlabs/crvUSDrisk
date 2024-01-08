@@ -647,9 +647,9 @@ def _generate_content(output: MonteCarloResults):
                                 ),
                                 html.Div(
                                     dbc.Table.from_dataframe(
-                                        corr_matrix
-                                        .reset_index(names="Name")
-                                        .round(DECIMALS),
+                                        corr_matrix.reset_index(names="Name").round(
+                                            DECIMALS
+                                        ),
                                         **DBC_TABLE_KWARGS,
                                     ),
                                     **SCROLL_DIV_KWARGS,
