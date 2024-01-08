@@ -65,13 +65,13 @@ We provide sample simulation results for the `baseline` scenario in [this](https
 
 ## Running Simulations
 
-### In the Dashboard
+### From the Dashboard
 
 Select a `scenario`, `market`, and number of iterations (model runs) for you scenario and click the simulate button. Your terminal will begin to print the logs for the simulation. 
 
-*Simulations may take a long time to finalize; by default, multiprocessing will be applied using all your machine's processors*.
+*Simulations may take a long time to finalize; by default, multiprocessing will be applied using all your machine's processors. It is much faster to run simulations directly from the command line.*.
 
-### In a Script
+### From the Command Line
 
 Alternatively, you may run a simulation via the `scripts/sim.py` script as follows:
 
