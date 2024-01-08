@@ -13,11 +13,19 @@ crvUSD Risk is a tool for Curve’s researchers and developers to test the resil
 
 For a quick introduction to the key agents in our agent-based model and the overall simulation architecture, please refer to the `./notebooks/demo_*` notebooks! 
 
+To view the risk dashboard, please run:
+
+```python
+python3 -m app.app
+```
+
+Download sample results to view in the dashboard [here](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing), or run your own simulation as instructued in [Usage](#usage).
+
 ### Table of Contents
 
 1. [Setup](#setup)
 2. [Usage](#usage)
-3. [Results](#results)
+3. [Dashboard](#dashboard)
 4. [Conceptual Overview](#conceptual-overview)
 
 *More detailed documentation coming soon.*
@@ -32,7 +40,7 @@ source venv/bin/activate
 python3 -m pip install --upgrade pip
 grep -v 'crvusdsim' requirements.txt > temp_requirements.txt
 python3 -m pip install -r temp_requirements.txt
-python3 -m pip install git+https://github.com/Tcintra/crvusdsim@dev --no-deps
+python3 -m pip install git+https://github.com/Tcintra/crvusdsim@main --no-deps
 rm temp_requirements.txt
 ```
 
@@ -42,36 +50,56 @@ Only Python3.11 is guaranteed support.
 
 # Usage
 
+## Viewing Results
+
 The recommended way to analyze simulation results is via our Plotly Dash app. To run the app:
 
 ```bash
 python3 -m app.app
 ```
 
-Alternatively, you may run the simulation via the `scripts/sim.py` script in interactive mode, or follow the instructions in `notebooks/demo_monte_carlo.ipynb` (for many simulations) or `notebooks/demo_sim.ipynb` (for a single simulation).
+Simply select to load a results file (`.pkl`), or run your own simulation.
 
-## Running Local Simulations
-
-Running `./app/app.py` will either run a simulation on your machine, or it will try to read an output `.pkl` object in your root directory (e.g. `sample_output.pkl` as discussed below). 
-
-To run a simulation on your machine, uncomment the relevant lines in `./app/app.py` and optionally edit the arguments to `run_scenario(...)`.
-
-## Viewing Saved Results
+### Viewing Saved Results
 
 We provide sample simulation results for the `baseline` scenario in [this](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing) google drive. Please download it into the root directory and ensure you are using local results in `./app/app.py`.
 
-# Results
+## Running Simulations
 
-The results for 1000 runs of the `baseline` scenario are shown below. These are the same results that can be found in the `sample_output.pkl` in [this](https://drive.google.com/drive/folders/13f6Z8FHI-NTGIbm67hdHpm2Q_IIq9sIs?usp=sharing) google drive.
+Alternatively, you may run a simulation via the `scripts/sim.py` script as follows:
 
-![Arbitrageur Profits](./figs/samples/sample1.png)
-*Arbitrageur Profits*
+```bash
+python3 -m scripts.sim baseline_macro wsteth 100 -mp &> logs/sim.log
+```
 
-![Prices for Run 0](./figs/samples/sample2.png)
-*Prices for Run 0*
+Make sure to create the `logs` directory to view simulation logs/warnings, or remove the `&> logs/sim.log` redirection.
 
-![Histogram of System Health](./figs/samples/sample3.png)
-*Histogram of System Health*
+### In a Notebook
+
+Follow the instructions in `notebooks/demo_monte_carlo.ipynb` to run simulations in a Jupyter notebook or `notebooks/demo_sim.ipynb` to run a single simulation.
+
+# Dashboard
+
+The Risk Dashboard allows the user to analyze the results of a given model run. Ultimately, the dashboard will allow users to compare the results from model runs with different parameter configurations (e.g. Debt Ceilings) to identify parameter improvements for the crvUSD system.
+
+The results for 1000 runs of the `Baseline Macro` scenario (in the Google Drive) are shown below.
+
+### Summary Metrics
+
+![Summary Tab](./figs/samples/summary.png)
+*Summary Tab*
+
+### Per-Run Metrics
+![Per Run Metrics](./figs/samples/per_run_metrics.png)
+*Per Run Metrics Tab*
+
+### Per-Run Prices
+![Per Run Prices](./figs/samples/per_run_prices.png)
+*Per Run Prices*
+
+### Modeled External Liquidity
+![Liquidity](./figs/samples/liquidity.png)
+*Liquidity*
 
 # Conceptual Overview
 
@@ -79,7 +107,7 @@ The results for 1000 runs of the `baseline` scenario are shown below. These are 
 
 One of the primary purposes of crvUSD Risk simulations is to analyze the impact of available crvUSD liquidity on crvUSD liquidations. We explicitly simulate arbitrageurs and liquidators trading against the relevant LLAMMAs and Curve pools using the [curvesim](https://github.com/curveresearch/curvesim/tree/main) and [crvusdsim](https://github.com/0xreviews/crvusdsim) packages. This allows us to understand the impact of liquidity and liquidations themselves on the health of the crvUSD system.
 
-![Liquidation Model](./figs/samples/sample4.png)
+![Liquidation Model](./figs/samples/oracle_risk.png)
 *Liquidation Model*
 
 ## Inputs
@@ -94,5 +122,5 @@ Inputs are generated according to "Stress Scenario" configurations in `./src/con
 
 Below is the overview for the ABM architecture.
 
-![Architecture](/figs/samples/sample5.png)
+![Architecture](/figs/samples/architecture.png)
 *ABM Architecture*

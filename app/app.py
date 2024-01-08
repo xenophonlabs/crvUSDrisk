@@ -800,7 +800,7 @@ def update_run_graph(value):
 
 @callback(Output("run-data-container", "children"), Input("run-dropdown", "value"))
 def update_run_data_table(value: int):
-    if not output:
+    if not output or not value:
         return no_update
     return dbc.Table.from_dataframe(
         output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),

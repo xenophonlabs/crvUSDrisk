@@ -39,12 +39,10 @@ The model also comes with some technical limitations. Limitations differ from as
     <li>LLAMMA → LLAMMA → External Market</li>
     <li>StableSwap → StableSwap → External Market</li>
 </ul>
-Every timestep, the arbitrageur will consider all cycles matching the above structure, optimize the allocation to those cycles, and <b>greedily</b> execute the most profitable cycle. They will repeat this process until no profitable arbitrages are left. 
-
-<b>Example:</b> USDC → [StableSwap crvUSD/USDC] → crvUSD → [LLAMMA crvUSD/ETH] → ETH → [External Market ETH/USDC] → USDC.
-<li><b>Risk Averse Liquidators.</b>The purpose of the Liquidator is to close underwater positions at a profit before they become "bad debt". The Liquidator will liquidate any position as long as a liquidation will exceed their profit tolerance. Similar to arbitrages, liquidations are cyclic and follow the form: StableSwap → LLAMMA → External Market, meaning the liquidator first sources crvUSD liquidity from the simulated StableSwap pools (that is, liquidators do not hold crvUSD inventory). Liquidators will only source crvUSD from the USDC and USDT StableSwap pools.
+Every timestep, the arbitrageur will consider all cycles matching the above structure, optimize the allocation to those cycles, and <b>greedily</b> execute the most profitable cycle. They will repeat this process until no profitable arbitrages are left.
+<b>Example:</b> USDC → [StableSwap crvUSD/USDC] → crvUSD → [LLAMMA crvUSD/ETH] → ETH → [External Market ETH/USDC] → USDC.</li>
+<li><b>Risk Averse Liquidators.</b>The purpose of the Liquidator is to close underwater positions at a profit before they become "bad debt". The Liquidator will liquidate any position as long as a liquidation will exceed their profit tolerance. Similar to arbitrages, liquidations are cyclic and follow the form: StableSwap → LLAMMA → External Market, meaning the liquidator first sources crvUSD liquidity from the simulated StableSwap pools (that is, liquidators do not hold crvUSD inventory). Liquidators will only source crvUSD from the USDC and USDT StableSwap pools.</li>
 </ol>
-</li> 
 
 *Notice that by assuming arbitrages and liquidations are cyclic, we are implicitly modeling liquidations as flash swaps originating from External Markets (largely Uniswap v3 pools).*
 
