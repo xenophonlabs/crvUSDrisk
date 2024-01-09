@@ -12,7 +12,8 @@ import multiprocessing as mp
 import os
 from contextlib import contextmanager
 from logging.handlers import QueueHandler, QueueListener
-from typing import Dict, List
+from queue import Queue
+from typing import Dict, List, Generator
 
 # -- convenient parameters to adjust for debugging -- #
 DEFAULT_LEVEL = "info"
@@ -97,21 +98,23 @@ for name in silenced_loggers:
 logging.config.dictConfig(CUSTOM_LOGGING_CONFIG)
 
 
-def get_logger(logger_name, level=DEFAULT_LEVEL):
+def get_logger(logger_name: str, _level: str = DEFAULT_LEVEL) -> logging.Logger:
     """
     Ensures logging config is loaded and allows us
     to make various customizations.
     """
     logger = logging.getLogger(logger_name)
-    if isinstance(level, str):
-        level = LEVELS[level.strip().lower()]
+    if isinstance(_level, str):
+        level = LEVELS[_level.strip().lower()]
+    else:
+        level = _level
     logger.setLevel(level)
 
     return logger
 
 
 @contextmanager
-def multiprocessing_logging_queue():
+def multiprocessing_logging_queue() -> Generator[Queue, None, None]:
     """
     Context manager for a logging queue that can be shared
     across multiple processes.
@@ -127,7 +130,7 @@ def multiprocessing_logging_queue():
             listener.stop()
 
 
-def configure_multiprocess_logging(logging_queue):
+def configure_multiprocess_logging(logging_queue: Queue) -> None:
     """Configure root logger in process to enqueue logs."""
     root_logger = get_logger("")
     root_logger.handlers.clear()

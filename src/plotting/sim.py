@@ -52,7 +52,9 @@ def plot_prices(
     return save(f, fn)
 
 
-def plot_jumps(df, recovery_threshold, fn=None):
+def plot_jumps(
+    df: pd.Series, recovery_threshold: float, fn: str | None = None
+) -> plt.Figure:
     """Plot prices with jumps."""
     f, ax = plt.subplots(figsize=(8, 5))
 

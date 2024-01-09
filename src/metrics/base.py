@@ -42,7 +42,7 @@ class Metric(ABC):
         return list(self.config.keys())
 
     @abstractmethod
-    def compute(self, **kwargs) -> Dict[str, Union[int, float]]:
+    def compute(self, **kwargs: dict) -> Dict[str, Union[int, float]]:
         """
         Method for computing the metrics, implemented
         by the child class.

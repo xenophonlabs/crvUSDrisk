@@ -151,7 +151,7 @@ def get_prices_df(
     return df
 
 
-def address_from_coin_id(coin_id, chain="ethereum"):
+def address_from_coin_id(coin_id: str, chain: str = "ethereum") -> str:
     """Map Coingecko coin_id to an address"""
 
     # Check if we already know the address

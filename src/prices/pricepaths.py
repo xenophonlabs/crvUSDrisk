@@ -4,7 +4,7 @@ through `PriceSample`s. A `PriceSample` stores USD token prices
 at a given timestep and converts them to pairwise prices.
 """
 from __future__ import annotations
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING, Generator
 from dataclasses import dataclass
 from itertools import permutations
 from collections import defaultdict
@@ -38,7 +38,7 @@ class PriceSample:
         self.prices_usd = prices_usd  # USD
         self.prices = get_pairwise_prices(prices_usd)
 
-    def update(self, prices_usd: Dict[str, float]):
+    def update(self, prices_usd: Dict[str, float]) -> None:
         """
         Update USD prices for any subset of tokens.
         Recalculate pairwise prices.
@@ -53,7 +53,7 @@ class PriceSample:
         """
         return self.prices[address]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"PriceSample({self.timestamp}, {self.prices_usd})"
 
 
@@ -90,7 +90,7 @@ class PricePaths:
         self.dt = dt
         self.coins = [address_from_coin_id(coin_id) for coin_id in coin_ids]
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[PriceSample, None, None]:
         """
         Yields
         ------

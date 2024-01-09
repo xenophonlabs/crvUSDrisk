@@ -3,13 +3,14 @@ Provides the function to simulate the
 baseline scenario.
 """
 
-from typing import List, Type
+from typing import List, Type, Any
 from copy import deepcopy
 import pickle
 import multiprocessing as mp
+from queue import Queue
 from .strategy import BaselineStrategy
 from ...processing import MonteCarloProcessor
-from ...results import MonteCarloResults
+from ...results import MonteCarloResults, SingleSimResults
 from ...scenario import Scenario
 from ....logging import (
     get_logger,
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 # pylint: disable=too-many-arguments, too-many-locals
 def simulate(
     config: str,
-    market_name: str,
+    market_names: List[str],
     num_iter: int = 1,
     metrics: List[Type[Metric]] | None = None,
     local: str = "",
@@ -39,8 +40,8 @@ def simulate(
     ----------
     config : str
         The filepath for the stress test scenario config file.
-    market_name : str
-        The name of the market to simulate. TODO remove this
+    market_names : List[str]
+        The names of the markets to simulate.
     num_iter : int, default 1
         The number of iterations to run.
     metrics : List[Type[Metric]], default None
@@ -61,13 +62,13 @@ def simulate(
         with open(local, "rb") as f:
             scenario_template = pickle.load(f)
     else:
-        scenario_template = Scenario(config, market_name)
+        scenario_template = Scenario(config, market_names)
         scenario_template.prepare_for_run()
 
     metadata = {
         "scenario": config,
         "num_iter": num_iter,
-        "markets": [market_name],
+        "markets": market_names,
         "num_steps": scenario_template.num_steps,
         "freq": scenario_template.freq,
         "description": scenario_template.description,
@@ -117,9 +118,15 @@ def simulate(
     return mcaggregator.process()
 
 
-def worker(strategy, logging_queue, *args):
+def worker(
+    strategy: BaselineStrategy,
+    logging_queue: Queue,
+    scenario: Scenario,
+    params: dict,
+    i: int,
+) -> SingleSimResults:
     """
     Wrap strategy for multiprocess logging.
     """
     configure_multiprocess_logging(logging_queue)
-    return strategy(*args)
+    return strategy(scenario, params, i)

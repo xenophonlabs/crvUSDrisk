@@ -2,7 +2,7 @@
 Provides the `MonteCarloResults` dataclass.
 """
 from __future__ import annotations
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Dict
 from dataclasses import dataclass
 from functools import cached_property
 import pandas as pd
@@ -26,11 +26,11 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
     metadata: dict | None = None
 
     @property
-    def metric_map(self):
+    def metric_map(self) -> Dict[str, int]:
         """Map metric ids to names."""
         return self.data[0].metric_map
 
-    def plot_runs(self, metric_id: int):
+    def plot_runs(self, metric_id: int) -> None:
         """Plot metric for each run."""
         axs = None
         for i, _df in enumerate(self.data):
@@ -39,7 +39,7 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
                 show = True
             axs = _df.plot_metric(metric_id, axs=axs, show=show)
 
-    def plot_summary(self, cols: List[str] | None = None, show: bool = True):
+    def plot_summary(self, cols: List[str] | None = None, show: bool = True) -> None:
         """Plot histogram of summary metrics."""
         cols = cols or self.key_agg_cols
 
@@ -69,14 +69,13 @@ class MonteCarloResults:  # pylint: disable=too-few-public-methods
             plt.show()
 
     @cached_property
-    def key_agg_cols(self):
+    def key_agg_cols(self) -> List[str]:
         """Key columns."""
         return self.data[0].key_agg_cols
 
     @cached_property
-    def summary(self):
+    def summary(self) -> pd.DataFrame:
         """Summarize metrics."""
         summary = pd.concat([x.summary for x in self.data])
         summary.index = range(len(summary))
-        summary.index.name = "Run ID"
-        return summary
+        return summary.rename_axis("Run ID")

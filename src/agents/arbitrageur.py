@@ -32,7 +32,7 @@ class Arbitrageur(Agent):
         self._count: int = 0
         self._borrower_loss: float = 0.0
 
-    def arbitrage(self, cycles: List[Cycle], prices: PriceSample):
+    def arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> None:
         """
         Identify optimal arbitrages involving crvusd of the form:
 

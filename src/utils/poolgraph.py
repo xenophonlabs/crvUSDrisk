@@ -109,11 +109,15 @@ class PoolGraph:
             return False
         return bool(shared_address(curr, nxt, used))
 
-    def update_used_coins(self, used: Set[str], curr: SimPoolType, nxt: SimPoolType):
+    def update_used_coins(
+        self, used: Set[str], curr: SimPoolType, nxt: SimPoolType
+    ) -> None:
         """Update the set of used coins in the cycle."""
         used.update(shared_address(curr, nxt))
 
-    def revert_used_coins(self, used: Set[str], curr: SimPoolType, nxt: SimPoolType):
+    def revert_used_coins(
+        self, used: Set[str], curr: SimPoolType, nxt: SimPoolType
+    ) -> None:
         """Revert the set of used coins in the cycle."""
         used.difference_update(shared_address(curr, nxt))
 
@@ -134,7 +138,7 @@ class PoolGraph:
         used: Set[str],
         cycles: List[Cycle],
         n: int,
-    ):
+    ) -> None:
         """
         Perform a depth-first search to find cycles of length `n`.
 
@@ -192,7 +196,7 @@ class PoolGraph:
             valid.append(cycle)
         return valid
 
-    def test_cycles(self, cycles: List[Cycle], n: int):
+    def test_cycles(self, cycles: List[Cycle], n: int) -> None:
         """
         Test that the cycles are valid:
         1. Cycle correctness (incl. closure)

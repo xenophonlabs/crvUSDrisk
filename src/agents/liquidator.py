@@ -1,6 +1,6 @@
 """Provides the `Liquidator` class."""
 import math
-from typing import List
+from typing import List, Dict
 from dataclasses import dataclass
 from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
@@ -50,7 +50,7 @@ class Liquidator(Agent):
         TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
     ]
 
-    paths: List[Path] = []
+    paths: Dict[str, List[Path]] = {}
 
     def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
         assert tolerance >= 0
@@ -64,10 +64,10 @@ class Liquidator(Agent):
 
     def set_paths(
         self,
-        controller: SimController,
+        controllers: List[SimController],
         crvusd_pools: List[SimCurveStableSwapPool],
         collat_pools: MarketsType,
-    ):
+    ) -> None:
         """
         Set the paths for liquidations. Currently:
         1. Purchase crvusd from basis_token/crvusd pools.
@@ -75,30 +75,33 @@ class Liquidator(Agent):
         3. Sell collateral for basis_token in collateral/basis_token
         External markets.
         """
-        collateral = TOKEN_DTOs[controller.COLLATERAL_TOKEN.address]
+        for controller in controllers:
+            collateral = TOKEN_DTOs[controller.COLLATERAL_TOKEN.address]
 
-        self.paths = []
-        for basis_token in self.basis_tokens:
-            pair = (
-                min(basis_token, collateral),
-                max(basis_token, collateral),
-            )  # sorted
+            paths = []
+            for basis_token in self.basis_tokens:
+                pair = (
+                    min(basis_token, collateral),
+                    max(basis_token, collateral),
+                )  # sorted
 
-            # Get basis_token/crvusd pool
-            for pool in crvusd_pools:
-                coins = [c.address for c in pool.coins]
-                if basis_token.address in coins:
-                    crvusd_pool = pool
-                    # TODO assuming only one pool for each basis token
-                    break
+                # Get basis_token/crvusd pool
+                for pool in crvusd_pools:
+                    coins = [c.address for c in pool.coins]
+                    if basis_token.address in coins:
+                        crvusd_pool = pool
+                        # TODO assuming only one pool for each basis token
+                        break
 
-            # Get collateral/basis_token pool
-            collat_pool = collat_pools[pair]
-            self.paths.append(Path(basis_token, crvusd_pool, collat_pool))
+                # Get collateral/basis_token pool
+                collat_pool = collat_pools[pair]
+                paths.append(Path(basis_token, crvusd_pool, collat_pool))
+
+            self.paths[controller.address] = paths
 
     def perform_liquidations(
         self,
-        controller: SimController,
+        controllers: List[SimController],
         prices: PriceSample,
     ) -> None:
         """
@@ -116,17 +119,22 @@ class Liquidator(Agent):
         count : int
             Count of liquidations performed.
         """
-        controller.AMM.price_oracle_contract.freeze()
-        to_liquidate = controller.users_to_liquidate()
-        controller.AMM.price_oracle_contract.unfreeze()
+        for controller in controllers:
+            logger.debug("Liquidating users in controller %s.", controller.address)
 
-        logger.debug("There are %d users to liquidate.", len(to_liquidate))
+            controller.AMM.price_oracle_contract.freeze()
+            to_liquidate = controller.users_to_liquidate()
+            controller.AMM.price_oracle_contract.unfreeze()
 
-        count = 0
-        for position in to_liquidate:
-            count += self.maybe_liquidate(position, controller, prices)
+            logger.debug("There are %d users to liquidate.", len(to_liquidate))
 
-        logger.debug("There are %d users left to liquidate", len(to_liquidate) - count)
+            count = 0
+            for position in to_liquidate:
+                count += self.maybe_liquidate(position, controller, prices)
+
+            logger.debug(
+                "There are %d users left to liquidate", len(to_liquidate) - count
+            )
 
     # pylint: disable=too-many-locals
     def maybe_liquidate(
@@ -169,8 +177,9 @@ class Liquidator(Agent):
 
         collateral = controller.COLLATERAL_TOKEN.address
 
-        assert self.paths, "Liquidator paths not set."
-        for path in self.paths:
+        paths = self.paths[controller.address]
+        assert paths, f"Liquidator paths not set for controller {controller.address}."
+        for path in paths:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
 

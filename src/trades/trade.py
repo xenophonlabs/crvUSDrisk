@@ -27,11 +27,11 @@ logger = get_logger(__name__)
 class Trade(ABC):
     """Simple trade interface."""
 
-    def get_address(self, i: int):
+    def get_address(self, i: int) -> str:
         """Get the address of token `i`."""
         raise NotImplementedError
 
-    def get_decimals(self, i: int):
+    def get_decimals(self, i: int) -> int:
         """Get the decimals of token `i`."""
         raise NotImplementedError
 
@@ -55,13 +55,13 @@ class Swap(Trade):
     amt: int
     out: int = 0
 
-    def get_address(self, i: int):
+    def get_address(self, i: int) -> str:
         """Get the address of token `i`."""
         if isinstance(self.pool, SimCurveStableSwapPool):
             return self.pool.coins[i].address.lower()
         return self.pool.coin_addresses[i].lower()
 
-    def get_decimals(self, i: int):
+    def get_decimals(self, i: int) -> int:
         """Get the decimals of token `i`."""
         return self.pool.coin_decimals[i]
 
@@ -116,7 +116,7 @@ class Swap(Trade):
 
         return amt_out, self.get_decimals(self.j)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"Swap(pool={self.pool.name}, "
             f"in={self.pool.coin_names[self.i]}, "
@@ -140,19 +140,21 @@ class Liquidation(Trade):
     j: int = 1  # receive collateral
     out: int = 0
 
-    def get_address(self, i: int):
+    def get_address(self, i: int) -> str:
         """Get the address of token `i`."""
         if i == 0:
             return self.controller.STABLECOIN.address.lower()
         return self.controller.COLLATERAL_TOKEN.address.lower()
 
-    def get_decimals(self, i: int):
+    def get_decimals(self, i: int) -> int:
         """Get the decimals of token `i`."""
         if i == 0:
             return self.controller.STABLECOIN.decimals
         return self.controller.COLLATERAL_TOKEN.decimals
 
-    def execute(self, amt_in: int, use_snapshot_context=False) -> Tuple[int, int]:
+    def execute(
+        self, amt_in: int, use_snapshot_context: bool = False
+    ) -> Tuple[int, int]:
         """
         Perform the liquidation.
 

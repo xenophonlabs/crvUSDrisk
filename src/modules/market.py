@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from itertools import permutations
 from functools import cached_property
-from typing import Tuple, Dict, TYPE_CHECKING
+from typing import Tuple, Dict, TYPE_CHECKING, List
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
@@ -47,27 +47,27 @@ class ExternalMarket:
         self.models: Dict[int, Dict[int, IsotonicRegression]] = defaultdict(dict)
 
     @cached_property
-    def name(self):
+    def name(self) -> str:
         """Market name."""
         return f"External Market ({self.coins[0].symbol}, {self.coins[1].symbol})"
 
     @cached_property
-    def coin_names(self):
+    def coin_names(self) -> List[str]:
         """List of coin names in the market."""
         return [c.name for c in self.coins]
 
     @cached_property
-    def coin_symbols(self):
+    def coin_symbols(self) -> List[str]:
         """List of coin symbols in the market."""
         return [c.symbol for c in self.coins]
 
     @cached_property
-    def coin_addresses(self):
+    def coin_addresses(self) -> List[str]:
         """List of coin addresses in the market."""
         return [c.address for c in self.coins]
 
     @cached_property
-    def coin_decimals(self):
+    def coin_decimals(self) -> List[int]:
         """List of coin decimals in the market."""
         return [c.decimals for c in self.coins]
 
@@ -77,7 +77,7 @@ class ExternalMarket:
             raise ValueError("Prices not set for External Market.")
         return self.prices[i][j]
 
-    def update_price(self, prices: "PairwisePricesType"):
+    def update_price(self, prices: "PairwisePricesType") -> None:
         """
         Update the markets prices.
 
@@ -97,7 +97,7 @@ class ExternalMarket:
             if token_in in self.coin_addresses
         }
 
-    def fit(self, quotes: pd.DataFrame):
+    def fit(self, quotes: pd.DataFrame) -> None:
         """
         Fit an IsotonicRegression to the price impact data for each
         pair of tokens.
@@ -192,5 +192,5 @@ class ExternalMarket:
         model = self.models[i][j]
         return int(model.X_max_ * (1 - out_balance_perc))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
