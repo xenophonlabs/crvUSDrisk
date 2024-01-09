@@ -2,7 +2,7 @@
 Provides the `SingleSimResults` dataclass.
 """
 
-from typing import List, Any
+from typing import List, Any, Dict
 from dataclasses import dataclass
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,13 +27,13 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
         self.metrics = metrics
 
     @property
-    def metric_map(self):
+    def metric_map(self) -> Dict[str, int]:
         """Return the metric map."""
         return {type(metric).__name__: i for i, metric in enumerate(self.metrics)}
 
     def plot_metric(
         self, metric_index: int, axs: Any = None, show: bool = True, i: int = -1
-    ):
+    ) -> plt.Axes:
         """
         Plot the ith metric of `self.metrics[metric_index]`.
         If `i` is -1, plot the key metric.
@@ -58,14 +58,14 @@ class SingleSimResults:  # pylint: disable=too-few-public-methods
 
         return axs
 
-    def plot_prices(self, show: bool = True):
+    def plot_prices(self, show: bool = True) -> None:
         """Plot the prices."""
         plot_prices(self.pricepaths.prices)
         if show:
             plt.show()
 
     @property
-    def agg_config(self):
+    def agg_config(self) -> Dict[str, List[str]]:
         """
         Config for aggregating metrics.
         """

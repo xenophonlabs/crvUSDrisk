@@ -49,7 +49,7 @@ class Agent(ABC):
         """Agent name."""
         return type(self).__name__
 
-    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample):
+    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample) -> None:
         """
         Update the borrower loss. Applicable to
         the Liquidator and Arbitrageur child classes.

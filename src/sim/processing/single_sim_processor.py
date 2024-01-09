@@ -14,7 +14,7 @@ metrics are processed into a `SingleSimResults` object and collected
 by the `MonteCarloProcessor`.
 """
 
-from typing import List, Dict, Union, Type
+from typing import List, Dict, Union, Type, Any
 import pandas as pd
 from ..results import SingleSimResults
 from ..scenario import Scenario
@@ -30,7 +30,7 @@ class SingleSimProcessor:
     TODO narrow down to the useful ones.
     """
 
-    def __init__(self, scenario: Scenario, metrics: List[Type[Metric]]):
+    def __init__(self, scenario: Scenario, metrics: List[Type[Metric]]) -> None:
         self.metrics = init_metrics(metrics, scenario)
 
         cols: List[str] = ["timestamp"]
@@ -42,7 +42,7 @@ class SingleSimProcessor:
         self.results: pd.DataFrame = pd.DataFrame(columns=self.cols)
 
         self.pricepaths = scenario.pricepaths
-        self.oracles = [scenario.price_oracle]
+        self.oracles = scenario.oracles
         self.scenario = scenario
 
         # Initial state
@@ -70,16 +70,22 @@ class SingleSimProcessor:
 
         return res
 
-    def metric_kwargs(self):
+    def metric_kwargs(self) -> Dict[str, Any]:
         """
         Get kwargs for all metrics. This prevents
         us from repeating expensive operations like
         calculating healths.
         """
-        return {
-            "healths": controller_healths(self.scenario.controller),
-            "debts": controller_debts(self.scenario.controller),
+        kwargs: Dict[str, Any] = {
+            "healths": {},
+            "debts": {},
         }
+
+        for controller in self.scenario.controllers:
+            kwargs["healths"][controller.address] = controller_healths(controller)
+            kwargs["debts"][controller.address] = controller_debts(controller)
+
+        return kwargs
 
     def process(self) -> SingleSimResults:
         """Process timeseries df into metrics result."""

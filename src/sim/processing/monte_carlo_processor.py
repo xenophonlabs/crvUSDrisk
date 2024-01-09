@@ -31,7 +31,7 @@ class MonteCarloProcessor:
             self.prune()
         return MonteCarloResults(self.results, self.metadata)
 
-    def prune(self):
+    def prune(self) -> None:
         """Prune size."""
         for run in self.results:
             for metric in run.metrics:

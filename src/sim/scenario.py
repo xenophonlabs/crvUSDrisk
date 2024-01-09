@@ -6,8 +6,10 @@ from typing import List, Tuple, Set, cast
 from itertools import combinations
 from datetime import datetime
 import pandas as pd
-from crvusdsim.pool import get  # type: ignore
+from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
+from curvesim.pool.sim_interface import SimCurveCryptoPool
+from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
 from ..configs import TOKEN_DTOs, get_scenario_config, get_price_config, CRVUSD_DTO
 from ..configs.tokens import WETH, WSTETH, SFRXETH
@@ -30,8 +32,8 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, scenario: str, market_name: str):
-        self.market_name = market_name
+    def __init__(self, scenario: str, market_names: List[str]):
+        self.market_names = market_names
         self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
         self.description: str = config["description"]
@@ -90,10 +92,12 @@ class Scenario:
         self.liquidity_provider: LiquidityProvider = LiquidityProvider()
 
         # Set liquidator paths
-        self.liquidator.set_paths(self.controller, self.stableswap_pools, self.markets)
+        self.liquidator.set_paths(self.controllers, self.stableswap_pools, self.markets)
+
         # Set arbitrage cycles
+        # TODO include TBTC TriCrypto pool
         self.graph = PoolGraph(
-            self.stableswap_pools + [self.llamma] + list(self.markets.values())
+            self.stableswap_pools + self.llammas + list(self.markets.values())
         )
         self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
@@ -112,47 +116,59 @@ class Scenario:
         Generate the crvusd modules to simulate, including
         LLAMMAs, Controllers, StableSwap pools, etc.
         """
-        # TODO handle generation of multiple markets
-        logger.info("Fetching sim_market from subgraph.")
-        sim_market = get(
-            self.market_name, bands_data="controller", use_simple_oracle=False
+        sim_markets: List[SimMarketInstance] = []
+        for market_names in self.market_names:
+            logger.info("Fetching %s market from subgraph", market_names)
+
+            sim_market = get(
+                market_names, bands_data="controller", use_simple_oracle=False
+            )
+
+            metadata = sim_market.pool.metadata
+
+            logger.info(
+                "Market snapshot as %s",
+                datetime.fromtimestamp(int(metadata["timestamp"])),
+            )
+            logger.info(
+                "Bands snapshot as %s",
+                datetime.fromtimestamp(int(metadata["bands"][0]["timestamp"])),
+            )
+            logger.info(
+                "Users snapshot as %s",
+                datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
+            )
+
+            # NOTE huge memory consumption
+            del sim_market.pool.metadata["bands"]
+            del sim_market.pool.metadata[
+                "userStates"
+            ]  # TODO compare these before deleting
+
+            sim_markets.append(sim_market)
+
+        # Rebind all markets to use the same shared resources
+        rebind_markets(sim_markets)
+
+        # Set scenario attributes
+        self.llammas = [sim_market.pool for sim_market in sim_markets]
+        self.controllers = [sim_market.controller for sim_market in sim_markets]
+        self.oracles = cast(
+            List[Oracle], [sim_market.price_oracle for sim_market in sim_markets]
         )
+        self.policies = [sim_market.policy for sim_market in sim_markets]
+        self.stableswap_pools = sim_markets[0].stableswap_pools
+        self.aggregator = sim_markets[0].aggregator
+        self.peg_keepers = sim_markets[0].peg_keepers
+        self.factory = sim_markets[0].factory
+        self.stablecoin = sim_markets[0].stablecoin
 
-        metadata = sim_market.pool.metadata
-
-        logger.info(
-            "Market snapshot as %s", datetime.fromtimestamp(int(metadata["timestamp"]))
-        )
-        logger.info(
-            "Bands snapshot as %s",
-            datetime.fromtimestamp(int(metadata["bands"][0]["timestamp"])),
-        )
-        logger.info(
-            "Users snapshot as %s",
-            datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
-        )
-
-        # NOTE huge memory consumption
-        del sim_market.pool.metadata["bands"]
-        del sim_market.pool.metadata["userStates"]  # TODO compare these before deleting
-
-        self.llamma = sim_market.pool
-        self.controller = sim_market.controller
-        self.stableswap_pools = sim_market.stableswap_pools
-        self.aggregator = sim_market.aggregator
-        self.price_oracle = cast(Oracle, sim_market.price_oracle)
-        self.peg_keepers = sim_market.peg_keepers
-        self.policy = sim_market.policy
-        self.factory = sim_market.factory
-        self.stablecoin = sim_market.stablecoin
-        self.tricrypto = sim_market.tricrypto
-
-        # Convenient reference to all pools
-        # TODO add all crvUSD pools (tBTC TriCrypto!)
-        self.pools = [self.llamma] + self.stableswap_pools
+        self.tricryptos: Set[SimCurveCryptoPool] = set()
+        for sim_market in sim_markets:
+            self.tricryptos.update(sim_market.tricrypto)
 
         self.coins: Set[TokenDTO] = set()
-        for pool in self.pools:
+        for pool in self.llammas + self.stableswap_pools:
             for a in pool.coin_addresses:
                 if a.lower() != CRVUSD_DTO.address.lower():
                     self.coins.add(TOKEN_DTOs[a.lower()])
@@ -195,53 +211,62 @@ class Scenario:
         )
 
         # Liquidate users that were loaded underwater
-        controller = self.controller
-        to_liquidate = controller.users_to_liquidate()
-        n = len(to_liquidate)
-        if n > 0:
-            logger.info("%d users were loaded underwater.", n)
+        for controller in self.controllers:
+            name = controller.AMM.name.replace("Curve.fi Stablecoin ", "")
+            logger.info("Validating loaded positions in %s Controller.", name)
 
-        # Check that only a small portion of debt is liquidatable at start
-        damage = 0
-        for pos in to_liquidate:
-            damage += pos.debt
-            logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
-        pct = round(damage / controller.total_debt() * 100, 2)
-        args = (
-            "%.2f%% of debt was incorrectly loaded with sub-zero health (%d crvUSD)",
-            pct,
-            damage / 1e18,
-        )
-        if pct > 1:
-            logger.warning(*args)
-        else:
-            logger.info(*args)
+            to_liquidate = controller.users_to_liquidate()
+            n = len(to_liquidate)
 
-        controller.after_trades(do_liquidate=True)  # liquidations
+            # Check that only a small portion of debt is liquidatable at start
+            damage = 0
+            for pos in to_liquidate:
+                damage += pos.debt
+                logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
+            pct = round(damage / controller.total_debt() * 100, 2)
+            args = (
+                "%.2f%% of debt (%d positions) was incorrectly \
+                    loaded with sub-zero health (%d crvUSD)",
+                pct,
+                n,
+                damage / 1e18,
+            )
+            if pct > 1:
+                logger.warning(*args)
+            else:
+                logger.info(*args)
+
+            controller.after_trades(do_liquidate=True)  # liquidations
 
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
         self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
 
-        self.llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
-        self.llamma.prev_p_o_time = ts
-        self.llamma.rate_time = ts
-        self.price_oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
+        for llamma in self.llammas:
+            llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
+            llamma.prev_p_o_time = ts
+            llamma.rate_time = ts
 
-        self.controller._increment_timestamp(ts)  #  pylint: disable=protected-access
+        for oracle in self.oracles:
+            oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
+
+        for controller in self.controllers:
+            controller._increment_timestamp(ts)  #  pylint: disable=protected-access
 
         for spool in self.stableswap_pools:
             spool._increment_timestamp(ts)  #  pylint: disable=protected-access
             spool.ma_last_time = ts
-        for tpool in self.tricrypto:
+
+        for tpool in self.tricryptos:
             tpool._increment_timestamp(ts)  #  pylint: disable=protected-access
             tpool.last_prices_timestamp = ts
+
         for pk in self.peg_keepers:
             pk._increment_timestamp(ts)  #  pylint: disable=protected-access
 
     def update_tricrypto_prices(self, sample: PriceSample) -> None:
         """Update TriCrypto prices with a new sample."""
-        for tpool in self.tricrypto:
+        for tpool in self.tricryptos:
             tpool.prepare_for_run(
                 pd.DataFrame(
                     [
@@ -257,14 +282,14 @@ class Scenario:
     def update_staked_prices(self, sample: PriceSample) -> None:
         """Update staked prices with a new sample."""
         # Need to know which assets (staked and base)
-        oracle = self.price_oracle
-        llamma = self.llamma  # TODO need to know which llamma is associated with oracle
-        if hasattr(oracle, "staked_oracle"):
-            derivative = llamma.COLLATERAL_TOKEN.address
-            base = WETH
-            assert derivative in [WSTETH, SFRXETH]
-            p_staked = int(sample.prices[derivative][base] * 10**18)
-            oracle.staked_oracle.update(p_staked)
+        for llamma in self.llammas:
+            oracle = cast(Oracle, llamma.price_oracle_contract)
+            if hasattr(oracle, "staked_oracle"):
+                derivative = llamma.COLLATERAL_TOKEN.address
+                base = WETH
+                assert derivative in [WSTETH, SFRXETH]
+                p_staked = int(sample.prices[derivative][base] * 10**18)
+                oracle.staked_oracle.update(p_staked)
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
@@ -273,13 +298,20 @@ class Scenario:
         self.update_tricrypto_prices(sample)
         self.update_staked_prices(sample)
 
-        self.llamma.prepare_for_trades(ts)  # this increments oracle timestamp
-        self.controller.prepare_for_trades(ts)
+        for llamma in self.llammas:
+            llamma.prepare_for_trades(ts)  # this increments oracle timestamp
+
+        for controller in self.controllers:
+            controller.prepare_for_trades(ts)
+
         self.aggregator.prepare_for_trades(ts)
+
         for spool in self.stableswap_pools:
             spool.prepare_for_trades(ts)
-        for tpool in self.tricrypto:
+
+        for tpool in self.tricryptos:
             tpool.prepare_for_trades(ts)
+
         for peg_keeper in self.peg_keepers:
             peg_keeper.prepare_for_trades(ts)
 
@@ -291,7 +323,7 @@ class Scenario:
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
         self.arbitrageur.arbitrage(self.cycles, prices)
-        self.liquidator.perform_liquidations(self.controller, prices)
+        self.liquidator.perform_liquidations(self.controllers, prices)
         self.keeper.update(self.peg_keepers)
         # TODO what is the right order for the actions?
         # TODO need to incorporate LPs add/remove liquidity

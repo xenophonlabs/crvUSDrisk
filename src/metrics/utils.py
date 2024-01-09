@@ -7,7 +7,7 @@ import numpy as np
 from crvusdsim.pool.sim_interface import SimController
 
 
-def entity_str(entity: Any, type_: str):
+def entity_str(entity: Any, type_: str) -> str:
     """
     Get a simplified name for the pool
     to use in metrics column names.

@@ -68,7 +68,7 @@ class Cycle:
                 trades.append(i)
         return trades
 
-    def freeze_oracles(self):
+    def freeze_oracles(self) -> None:
         """
         Freeze oracle prices.
 
@@ -80,7 +80,7 @@ class Cycle:
             oracle.price_w()  # Ensure we use updated prices
             oracle.freeze()
 
-    def unfreeze_oracles(self):
+    def unfreeze_oracles(self) -> None:
         """
         Unfreeze oracle prices and write latest prices.
         """
@@ -202,7 +202,7 @@ class StateKey:
     def __init__(self, cycle: Cycle):
         self.cycle = cycle
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         trades = self.cycle.trades
         hashes = []
         for trade in trades:
