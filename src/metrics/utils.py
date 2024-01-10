@@ -31,7 +31,7 @@ def entity_str(entity: Any, type_: str) -> str:
     else:
         raise ValueError("Invalid type_.")
 
-    return "_".join([type_, name])
+    return " ".join([type_, name]).title()
 
 
 def controller_healths(controller: SimController) -> np.ndarray:

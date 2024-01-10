@@ -206,8 +206,8 @@ class Scenario:
         arbitrageur.arbitrage(self.cycles, sample)
         logger.info(
             "Equilibrated prices with %d arbitrages with total profit %d",
-            arbitrageur.count,
-            arbitrageur.profit,
+            arbitrageur.count(),
+            arbitrageur.profit(),
         )
 
         # Liquidate users that were loaded underwater

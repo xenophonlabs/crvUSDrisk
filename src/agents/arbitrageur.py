@@ -63,7 +63,7 @@ class Arbitrageur(Agent):
                 self._profit["all"] += _profit
                 self._count["all"] += 1
 
-                self.update_borrower_losses(best_cycle, prices, "all")
+                self.update_borrower_losses(best_cycle, prices)
 
             else:
                 logger.debug("No more profitable arbitrages.")

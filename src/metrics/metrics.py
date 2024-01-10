@@ -19,7 +19,7 @@ class BadDebtMetric(Metric):
     def _config(self) -> Dict[str, List[str]]:
         cfg = {"Bad Debt": ["mean", "max"]}
         for controller in self.scenario.controllers:
-            cfg[f"{entity_str(controller, 'controller')} Bad Debt"] = ["mean", "max"]
+            cfg[f"Bad Debt on {entity_str(controller, 'controller')}"] = ["mean", "max"]
         return cfg
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
@@ -30,7 +30,7 @@ class BadDebtMetric(Metric):
             healths = kwargs["healths"][controller.address]
             debts = kwargs["debts"][controller.address]
             bad_debt = debts[np.where(healths < 0)].sum() / 1e18
-            val[entity_str(controller, "controller") + " Bad Debt"] = bad_debt
+            val[f"Bad Debt on {entity_str(controller, 'controller')}"] = bad_debt
             total += bad_debt
         val["Bad Debt"] = total
         return val
@@ -50,7 +50,7 @@ class SystemHealthMetric(Metric):
     def _config(self) -> Dict[str, List[str]]:
         cfg = {"System Health": ["mean", "min"]}
         for controller in self.scenario.controllers:
-            cfg[f"{entity_str(controller, 'controller')} System Health"] = [
+            cfg[f"System Health on {entity_str(controller, 'controller')}"] = [
                 "mean",
                 "min",
             ]
@@ -66,7 +66,7 @@ class SystemHealthMetric(Metric):
             debts = kwargs["debts"][controller.address]
             all_healths = np.append(all_healths, healths)
             all_debts = np.append(all_debts, debts)
-            val[entity_str(controller, "controller") + " System Health"] = (
+            val[f"System Health on {entity_str(controller, 'controller')}"] = (
                 (healths * debts).sum() / debts.sum() / 1e18
             )
         val["System Health"] = (all_healths * all_debts).sum() / all_debts.sum() / 1e18
@@ -107,8 +107,8 @@ class BorrowerLossMetric(Metric):
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute borrower loss."""
-        hard_loss = self.scenario.liquidator.borrower_loss()
-        soft_loss = self.scenario.arbitrageur.borrower_loss()
+        hard_loss = self.scenario.liquidator.borrower_loss
+        soft_loss = self.scenario.arbitrageur.borrower_loss
         borrower_loss = hard_loss + soft_loss
         return {
             "Borrower Loss": borrower_loss,
@@ -189,11 +189,11 @@ class PegStrengthMetric(Metric):
     Calculates the strength of the crvUSD peg.
     """
 
-    key_metric = "Peg Strength"
+    key_metric = "Aggregator Price"
 
     def _config(self) -> Dict[str, List[str]]:
         cfg = {
-            "Peg Strength": ["mean", "min", "max"],
+            "Aggregator Price": ["mean", "min", "max"],
         }
         for spool in self.scenario.stableswap_pools:
             cfg[f"{entity_str(spool, 'stableswap')} Price"] = ["mean", "min", "max"]
@@ -201,7 +201,7 @@ class PegStrengthMetric(Metric):
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute peg strength."""
-        val = {"Peg Strength": self.scenario.aggregator.price() / 1e18}
+        val = {"Aggregator Price": self.scenario.aggregator.price() / 1e18}
         for spool in self.scenario.stableswap_pools:
             i = get_crvusd_index(spool)
             val[f"{entity_str(spool, 'stableswap')} Price"] = (
@@ -239,10 +239,8 @@ class LiquidationsMetric(Metric):
         for controller in self.scenario.controllers:
             _controller = entity_str(controller, "controller")
 
-            debt_liquidated = liquidator.debt_repaid[controller.address] / 1e18
-            collateral_liquidated = (
-                liquidator.collateral_liquidated[controller.address] / 1e18
-            )
+            debt_liquidated = liquidator.debt_repaid[controller.address]
+            collateral_liquidated = liquidator.collateral_liquidated[controller.address]
 
             val[f"Debt Liquidated on {_controller}"] = debt_liquidated
             val[f"Collateral Liquidated on {_controller}"] = collateral_liquidated

@@ -23,7 +23,7 @@ class Agent(ABC):
     def __init__(self) -> None:
         self._profit: Dict[str, float] = defaultdict(float)
         self._count: Dict[str, int] = defaultdict(int)
-        self._borrower_loss: Dict[str, float] = defaultdict(float)
+        self._borrower_loss = 0.0
 
     def profit(self, address: str | None = None) -> float:
         """Return the profit."""
@@ -37,20 +37,17 @@ class Agent(ABC):
             return sum(self._count.values())
         return self._count[address]
 
-    def borrower_loss(self, address: str | None = None) -> float:
+    @property
+    def borrower_loss(self) -> float:
         """Return the borrower loss."""
-        if not address:
-            return sum(self._borrower_loss.values())
-        return self._borrower_loss[address]
+        return self._borrower_loss
 
     @cached_property
     def name(self) -> str:
         """Agent name."""
         return type(self).__name__
 
-    def update_borrower_losses(
-        self, cycle: Cycle, prices: PriceSample, address: str
-    ) -> None:
+    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample) -> None:
         """
         Update the borrower loss. Applicable to
         the Liquidator and Arbitrageur child classes.
@@ -72,4 +69,4 @@ class Agent(ABC):
                 logger.debug(
                     "Borrower loss was positive for cycle %s: %f", cycle, borrower_loss
                 )
-            self._borrower_loss[address] += borrower_loss
+            self._borrower_loss += borrower_loss

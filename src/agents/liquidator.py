@@ -52,7 +52,7 @@ class Liquidator(Agent):
         assert tolerance >= 0
         self.tolerance = tolerance
         self.collateral_liquidated: Dict[str, int] = defaultdict(int)
-        self.debt_repaid: Dict[str, int] = defaultdict(int)
+        self.debt_repaid: Dict[str, float] = defaultdict(float)
         self.basis_tokens = [
             TOKEN_DTOs["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],  # USDC
             TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
@@ -226,7 +226,7 @@ class Liquidator(Agent):
                 controller.address
             ] += liquidation.amt / 10 ** liquidation.get_decimals(liquidation.i)
 
-            self.update_borrower_losses(best, prices, controller.address)
+            self.update_borrower_losses(best, prices)
 
             return True
 
