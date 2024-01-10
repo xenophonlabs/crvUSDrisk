@@ -28,6 +28,7 @@ SYMBOL_TO_ADDRESS = {v.symbol: k for k, v in TOKEN_DTOs.items()}
 
 # Constants
 DEFAULT_PROFIT_TOLERANCE = 1  # one dollah
+# TODO modify tolerance to account for gas (and speed up sim)
 
 # LLAMMAs
 LLAMMA_WETH = "0x1681195c176239ac5e72d9aebacf5b2492e0c4ee"

@@ -41,6 +41,9 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
 
         # LLAMMA
         sim_market.pool.BORROWED_TOKEN = master_stablecoin
+        master_stablecoin.mint(
+            sim_market.pool.address, sum(sim_market.pool.bands_x.values())
+        )
 
         # Controller
         sim_market.controller.STABLECOIN = master_stablecoin

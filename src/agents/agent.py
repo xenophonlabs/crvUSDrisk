@@ -2,7 +2,8 @@
 from __future__ import annotations
 from abc import ABC
 from functools import cached_property
-from typing import TYPE_CHECKING
+from collections import defaultdict
+from typing import TYPE_CHECKING, Dict
 from ..logging import get_logger
 
 logger = get_logger(__name__)
@@ -19,37 +20,37 @@ TOLERANCE = -10  # USD
 class Agent(ABC):
     """Base class for agents."""
 
-    _profit: float = 0.0
-    _count: int = 0
-    _volume: int = 0
-    _borrower_loss: float = 0.0
+    def __init__(self) -> None:
+        self._profit: Dict[str, float] = defaultdict(float)
+        self._count: Dict[str, int] = defaultdict(int)
+        self._borrower_loss: Dict[str, float] = defaultdict(float)
 
-    @property
-    def profit(self) -> float:
+    def profit(self, address: str | None = None) -> float:
         """Return the profit."""
-        return self._profit
+        if not address:
+            return sum(self._profit.values())
+        return self._profit[address]
 
-    @property
-    def count(self) -> int:
+    def count(self, address: str | None = None) -> int:
         """Return the count."""
-        return self._count
+        if not address:
+            return sum(self._count.values())
+        return self._count[address]
 
-    @property
-    def volume(self) -> int:
-        """Return the volume."""
-        return self._volume
-
-    @property
-    def borrower_loss(self) -> float:
+    def borrower_loss(self, address: str | None = None) -> float:
         """Return the borrower loss."""
-        return self._borrower_loss
+        if not address:
+            return sum(self._borrower_loss.values())
+        return self._borrower_loss[address]
 
     @cached_property
     def name(self) -> str:
         """Agent name."""
         return type(self).__name__
 
-    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample) -> None:
+    def update_borrower_losses(
+        self, cycle: Cycle, prices: PriceSample, address: str
+    ) -> None:
         """
         Update the borrower loss. Applicable to
         the Liquidator and Arbitrageur child classes.
@@ -71,4 +72,4 @@ class Agent(ABC):
                 logger.debug(
                     "Borrower loss was positive for cycle %s: %f", cycle, borrower_loss
                 )
-            self._borrower_loss += borrower_loss
+            self._borrower_loss[address] += borrower_loss

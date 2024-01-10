@@ -2,6 +2,7 @@
 import math
 from typing import List, Dict
 from dataclasses import dataclass
+from collections import defaultdict
 from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
@@ -45,22 +46,18 @@ class Liquidator(Agent):
     3. Sell collateral for USDC in the USDC/collateral External Market.
     """
 
-    basis_tokens: List[TokenDTO] = [
-        TOKEN_DTOs["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],  # USDC
-        TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
-    ]
-
-    paths: Dict[str, List[Path]] = {}
-
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
+        super().__init__()
         assert tolerance >= 0
         self.tolerance = tolerance
-        self._profit: float = 0.0
-        self._count: int = 0
-        self._borrower_loss: float = 0
-
-        self.collateral_liquidated: int = 0
-        self.debt_repaid: int = 0
+        self.collateral_liquidated: Dict[str, int] = defaultdict(int)
+        self.debt_repaid: Dict[str, int] = defaultdict(int)
+        self.basis_tokens = [
+            TOKEN_DTOs["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],  # USDC
+            TOKEN_DTOs["0xdac17f958d2ee523a2206206994597c13d831ec7"],  # USDT
+        ]
+        self.paths: Dict[str, List[Path]] = {}
 
     def set_paths(
         self,
@@ -177,9 +174,10 @@ class Liquidator(Agent):
 
         collateral = controller.COLLATERAL_TOKEN.address
 
-        paths = self.paths[controller.address]
-        assert paths, f"Liquidator paths not set for controller {controller.address}."
-        for path in paths:
+        assert (
+            controller.address in self.paths
+        ), f"Liquidator paths {self.paths} not set for controller {controller.address}."
+        for path in self.paths[controller.address]:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
 
@@ -216,19 +214,19 @@ class Liquidator(Agent):
             logger.debug("Liquidated user %s with profit: %f.", user, profit)
 
             # Update state
-            self._profit += profit
-            self._count += 1
+            self._profit[controller.address] += profit
+            self._count[controller.address] += 1
 
             external = best.trades[2]
             liquidation = best.trades[1]
-            self.collateral_liquidated += external.amt / 10 ** external.get_decimals(
-                external.i
-            )
-            self.debt_repaid += liquidation.amt / 10 ** liquidation.get_decimals(
-                liquidation.i
-            )
+            self.collateral_liquidated[
+                controller.address
+            ] += external.amt / 10 ** external.get_decimals(external.i)
+            self.debt_repaid[
+                controller.address
+            ] += liquidation.amt / 10 ** liquidation.get_decimals(liquidation.i)
 
-            self.update_borrower_losses(best, prices)
+            self.update_borrower_losses(best, prices, controller.address)
 
             return True
 

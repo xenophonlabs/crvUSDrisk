@@ -39,6 +39,7 @@ from .utils import (
     run_sim,
     plot_quotes,
     plot_regression,
+    create_card,
 )
 
 plt.switch_backend("Agg")
@@ -62,6 +63,8 @@ DIV_KWARGS = {
 SCROLL_DIV_KWARGS = {"style": {"maxHeight": "500px", "overflow": "scroll"}}
 
 TAB_KWARGS = {"label_style": {"color": "black"}}
+
+QUANTILE = 0.99
 
 global output
 output = None
@@ -264,6 +267,54 @@ def _generate_content(output: MonteCarloResults):
         .idxmax()
     ]
 
+    cov_matrix = pd.DataFrame(price_config["cov"])
+    std_devs = np.sqrt(np.diag(cov_matrix))
+    std_dev_matrix = np.outer(std_devs, std_devs)
+    corr_matrix = cov_matrix / std_dev_matrix
+    corr_matrix = pd.DataFrame(
+        corr_matrix, index=cov_matrix.index, columns=cov_matrix.columns
+    )
+
+    cards = []
+
+    var_body = [
+        html.H4(f"VaR: {output.summary['Bad Debt Max'].quantile(QUANTILE):,.0f} crvUSD")
+    ]
+
+    for controller in metadata["template"].controllers:
+        controller_bad_debt = output.summary[
+            entity_str(controller, "controller") + " Bad Debt"
+        ].quantile(QUANTILE)
+        var_body.append(f"VaR: {controller_bad_debt:,.0f} crvUSD")
+
+    var_card = create_card(
+        "Value at Risk",
+        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time.",
+        var_body,
+    )
+
+    lar_body = [
+        html.H4(
+            f"LaR: {output.summary['Collateral Liquidated Max'].quantile(QUANTILE):,.0f} {ADDRESS_TO_SYMBOL[metadata['template'].llamma.COLLATERAL_TOKEN.address]}"
+        )
+    ]  # TODO llamma not an attr
+    lar_card = create_card(
+        "Liquidations at Risk",
+        "Liquidations at Risk (LaR) is the p99 maximum collateral liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated collateral under the input assumptions will only ever exceed LaR 1% of the time.",
+        lar_body,
+    )
+
+    blar_body = [
+        html.H4(
+            f"BLaR: {output.summary['Borrower Loss Max'].quantile(QUANTILE):,.0f} USD"
+        )
+    ]
+    blar_card = create_card(
+        "Borrower Losses at Risk",
+        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
+        blar_body,
+    )
+
     spools = [
         entity_str(spool, "stableswap").title()
         for spool in metadata["template"].stableswap_pools
@@ -282,7 +333,6 @@ def _generate_content(output: MonteCarloResults):
             worst_depeg_spool = "/".join(spool.split("_")[1:]).upper()
             worst_depeg_spool_val = val
     worst_depeg_spool, worst_depeg_spool_val
-
     depeg_str = html.Div(
         [
             html.H5(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.3f}"),
@@ -291,14 +341,13 @@ def _generate_content(output: MonteCarloResults):
             ),
         ]
     )
-
-    cov_matrix = pd.DataFrame(price_config["cov"])
-    std_devs = np.sqrt(np.diag(cov_matrix))
-    std_dev_matrix = np.outer(std_devs, std_devs)
-    corr_matrix = cov_matrix / std_dev_matrix
-    corr_matrix = pd.DataFrame(
-        corr_matrix, index=cov_matrix.index, columns=cov_matrix.columns
+    depeg_card = create_card(
+        "Worst Depeg",
+        "The worst depeg (up or down) observed over the simulated runs for the Aggregator or any StableSwap pool.",
+        depeg_str,
     )
+
+    metric_cards = dbc.CardGroup(cards)
 
     layout = html.Div(
         [
@@ -394,76 +443,7 @@ def _generate_content(output: MonteCarloResults):
                                     "Summarized metrics, histograms, and raw data across all model runs.",
                                     style={"textAlign": "center"},
                                 ),
-                                dbc.CardGroup(
-                                    [
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Value at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"VaR: {output.summary['Bad Debt Max'].quantile(0.99):,.0f} crvUSD"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Liquidations at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Liquidations at Risk (LaR) is the p99 maximum collateral liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated collateral under the input assumptions will only ever exceed LaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"LaR: {output.summary['Collateral Liquidated Max'].quantile(0.99):,.0f} {ADDRESS_TO_SYMBOL[metadata['template'].llamma.COLLATERAL_TOKEN.address]}"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Borrower Losses at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"BLaR: {output.summary['Borrower Loss Max'].quantile(0.99):,.0f} USD"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Worst Depeg",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "The worst depeg (up or down) observed over the simulated runs for the Aggregator or any StableSwap pool."
-                                                    ),
-                                                    html.H5(depeg_str),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                    ]
-                                ),
+                                metric_cards,
                                 html.Br(),
                                 html.H4(
                                     "Metric Histograms", style={"textAlign": "center"}

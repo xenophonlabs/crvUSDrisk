@@ -24,13 +24,9 @@ class Arbitrageur(Agent):
     """
 
     def __init__(self, tolerance: float = DEFAULT_PROFIT_TOLERANCE):
-        # tolerance in units of USD
+        super().__init__()
         assert tolerance > 0  # default is one dollah
-
         self.tolerance: float = tolerance
-        self._profit: float = 0.0
-        self._count: int = 0
-        self._borrower_loss: float = 0.0
 
     def arbitrage(self, cycles: List[Cycle], prices: PriceSample) -> None:
         """
@@ -64,10 +60,10 @@ class Arbitrageur(Agent):
                 )
 
                 # Update state
-                self._profit += _profit
-                self._count += 1
+                self._profit["all"] += _profit
+                self._count["all"] += 1
 
-                self.update_borrower_losses(best_cycle, prices)
+                self.update_borrower_losses(best_cycle, prices, "all")
 
             else:
                 logger.debug("No more profitable arbitrages.")

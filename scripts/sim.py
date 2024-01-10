@@ -59,16 +59,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    markets = args.markets.split(",")[0]  # TODO handle multiple markets
+    markets = args.markets.split(",")
+    scenario = args.scenario
+    num_iter = args.num_iter
 
     if args.multiprocess:
         ncpu = cpu_count()
     else:
         ncpu = 1
 
-    output = with_analysis(args.scenario, args.markets, args.num_iter, ncpu)
-    # output = without_analysis(args.scenario, args.markets, args.num_iter, ncpu)
+    output = with_analysis(scenario, markets, num_iter, ncpu)
+    # output = without_analysis(scenario, markets, num_iter, ncpu)
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    with open(f"results/{args.scenario}.pkl", "wb") as f:
+    with open(f"results/{scenario}_{'_'.join(markets)}_{num_iter}.pkl", "wb") as f:
         pickle.dump(output, f)

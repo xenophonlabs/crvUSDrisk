@@ -6,6 +6,8 @@ from datetime import datetime
 from multiprocessing import cpu_count
 import numpy as np
 import plotly.graph_objects as go
+import dash_bootstrap_components as dbc
+from dash import html
 from src.sim import run_scenario
 from src.sim.results import MonteCarloResults
 from src.logging import get_logger
@@ -145,3 +147,24 @@ def plot_regression(df, i, j, market):
     )
 
     return fig
+
+
+def create_card(name, description, value):
+    """
+    Create the main metric cards.
+    """
+    return dbc.Card(
+        dbc.CardBody(
+            [
+                html.H4(
+                    "Value at Risk",
+                    className="card-title",
+                ),
+                html.P(
+                    "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time."
+                ),
+                value,
+            ],
+        ),
+        style={"textAlign": "center"},
+    )

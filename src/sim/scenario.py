@@ -225,8 +225,7 @@ class Scenario:
                 logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
             pct = round(damage / controller.total_debt() * 100, 2)
             args = (
-                "%.2f%% of debt (%d positions) was incorrectly \
-                    loaded with sub-zero health (%d crvUSD)",
+                "%.2f%% of debt (%d positions) was incorrectly loaded with <0 health (%d crvUSD)",
                 pct,
                 n,
                 damage / 1e18,

@@ -107,8 +107,8 @@ class BorrowerLossMetric(Metric):
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute borrower loss."""
-        hard_loss = self.scenario.liquidator.borrower_loss
-        soft_loss = self.scenario.arbitrageur.borrower_loss
+        hard_loss = self.scenario.liquidator.borrower_loss()
+        soft_loss = self.scenario.arbitrageur.borrower_loss()
         borrower_loss = hard_loss + soft_loss
         return {
             "Borrower Loss": borrower_loss,
@@ -130,30 +130,58 @@ class ValueLeakageMetric(Metric):
     key_metric = "Value Leakage"
 
     def _config(self) -> Dict[str, List[str]]:
-        return {
-            "Value Leakage": ["max"],
-            "Keeper Profit": ["max"],  # Using virtual price
-            "Keeper Count": ["max"],
-            "Liquidator Profit": ["max"],
-            "Liquidator Count": ["max"],
-            "Arbitrageur Profit": ["max"],  # == last
-            "Arbitrageur Count": ["max"],
-        }
+        cfg = {"Value Leakage": ["max"]}
+
+        cfg["Keeper Profit"] = ["max"]
+        cfg["Keeper Count"] = ["max"]
+        for pk in self.scenario.peg_keepers:
+            _pk = entity_str(pk, "pk")
+            cfg[f"Keeper Profit on {_pk}"] = ["max"]
+            cfg[f"Keeper Count on {_pk}"] = ["max"]
+
+        cfg["Liquidator Profit"] = ["max"]
+        cfg["Liquidator Count"] = ["max"]
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+            cfg[f"Liquidator Profit on {_controller}"] = ["max"]
+            cfg[f"Liquidator Count on {_controller}"] = ["max"]
+
+        cfg["Arbitrageur Profit"] = ["max"]
+        cfg["Arbitrageur Count"] = ["max"]
+
+        return cfg
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
-        liquidator_profit = self.scenario.liquidator.profit
-        arbitrageur_profit = self.scenario.arbitrageur.profit
-        keeper_profit = self.scenario.keeper.profit
-        value_leakage = liquidator_profit + arbitrageur_profit + keeper_profit
-        return {
-            "Value Leakage": value_leakage,
-            "Keeper Profit": keeper_profit,
-            "Keeper Count": self.scenario.keeper.count,
-            "Liquidator Profit": liquidator_profit,
-            "Liquidator Count": self.scenario.liquidator.count,
-            "Arbitrageur Profit": arbitrageur_profit,
-            "Arbitrageur Count": self.scenario.arbitrageur.count,
-        }
+        val = {}
+
+        keeper = self.scenario.keeper
+        val["Keeper Profit"] = keeper.profit()
+        val["Keeper Count"] = keeper.count()
+        for pk in self.scenario.peg_keepers:
+            _pk = entity_str(pk, "pk")
+            val[f"Keeper Profit on {_pk}"] = keeper.profit(pk.address)
+            val[f"Keeper Count on {_pk}"] = keeper.count(pk.address)
+
+        liquidator = self.scenario.liquidator
+        val["Liquidator Profit"] = liquidator.profit()
+        val["Liquidator Count"] = liquidator.count()
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+            val[f"Liquidator Profit on {_controller}"] = liquidator.profit(
+                controller.address
+            )
+            val[f"Liquidator Count on {_controller}"] = liquidator.count(
+                controller.address
+            )
+
+        val["Arbitrageur Profit"] = self.scenario.arbitrageur.profit()
+        val["Arbitrageur Count"] = self.scenario.arbitrageur.count()
+
+        val["Value Leakage"] = (
+            val["Liquidator Profit"] + val["Arbitrageur Profit"] + val["Keeper Profit"]
+        )
+
+        return val
 
 
 class PegStrengthMetric(Metric):
@@ -187,22 +215,43 @@ class LiquidationsMetric(Metric):
     Calculates the hard liquidation volume.
     """
 
-    key_metric = "Collateral Liquidated"
+    key_metric = "Debt Liquidated"
 
     def _config(self) -> Dict[str, List[str]]:
-        return {
-            "Collateral Liquidated": ["max"],
-            "Debt Repaid": ["max"],
+        cfg = {
+            "Debt Liquidated": ["max"],
             "Liquidation Count": ["max"],
         }
 
+        for controller in self.scenario.controllers:
+            cfg[f"Debt Liquidated on {entity_str(controller, 'controller')}"] = ["max"]
+            cfg[f"Collateral Liquidated on {entity_str(controller, 'controller')}"] = [
+                "max"
+            ]
+
+        return cfg
+
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute liquidation metrics."""
-        return {
-            "Collateral Liquidated": self.scenario.liquidator.collateral_liquidated,
-            "Debt Repaid": self.scenario.liquidator.debt_repaid,
-            "Liquidation Count": self.scenario.liquidator.count,
-        }
+        val = {}
+        liquidator = self.scenario.liquidator
+        total_debt_liquidated = 0.0
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+
+            debt_liquidated = liquidator.debt_repaid[controller.address] / 1e18
+            collateral_liquidated = (
+                liquidator.collateral_liquidated[controller.address] / 1e18
+            )
+
+            val[f"Debt Liquidated on {_controller}"] = debt_liquidated
+            val[f"Collateral Liquidated on {_controller}"] = collateral_liquidated
+
+            total_debt_liquidated += debt_liquidated
+
+        val["Debt Liquidated"] = total_debt_liquidated
+
+        return val
 
 
 class PegKeeperMetric(Metric):
