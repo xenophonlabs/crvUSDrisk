@@ -93,6 +93,7 @@ def simulate(
             v["mu"] = 0
 
     if ncpu > 1:
+        mp.set_start_method("spawn", force=True)  # safer than `fork` on Unix
         logger.info("Running simulation in parallel on %d cores", ncpu)
         with multiprocessing_logging_queue() as logging_queue:
             strategy_args_list: list = [
