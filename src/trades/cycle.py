@@ -113,7 +113,7 @@ class Cycle:
                         f"Trade {i + 2,} input {next_trade_amt} in Cycle {self}."
                     )
                 else:  # liquidation
-                    if abs(amt_out - next_trade_amt) / next_trade_amt < TOLERANCE:
+                    if abs(amt_out - next_trade_amt) / next_trade_amt > TOLERANCE:
                         # pool.get_dx() is not exact
                         logger.warning(
                             "Difference between trade %d output %d and "
