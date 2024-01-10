@@ -17,6 +17,7 @@ from ..configs import (
     get_price_config,
     CRVUSD_DTO,
     ALIASES_LLAMMA,
+    MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
@@ -37,15 +38,13 @@ class Scenario:
     all crvusdsim modules (LLAMMAs, Controllers, etc.), and all agents.
     """
 
-    modelled_markets = ["wbtc", "weth", "sfrxeth", "wsteth"]
-
     # pylint: disable=too-many-instance-attributes
     def __init__(self, scenario: str, market_names: List[str]):
         for alias in market_names.copy():
             if alias[:2] == "0x":
                 alias = ALIASES_LLAMMA[alias]
-            assert alias.lower() in self.modelled_markets, ValueError(
-                f"Only %s markets are supported, not {alias}."
+            assert alias.lower() in MODELLED_MARKETS, ValueError(
+                f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
             )
         self.market_names = market_names
         self.config = config = get_scenario_config(scenario)
