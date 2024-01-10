@@ -51,6 +51,7 @@ LLAMMA_ALIASES = {
     LLAMMA_WSTETH_ALIAS: LLAMMA_WSTETH,
     LLAMMA_TBTC_ALIAS: LLAMMA_TBTC,
 }
+ALIASES_LLAMMA = {v:k for k,v in LLAMMA_ALIASES.items()}
 
 
 def get_scenario_config(scenario: str) -> dict:

@@ -11,7 +11,13 @@ from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
 from curvesim.pool.sim_interface import SimCurveCryptoPool
 from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
-from ..configs import TOKEN_DTOs, get_scenario_config, get_price_config, CRVUSD_DTO
+from ..configs import (
+    TOKEN_DTOs,
+    get_scenario_config,
+    get_price_config,
+    CRVUSD_DTO,
+    ALIASES_LLAMMA,
+)
 from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
@@ -31,8 +37,16 @@ class Scenario:
     all crvusdsim modules (LLAMMAs, Controllers, etc.), and all agents.
     """
 
+    modelled_markets = ["wbtc", "weth", "sfrxeth", "wsteth"]
+
     # pylint: disable=too-many-instance-attributes
     def __init__(self, scenario: str, market_names: List[str]):
+        for alias in market_names.copy():
+            if alias[:2] == "0x":
+                alias = ALIASES_LLAMMA[alias]
+            assert alias.lower() in self.modelled_markets, ValueError(
+                f"Only %s markets are supported, not {alias}."
+            )
         self.market_names = market_names
         self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
@@ -83,6 +97,17 @@ class Scenario:
         """
         self.pricepaths: PricePaths = PricePaths(self.num_steps, self.price_config)
 
+    @property
+    def arbed_pools(self) -> list:
+        """
+        Return the pools that are arbed.
+        By default the arbitrageur will arbitrage all
+        crvUSD pools against External Markets.
+
+        This includes LLAMMAs and StableSwap pools.
+        """
+        return self.stableswap_pools + self.llammas + list(self.markets.values())
+
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
         self.arbitrageur: Arbitrageur = Arbitrageur()
@@ -95,10 +120,7 @@ class Scenario:
         self.liquidator.set_paths(self.controllers, self.stableswap_pools, self.markets)
 
         # Set arbitrage cycles
-        # TODO include TBTC TriCrypto pool
-        self.graph = PoolGraph(
-            self.stableswap_pools + self.llammas + list(self.markets.values())
-        )
+        self.graph = PoolGraph(self.arbed_pools)
         self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
@@ -139,11 +161,9 @@ class Scenario:
                 datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
             )
 
-            # NOTE huge memory consumption
+            # huge memory consumption
             del sim_market.pool.metadata["bands"]
-            del sim_market.pool.metadata[
-                "userStates"
-            ]  # TODO compare these before deleting
+            del sim_market.pool.metadata["userStates"]
 
             sim_markets.append(sim_market)
 
@@ -324,8 +344,5 @@ class Scenario:
         self.arbitrageur.arbitrage(self.cycles, prices)
         self.liquidator.perform_liquidations(self.controllers, prices)
         self.keeper.update(self.peg_keepers)
-        # TODO what is the right order for the actions?
-        # TODO need to incorporate LPs add/remove liquidity
-        # ^ currently USDT pool has more liquidity and this doesn't change since we
-        # only model swaps.
-        # TODO borrower
+        # TODO LP
+        # TODO Borrower
