@@ -165,6 +165,10 @@ class Liquidator(Agent):
         user = position.user
         health = position.health
 
+        if controller.health(user, full=True) < 0:
+            logger.debug("User %s is no longer liquidatable.", user)
+            return False
+
         to_repay = int(controller.tokens_to_liquidate(user))
         _, y = controller.AMM.get_sum_xy(user)
         y = int(y)

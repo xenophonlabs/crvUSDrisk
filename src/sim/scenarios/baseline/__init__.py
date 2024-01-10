@@ -110,7 +110,8 @@ def simulate(
                 pool.join()
 
             for result in results:
-                mcaggregator.collect(result)
+                if result:
+                    mcaggregator.collect(result)
     else:
         for i in range(num_iter):
             scenario = deepcopy(scenario_template)
@@ -125,9 +126,14 @@ def worker(
     scenario: Scenario,
     params: dict,
     i: int,
-) -> SingleSimResults:
+) -> SingleSimResults | None:
     """
     Wrap strategy for multiprocess logging.
     """
     configure_multiprocess_logging(logging_queue)
-    return strategy(scenario, params, i)
+    try:
+        result = strategy(scenario, params, i)
+    except AssertionError as e:
+        logger.exception("Failed run %d with exception %s", i, e)
+        return None
+    return result
