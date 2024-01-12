@@ -112,7 +112,7 @@ class Scenario:
         self.arbitrageur: Arbitrageur = Arbitrageur()
         self.liquidator: Liquidator = Liquidator()
         self.keeper: Keeper = Keeper()
-        self.borrower: Borrower = Borrower()
+        # self.borrower: Borrower = Borrower()
         self.liquidity_provider: LiquidityProvider = LiquidityProvider()
 
         # Set liquidator paths
@@ -128,7 +128,7 @@ class Scenario:
             self.arbitrageur,
             self.liquidator,
             self.keeper,
-            self.borrower,
+            # self.borrower,
             self.liquidity_provider,
         ]
 
@@ -345,3 +345,24 @@ class Scenario:
         self.keeper.update(self.peg_keepers)
         # TODO LP
         # TODO Borrower
+
+    def setup_borrowers(self) -> None:
+        """
+        Setup borrowers for the scenario.
+
+        TODO doc
+        """
+        for controller in self.controllers:
+            min_band = controller.AMM.min_band - 5  # Offset by a little bit
+            active_band = min_band + 1
+
+            controller.AMM.active_band = active_band
+            controller.AMM.min_band = min_band
+
+            p = controller.AMM.p_oracle_up(active_band)
+            controller.AMM.price_oracle_contract.last_price = p
+            controller.AMM.price_oracle_contract.freeze()
+
+            ts = controller._block_timestamp  # pylint: disable=protected-access
+            controller.prepare_for_trades(ts + 60 * 60)
+            controller.AMM.prepare_for_trades(ts + 60 * 60)

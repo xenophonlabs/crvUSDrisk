@@ -1,7 +1,10 @@
 """Plotting functions for simulations."""
 import pandas as pd
 import matplotlib.pyplot as plt
-from .utils import save
+from matplotlib import gridspec
+import plotly.graph_objects as go
+import numpy as np
+from .utils import save, remove_spines_and_ticks
 from ..configs import ADDRESS_TO_SYMBOL
 from ..configs.tokens import COINGECKO_IDS
 
@@ -87,3 +90,88 @@ def plot_jumps(
     f.legend(loc="upper center", bbox_to_anchor=(0.5, 0), ncol=3)
 
     return save(f, fn)
+
+
+# pylint: disable=too-many-arguments
+def plot_borrowers_2d(
+    health: np.ndarray,
+    collateral: np.ndarray,
+    density: np.ndarray,
+    xlim: tuple | None = None,
+    ylim: tuple | None = None,
+    num_bins: int = 50,
+) -> plt.Figure:
+    """
+    Plot borrower distribution.
+    """
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(4, 4, wspace=0.1, hspace=0.1)
+
+    ax = fig.add_subplot(gs[1:4, 0:3])
+    ax.scatter(health, collateral, c=density, s=2)
+    ax.set_xlabel("Health")
+    ax.set_ylabel("Log of Collateral")
+
+    # Apply x and y limits if provided
+    if xlim is not None:
+        ax.set_xlim(*xlim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    ax_histx = fig.add_subplot(gs[0, 0:3])
+    ax_histx.hist(health, bins=num_bins, density=True, color="#450e58")
+    ax_histx = remove_spines_and_ticks(ax_histx, skip=["bottom"], keep_x_ticks=True)
+
+    if xlim is not None:
+        ax_histx.set_xlim(*xlim)
+
+    ax_histy = fig.add_subplot(gs[1:4, 3])
+    ax_histy.hist(
+        collateral,
+        bins=num_bins,
+        density=True,
+        orientation="horizontal",
+        color="#450e58",
+    )
+    ax_histy = remove_spines_and_ticks(ax_histy, skip=["left"], keep_y_ticks=True)
+    ax_histx.set_title("Borrower States")
+
+    if ylim is not None:
+        ax_histy.set_ylim(*ylim)
+
+    return fig
+
+
+def plot_borrowers_3d(
+    health: np.ndarray, collateral_log: np.ndarray, n: np.ndarray, density: np.ndarray
+) -> go.Figure:
+    """
+    Plot borrower distribution.
+    """
+    fig = go.Figure(
+        data=[
+            go.Scatter3d(
+                x=health,
+                y=collateral_log,
+                z=n,
+                mode="markers",
+                marker={
+                    "size":2,
+                    "color":density,  # set color to an array/list of desired values
+                    "colorscale":"Viridis",  # choose a colorscale
+                    "opacity":0.1,
+                },
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title="Borrower Stats",
+        xaxis_title="Health",
+        yaxis_title="Log Collateral",
+        # zaxis_title="N",
+        height=500,
+        showlegend=False,
+    )
+
+    return fig
