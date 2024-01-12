@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import plotly.graph_objects as go
 import numpy as np
+from crvusdsim.pool.sim_interface import SimLLAMMAPool
 from .utils import save, remove_spines_and_ticks
 from ..configs import ADDRESS_TO_SYMBOL
 from ..configs.tokens import COINGECKO_IDS
@@ -115,6 +116,7 @@ def plot_borrowers_2d(
     # Apply x and y limits if provided
     if xlim is not None:
         ax.set_xlim(*xlim)
+        health = health[(health > xlim[0]) & (health < xlim[1])]
     if ylim is not None:
         ax.set_ylim(*ylim)
 
@@ -156,10 +158,10 @@ def plot_borrowers_3d(
                 z=n,
                 mode="markers",
                 marker={
-                    "size":2,
-                    "color":density,  # set color to an array/list of desired values
-                    "colorscale":"Viridis",  # choose a colorscale
-                    "opacity":0.1,
+                    "size": 2,
+                    "color": density,  # set color to an array/list of desired values
+                    "colorscale": "Viridis",  # choose a colorscale
+                    "opacity": 0.1,
                 },
             )
         ]
@@ -175,3 +177,38 @@ def plot_borrowers_3d(
     )
 
     return fig
+
+
+def plot_reserves(llamma: SimLLAMMAPool) -> plt.Figure:
+    """Plot LLAMMA reserves."""
+    band_range = range(llamma.min_band, llamma.max_band + 1)
+    bands_x = [llamma.bands_x[i] / 1e18 for i in band_range]
+    bands_y = [llamma.bands_y[i] * llamma.price_oracle() / 1e36 for i in band_range]
+    band_edges = [llamma.p_oracle_down(i) / 1e18 for i in band_range]
+    band_widths = [llamma.p_oracle_up(i) / llamma.A * 0.9 / 1e18 for i in band_range]
+
+    f, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(
+        band_edges, bands_y, color="royalblue", width=band_widths, label="Collateral"
+    )
+    ax.bar(
+        band_edges,
+        bands_x,
+        bottom=bands_y,
+        color="indianred",
+        width=band_widths,
+        label="crvusd",
+    )
+    ax.set_xlabel("p_o_down[n] (USD)")
+    ax.set_ylabel("Reserves (USD)")
+    ax.set_title("LLAMMA Collateral Distribution")
+    ax.axvline(
+        llamma.price_oracle() / 1e18,
+        color="black",
+        linestyle="--",
+        label="Oracle price",
+    )
+    ax.axvline(llamma.get_p() / 1e18, color="green", linestyle="--", label="AMM price")
+    ax.legend()
+
+    return f

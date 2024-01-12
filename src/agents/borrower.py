@@ -14,15 +14,13 @@ TOLERANCE = 1e-4
 
 
 def clean(
-    debt_log: float, collateral_log: float, n: int, collateral_decimals: int
+    debt_log: float, collateral_log: float, n: int, decimals: int = 18
 ) -> Tuple[int, int, int]:
     """
     Process log values into integers with the right decimals.
     """
     debt = int(np.exp(debt_log) * 1e18)
-    collateral = int(
-        np.exp(collateral_log) * 10**collateral_decimals
-    )  # TODO decimals
+    collateral = int(np.exp(collateral_log) * 10**decimals)  # TODO decimals
     n = min(max(int(n), 4), 50)
     return debt, collateral, n
 
@@ -38,11 +36,6 @@ class Borrower(Agent):
         super().__init__()
         self.address = "0x" + secrets.token_hex(20)
 
-    def borrow(self, debt: int, collateral: int, n: int) -> None:
-        """
-        Borrow crvusd from the Controller.
-        """
-
     def create_loan(self, controller: SimController, kde: gaussian_kde) -> None:
         """
         Create a loan in the given controller, sampled from
@@ -50,16 +43,20 @@ class Borrower(Agent):
 
         The KDE is trained on (log(debt), log(collateral), n)
         """
-        debt, collateral, n = clean(*kde.resample(1).T[0])
-        try:
-            health = controller.health_calculator(
-                self.address, collateral, debt, False, n
-            )
-        except AssertionError as _:
-            debt = controller.max_borrowable(collateral, n)
-            health = controller.health_calculator(
-                self.address, collateral, debt, False, n
-            )
+        debt_log, collateral_log, n = kde.resample(1).T[0]
+        debt, collateral, n = clean(
+            debt_log, collateral_log, n, decimals=controller.COLLATERAL_TOKEN.decimals
+        )
+        controller.COLLATERAL_TOKEN._mint(  # pylint: disable=protected-access
+            self.address, collateral
+        )
 
-        controller.COLLATERAL_TOKEN._mint(self.address, collateral)  # pylint: disable=protected-access
-        controller.create_loan(self.address, collateral, debt, n)
+        try:
+            controller.health_calculator(self.address, collateral, debt, False, n)
+            controller.create_loan(self.address, collateral, debt, n)
+        except AssertionError as e:
+            if str(e) == "Debt too high":
+                debt = controller.max_borrowable(collateral, n)
+                controller.create_loan(self.address, collateral, debt, n)
+            else:
+                raise e

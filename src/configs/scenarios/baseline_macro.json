@@ -11,5 +11,9 @@
         "start": 1672531200,
         "end": 1704067200
     },
+    "borrowers": {
+        "start": 1696132800,
+        "end": 1704085200
+    },
     "arb_cycle_length": 3
 }

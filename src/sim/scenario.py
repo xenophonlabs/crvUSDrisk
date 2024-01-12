@@ -2,12 +2,13 @@
 Provides the `Scenario` class for running simulations.
 """
 
-from typing import List, Tuple, Set, cast
+from typing import List, Tuple, Set, cast, Dict
 from itertools import combinations
 from datetime import datetime
 import pandas as pd
 from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
+from crvusdsim.pool.sim_interface import SimController
 from curvesim.pool.sim_interface import SimCurveCryptoPool
 from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
@@ -15,13 +16,14 @@ from ..configs import (
     TOKEN_DTOs,
     get_scenario_config,
     get_price_config,
+    get_borrower_kde,
     CRVUSD_DTO,
     ALIASES_LLAMMA,
     MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
-from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
+from ..agents import Arbitrageur, Liquidator, Keeper, Borrower
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
 from ..utils.poolgraph import PoolGraph
@@ -112,8 +114,6 @@ class Scenario:
         self.arbitrageur: Arbitrageur = Arbitrageur()
         self.liquidator: Liquidator = Liquidator()
         self.keeper: Keeper = Keeper()
-        # self.borrower: Borrower = Borrower()
-        self.liquidity_provider: LiquidityProvider = LiquidityProvider()
 
         # Set liquidator paths
         self.liquidator.set_paths(self.controllers, self.stableswap_pools, self.markets)
@@ -123,14 +123,7 @@ class Scenario:
         self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
-        # For convenience
-        self.agents = [
-            self.arbitrageur,
-            self.liquidator,
-            self.keeper,
-            # self.borrower,
-            self.liquidity_provider,
-        ]
+        self.borrowers: Dict[str, Borrower] = {}
 
     def generate_sim_market(self) -> None:
         """
@@ -203,7 +196,7 @@ class Scenario:
         for pair in self.pairs:
             self.markets[pair].update_price(sample.prices)
 
-    def prepare_for_run(self) -> None:
+    def prepare_for_run(self, resample_borrowers: bool = True) -> None:
         """
         Prepare all modules for a simulation run.
 
@@ -211,6 +204,9 @@ class Scenario:
         1. Run a single step of price arbitrages.
         2. Liquidate users that were loaded underwater.
         """
+        if resample_borrowers:
+            self.setup_borrowers()  # randomly sample positions
+
         sample = self.pricepaths[0]
         ts = int(sample.timestamp.timestamp())
 
@@ -344,7 +340,6 @@ class Scenario:
         self.liquidator.perform_liquidations(self.controllers, prices)
         self.keeper.update(self.peg_keepers)
         # TODO LP
-        # TODO Borrower
 
     def setup_borrowers(self) -> None:
         """
@@ -353,16 +348,55 @@ class Scenario:
         TODO doc
         """
         for controller in self.controllers:
-            min_band = controller.AMM.min_band - 5  # Offset by a little bit
-            active_band = min_band + 1
+            # controller.AMM.price_oracle_contract.freeze()
+            reset_controller_price(controller)
+            clear_controller(controller)
+            num_loans = 350  # TODO config!!! or something
+            # TODO reading from this file WILL BREAK MULTIPROCESSING
+            logger.critical("READING KDE FROM FILE.")
+            kde = get_borrower_kde(
+                controller.AMM.address,
+                self.config["borrowers"]["start"],
+                self.config["borrowers"]["end"],
+            )
+            for _ in range(num_loans):
+                borrower = Borrower()
+                borrower.create_loan(controller, kde)
+                self.borrowers[borrower.address] = borrower
+            controller.AMM.price_oracle_contract.unfreeze()
 
-            controller.AMM.active_band = active_band
-            controller.AMM.min_band = min_band
 
-            p = controller.AMM.p_oracle_up(active_band)
-            controller.AMM.price_oracle_contract.last_price = p
-            controller.AMM.price_oracle_contract.freeze()
+def clear_controller(controller: SimController) -> None:
+    """Clear all controller states."""
+    users = list(controller.loan.keys())
+    for user in users:
+        debt = controller._debt(user)[0]  # pylint: disable=protected-access
+        if debt > 0:
+            controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
+        controller.repay(debt, user)
+        del controller.loan[user]
 
-            ts = controller._block_timestamp  # pylint: disable=protected-access
-            controller.prepare_for_trades(ts + 60 * 60)
-            controller.AMM.prepare_for_trades(ts + 60 * 60)
+    assert controller.n_loans == 0
+    assert len(controller.loan) == 0
+    assert controller.total_debt() == 0
+
+
+def reset_controller_price(controller: SimController) -> None:
+    """
+    Reset controller price.
+    NOTE this freezes the oracle.
+    """
+    min_band = controller.AMM.min_band - 3  # Offset by a little bit
+    active_band = min_band + 1
+
+    controller.AMM.active_band = active_band
+    controller.AMM.min_band = min_band
+
+    p = controller.AMM.p_oracle_up(active_band)
+    controller.AMM.price_oracle_contract.last_price = p
+
+    controller.AMM.price_oracle_contract.freeze()
+
+    ts = controller._block_timestamp  # pylint: disable=protected-access
+    controller.prepare_for_trades(ts + 60 * 60)
+    controller.AMM.prepare_for_trades(ts + 60 * 60)

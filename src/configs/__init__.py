@@ -4,7 +4,9 @@ Master config with basic constants.
 
 import os
 import json
+import pickle
 from datetime import datetime
+from scipy.stats import gaussian_kde
 from .tokens import ADDRESSES, TOKEN_DTOs, STABLE_CG_IDS, CRVUSD_DTO
 from ..network.coingecko import get_current_prices
 from ..logging import get_logger
@@ -62,6 +64,18 @@ def get_scenario_config(scenario: str) -> dict:
     with open(fn, "r", encoding="utf-8") as f:
         config = json.load(f)
     return config
+
+
+def get_borrower_kde(market: str, start: int, end: int) -> gaussian_kde:
+    """
+    Get the KDE object for sampling borrowers.
+    """
+    if "0x" in market:
+        market = ALIASES_LLAMMA[market]
+    fn = os.path.join(BASE_DIR, "borrowers", market.lower(), f"{start}_{end}.pkl")
+    with open(fn, "rb") as f:
+        kde = pickle.load(f)
+    return kde
 
 
 def get_price_config(freq: str, start: int, end: int) -> dict:
