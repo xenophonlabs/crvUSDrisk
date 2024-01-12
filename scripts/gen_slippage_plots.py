@@ -3,7 +3,9 @@ Plot the simulated price impact curve for each [directional]
 permutation of modeled tokens. These are based off the 
 1inch quotes we store in our postgres database.
 """
+import pandas as pd
 from src.logging import get_logger
+from src.modules import ExternalMarket
 from src.sim.scenario import Scenario
 from src.plotting import plot_regression, plot_predictions
 
@@ -14,7 +16,15 @@ FN_PRED = f"{PATH}/predictions/" + "{}_{}.png"
 logger = get_logger(__name__)
 
 
-def plot(quotes, market, i, j, scale="log", fn_regr=None, fn_pred=None):
+def plot(
+    quotes: pd.DataFrame,
+    market: ExternalMarket,
+    i: int,
+    j: int,
+    scale: str = "log",
+    fn_regr: str | None = None,
+    fn_pred: str | None = None,
+) -> None:
     """Generate relevant price impact plots"""
     in_token = market.coins[i]
     out_token = market.coins[j]
@@ -24,11 +34,12 @@ def plot(quotes, market, i, j, scale="log", fn_regr=None, fn_pred=None):
     _ = plot_predictions(quotes_, i, j, market, scale=scale, fn=fn_pred)
 
 
-def main():
+def main() -> None:
     """Generate price impact plots for each token pair."""
-    scenario = Scenario("baseline_micro")
+    scenario = Scenario("baseline_micro", ["wsteth"])
     scenario.update_market_prices(scenario.pricepaths[0])
-    quotes = scenario.quotes
+
+    quotes = scenario.generate_markets()  # regenerate to fetch quotes
 
     # This takes a while to plot
     i = 1

@@ -101,6 +101,7 @@ def plot_borrowers_2d(
     xlim: tuple | None = None,
     ylim: tuple | None = None,
     num_bins: int = 50,
+    title: str | None = None,
 ) -> plt.Figure:
     """
     Plot borrower distribution.
@@ -136,7 +137,9 @@ def plot_borrowers_2d(
         color="#450e58",
     )
     ax_histy = remove_spines_and_ticks(ax_histy, skip=["left"], keep_y_ticks=True)
-    ax_histx.set_title("Borrower States")
+
+    title = title or "Borrower States"
+    ax_histx.set_title(title)
 
     if ylim is not None:
         ax_histy.set_ylim(*ylim)

@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
-from crvusdsim.pool.sim_interface import SimController
+from crvusdsim.pool.sim_interface import SimController, SimLLAMMAPool
 from curvesim.pool.sim_interface import SimCurveCryptoPool
 from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
@@ -131,11 +131,11 @@ class Scenario:
         LLAMMAs, Controllers, StableSwap pools, etc.
         """
         sim_markets: List[SimMarketInstance] = []
-        for market_names in self.market_names:
-            logger.info("Fetching %s market from subgraph", market_names)
+        for market_name in self.market_names:
+            logger.info("Fetching %s market from subgraph", market_name)
 
             sim_market = get(
-                market_names, bands_data="controller", use_simple_oracle=False
+                market_name, bands_data="controller", use_simple_oracle=False
             )
 
             metadata = sim_market.pool.metadata
@@ -348,7 +348,7 @@ class Scenario:
         TODO doc
         """
         for controller in self.controllers:
-            # controller.AMM.price_oracle_contract.freeze()
+            controller.AMM.price_oracle_contract.freeze()
             reset_controller_price(controller)
             clear_controller(controller)
             num_loans = 350  # TODO config!!! or something
@@ -364,6 +364,19 @@ class Scenario:
                 borrower.create_loan(controller, kde)
                 self.borrowers[borrower.address] = borrower
             controller.AMM.price_oracle_contract.unfreeze()
+            find_active_band(controller.AMM)
+
+
+def find_active_band(llamma: SimLLAMMAPool) -> None:
+    """Find the active band for a LLAMMA."""
+    min_band = llamma.min_band
+    for n in range(llamma.min_band, llamma.max_band):
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
+            min_band += 1
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
+            llamma.active_band = n
+            break
+    llamma.min_band = min_band
 
 
 def clear_controller(controller: SimController) -> None:
@@ -384,19 +397,18 @@ def clear_controller(controller: SimController) -> None:
 def reset_controller_price(controller: SimController) -> None:
     """
     Reset controller price.
-    NOTE this freezes the oracle.
     """
-    min_band = controller.AMM.min_band - 3  # Offset by a little bit
+    llamma = controller.AMM
+
+    min_band = llamma.min_band - 3  # Offset by a little bit
     active_band = min_band + 1
 
-    controller.AMM.active_band = active_band
-    controller.AMM.min_band = min_band
+    llamma.active_band = active_band
+    llamma.min_band = min_band
 
-    p = controller.AMM.p_oracle_up(active_band)
-    controller.AMM.price_oracle_contract.last_price = p
-
-    controller.AMM.price_oracle_contract.freeze()
+    p = llamma.p_oracle_up(active_band)
+    llamma.price_oracle_contract.last_price = p
 
     ts = controller._block_timestamp  # pylint: disable=protected-access
     controller.prepare_for_trades(ts + 60 * 60)
-    controller.AMM.prepare_for_trades(ts + 60 * 60)
+    llamma.prepare_for_trades(ts + 60 * 60)

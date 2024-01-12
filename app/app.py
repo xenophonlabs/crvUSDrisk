@@ -228,7 +228,6 @@ def _generate_content(output: MonteCarloResults):
 
     metadata = clean_metadata(output.metadata)
     template = metadata["template"]
-    output.template = template
     price_config = template.pricepaths.config.copy()
     for k, v in price_config["params"].items():
         v.update({"start_price": price_config["curr_prices"][k]})
@@ -826,8 +825,8 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
     # if not n_clicks:
     #     return no_update
     # else:
-    start = output.template.quotes_start
-    end = output.template.quotes_end
+    start = output.metadata["template"].quotes_start
+    end = output.metadata["template"].quotes_end
     in_asset_dto = TOKEN_DTOs[in_asset]
     out_asset_dto = TOKEN_DTOs[out_asset]
     pair = tuple(sorted((in_asset_dto, out_asset_dto)))
@@ -838,7 +837,7 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
     )
     i = pair.index(in_asset_dto)
     j = pair.index(out_asset_dto)
-    market = output.template.markets[pair]
+    market = output.metadata["template"].markets[pair]
     df = quotes.loc[in_asset_dto.address, out_asset_dto.address]
     return html.Div(
         [

@@ -1,3 +1,7 @@
+"""
+Script to run a Monte Carlo simulation.
+"""
+from typing import List
 import cProfile
 import pstats
 import pdb
@@ -7,11 +11,17 @@ from datetime import datetime
 from multiprocessing import cpu_count
 from src.sim import run_scenario
 from src.logging import get_logger
+from src.sim.results import MonteCarloResults
 
 logger = get_logger(__name__)
 
 
-def with_analysis(scenario, markets, num_iter, ncpu):
+def with_analysis(
+    scenario: str, markets: List[str], num_iter: int, ncpu: int
+) -> MonteCarloResults:
+    """
+    Run simulation with profiling and debugging.
+    """
     with cProfile.Profile() as pr:
         try:
             global output
@@ -25,7 +35,12 @@ def with_analysis(scenario, markets, num_iter, ncpu):
     return output
 
 
-def without_analysis(scenario, markets, num_iter, ncpu):
+def without_analysis(
+    scenario: str, markets: List[str], num_iter: int, ncpu: int
+) -> MonteCarloResults:
+    """
+    Run simulation without any analysis.
+    """
     start = datetime.now()
     global output
     output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=ncpu)
@@ -35,7 +50,10 @@ def without_analysis(scenario, markets, num_iter, ncpu):
     return output
 
 
-def analysis_help():
+def analysis_help() -> None:
+    """
+    Help for analysis.
+    """
     print("Call `output.summary` for a DF of summary metrics.")
     print("Call `output.plot_runs(<metric_id>)` to plot the input metric for all runs.")
     print("Call `output.metric_map` to get a list of metrics and their ids.")
