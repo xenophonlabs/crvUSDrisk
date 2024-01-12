@@ -10,6 +10,7 @@ from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
 from crvusdsim.pool.sim_interface import SimController, SimLLAMMAPool
 from curvesim.pool.sim_interface import SimCurveCryptoPool
+from scipy.stats import gaussian_kde
 from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
 from ..configs import (
@@ -63,6 +64,18 @@ class Scenario:
         self.generate_pricepaths()
         self.generate_markets()
         self.generate_agents()
+
+        # FIXME this costs a lot of memory to store
+        # but prevents us from having to read it from disk
+        # which would cause thread locks.
+        self.kde: Dict[str, gaussian_kde] = {}
+        for controller in self.controllers:
+            pool = controller.AMM
+            self.kde[pool.address] = get_borrower_kde(
+                pool.address,
+                self.config["borrowers"]["start"],
+                self.config["borrowers"]["end"],
+            )
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -219,7 +232,7 @@ class Scenario:
         # Equilibrate pool prices
         arbitrageur = Arbitrageur()  # diff arbitrageur
         arbitrageur.arbitrage(self.cycles, sample)
-        logger.info(
+        logger.debug(
             "Equilibrated prices with %d arbitrages with total profit %d",
             arbitrageur.count(),
             arbitrageur.profit(),
@@ -228,7 +241,7 @@ class Scenario:
         # Liquidate users that were loaded underwater
         for controller in self.controllers:
             name = controller.AMM.name.replace("Curve.fi Stablecoin ", "")
-            logger.info("Validating loaded positions in %s Controller.", name)
+            logger.debug("Validating loaded positions in %s Controller.", name)
 
             to_liquidate = controller.users_to_liquidate()
             n = len(to_liquidate)
@@ -237,18 +250,20 @@ class Scenario:
             damage = 0
             for pos in to_liquidate:
                 damage += pos.debt
-                logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
+                logger.debug("Liquidating %s: with debt %d.", pos.user, pos.debt)
             pct = round(damage / controller.total_debt() * 100, 2)
             args = (
-                "%.2f%% of debt (%d positions) was incorrectly loaded with <0 health (%d crvUSD)",
+                "%.2f%% of debt (%d positions) was incorrectly "
+                "loaded with <0 health (%d crvUSD) in %s Controller.",
                 pct,
                 n,
                 damage / 1e18,
+                name,
             )
             if pct > 1:
                 logger.warning(*args)
             else:
-                logger.info(*args)
+                logger.debug(*args)
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
@@ -344,27 +359,34 @@ class Scenario:
     def setup_borrowers(self) -> None:
         """
         Setup borrowers for the scenario.
-
-        TODO doc
+        - Shift AMM price up slightly
+        - Clear debt positions
+        - Resample new debt positions from KDE
+        - (AMM price shifts back down in `prepare_for_run`)
         """
         for controller in self.controllers:
-            controller.AMM.price_oracle_contract.freeze()
+            llamma = controller.AMM
+            llamma.price_oracle_contract.freeze()
             reset_controller_price(controller)
             clear_controller(controller)
-            num_loans = 350  # TODO config!!! or something
-            # TODO reading from this file WILL BREAK MULTIPROCESSING
-            logger.critical("READING KDE FROM FILE.")
-            kde = get_borrower_kde(
-                controller.AMM.address,
-                self.config["borrowers"]["start"],
-                self.config["borrowers"]["end"],
-            )
+            num_loans = self.config["borrowers"]["num_loans"][
+                ALIASES_LLAMMA[llamma.address]
+            ]
             for _ in range(num_loans):
                 borrower = Borrower()
-                borrower.create_loan(controller, kde)
+                success = borrower.create_loan(controller, self.kde[llamma.address])
+                if not success:
+                    break
                 self.borrowers[borrower.address] = borrower
-            controller.AMM.price_oracle_contract.unfreeze()
-            find_active_band(controller.AMM)
+            llamma.price_oracle_contract.unfreeze()
+            find_active_band(llamma)
+            del self.kde[llamma.address]  # free up memory
+            logger.debug(
+                "Resampled %d loans with total debt %d in %s.",
+                num_loans,
+                controller.total_debt(),
+                llamma.name,
+            )
 
 
 def find_active_band(llamma: SimLLAMMAPool) -> None:

@@ -575,8 +575,8 @@ def _generate_content(output: MonteCarloResults):
                                             dbc.Input(
                                                 id="run-dropdown",
                                                 type="number",
-                                                min=1,
-                                                max=len(output.data),
+                                                min=0,
+                                                max=len(output.data) - 1,
                                                 step=1,
                                                 value=0,
                                             ),
@@ -808,7 +808,7 @@ def update_run_data_table(value: int):
     if not output or value is None:
         return no_update
     return dbc.Table.from_dataframe(
-        output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),
+        output.data[value].df.reset_index(names=["Time"]).round(DECIMALS),
         **DBC_TABLE_KWARGS,
     )
 
@@ -863,7 +863,7 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
 def update_run_prices(value: int, show_all: bool):
     if not output or value is None:
         return no_update
-    df = output.data[value - 1].pricepaths.prices
+    df = output.data[value].pricepaths.prices
     cols = [col for col in df.columns if col != "timestamp"]
     titles = [ADDRESS_TO_SYMBOL[col] for col in cols]
     n, m = make_square(len(cols))

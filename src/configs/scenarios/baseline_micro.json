@@ -1,6 +1,6 @@
 {
     "name": "Baseline Micro",
-    "description": "Baseline scenario running on a short timescale. Price drifts for collateral assets are set to 0.",
+    "description": "Baseline scenario running on a short timescale. Price drifts for collateral assets are set to 0. Debt positions are randomly re-sampled from an empirical Gaussian KDE.",
     "freq": "5min",
     "N": 288,
     "quotes": {
@@ -13,7 +13,13 @@
     },
     "borrowers": {
         "start": 1696132800,
-        "end": 1704085200
+        "end": 1704085200,
+        "num_loans": {
+            "wsteth": 350,
+            "weth": 175,
+            "sfrxeth": 75,
+            "wbtc": 250
+        }
     },
     "arb_cycle_length": 3
 }

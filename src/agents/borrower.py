@@ -36,7 +36,7 @@ class Borrower(Agent):
         super().__init__()
         self.address = "0x" + secrets.token_hex(20)
 
-    def create_loan(self, controller: SimController, kde: gaussian_kde) -> None:
+    def create_loan(self, controller: SimController, kde: gaussian_kde) -> bool:
         """
         Create a loan in the given controller, sampled from
         the input KDE.
@@ -57,6 +57,13 @@ class Borrower(Agent):
         except AssertionError as e:
             if str(e) == "Debt too high":
                 debt = controller.max_borrowable(collateral, n)
+                if debt == 0:
+                    logger.warning(
+                        "Controller %s won't accept any more debt.", controller.AMM.name
+                    )
+                    return False
                 controller.create_loan(self.address, collateral, debt, n)
             else:
                 raise e
+
+        return True

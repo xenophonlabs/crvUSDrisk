@@ -63,7 +63,6 @@ def simulate(
             scenario_template = pickle.load(f)
     else:
         scenario_template = Scenario(config, market_names)
-        scenario_template.prepare_for_run()
 
     metadata = {
         "scenario": config,
@@ -84,7 +83,6 @@ def simulate(
     strategy = BaselineStrategy(metrics)
     mcaggregator = MonteCarloProcessor(metadata)
 
-    # TODO for other scenarios: apply shocks, etc.
     # TODO parameter sampling
 
     # Remove drift from collateral assets to enforce random walk
