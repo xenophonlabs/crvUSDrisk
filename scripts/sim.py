@@ -2,6 +2,7 @@
 Script to run a Monte Carlo simulation.
 """
 from typing import List
+import os
 import cProfile
 import pstats
 import pdb
@@ -14,6 +15,10 @@ from src.logging import get_logger
 from src.sim.results import MonteCarloResults
 
 logger = get_logger(__name__)
+
+BASE_DIR = os.getcwd()
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def with_analysis(
@@ -90,5 +95,8 @@ if __name__ == "__main__":
     # output = without_analysis(scenario, markets, num_iter, ncpu)
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    with open(f"results/{scenario}_{'_'.join(markets)}_{num_iter}.pkl", "wb") as f:
+    dir_ = os.path.join(RESULTS_DIR, scenario)
+    os.makedirs(dir_, exist_ok=True)
+    fn = os.path.join(dir_, f"{'_'.join(markets)}_{num_iter}.pkl")
+    with open(fn, "wb") as f:
         pickle.dump(output, f)

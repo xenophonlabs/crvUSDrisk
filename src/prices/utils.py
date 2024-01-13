@@ -450,8 +450,6 @@ def gen_cor_prices(
     # Initialize the price matrix and simulate the paths
     S = np.zeros((N, n))
 
-    # TODO convert all CG id references to ERC20 addresses
-    # and delete the STABLE_CG_IDS dict
     for i, coin in enumerate(coins):
         if coin in STABLE_CG_IDS:
             theta, mu, sigma = (
@@ -480,18 +478,6 @@ def gen_cor_prices(
 
 
 ### ========== Outdated ========== ###
-
-
-# def gen_cor_matrix(n_coins, sparse_cor):
-#     cor_matrix = np.identity(n_coins)
-#     for i in range(n_coins):
-#         for j in range(n_coins):
-#             pair = sorted([i, j])
-#             if i == j:
-#                 cor_matrix[i][j] = 1.0
-#             else:
-#                 cor_matrix[i][j] = sparse_cor[str(pair[0])][str(pair[1])]
-#     return cor_matrix
 
 
 # def gen_cor_jump_gbm2(coins, cor_matrix, T, dt):
