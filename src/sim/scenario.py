@@ -11,6 +11,7 @@ from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
 from crvusdsim.pool.sim_interface import SimController, SimLLAMMAPool
 from curvesim.pool.sim_interface import SimCurveCryptoPool
 from scipy.stats import gaussian_kde
+import numpy as np
 from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
 from ..configs import (
@@ -18,18 +19,19 @@ from ..configs import (
     get_scenario_config,
     get_price_config,
     get_borrower_kde,
+    get_liquidity_config,
     CRVUSD_DTO,
     ALIASES_LLAMMA,
     MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
-from ..agents import Arbitrageur, Liquidator, Keeper, Borrower
+from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
 from ..utils.poolgraph import PoolGraph
 from ..logging import get_logger
-from ..utils import get_quotes
+from ..utils import get_quotes, get_crvusd_index
 
 logger = get_logger(__name__)
 
@@ -73,9 +75,13 @@ class Scenario:
             pool = controller.AMM
             self.kde[pool.address] = get_borrower_kde(
                 pool.address,
-                self.config["borrowers"]["start"],
-                self.config["borrowers"]["end"],
+                config["borrowers"]["start"],
+                config["borrowers"]["end"],
             )
+
+        self.liquidity_config = get_liquidity_config(
+            config["liquidity"]["start"], config["liquidity"]["end"]
+        )
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -137,6 +143,7 @@ class Scenario:
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
         self.borrowers: Dict[str, Borrower] = {}
+        self.lps: Dict[str, LiquidityProvider] = {}
 
     def generate_sim_market(self) -> None:
         """
@@ -209,7 +216,7 @@ class Scenario:
         for pair in self.pairs:
             self.markets[pair].update_price(sample.prices)
 
-    def prepare_for_run(self, resample_borrowers: bool = True) -> None:
+    def prepare_for_run(self, resample: bool = True) -> None:
         """
         Prepare all modules for a simulation run.
 
@@ -217,8 +224,9 @@ class Scenario:
         1. Run a single step of price arbitrages.
         2. Liquidate users that were loaded underwater.
         """
-        if resample_borrowers:
+        if resample:
             self.setup_borrowers()  # randomly sample positions
+            self.resample_liquidity()  # resample crvUSD liquidity
 
         sample = self.pricepaths[0]
         ts = int(sample.timestamp.timestamp())
@@ -253,17 +261,14 @@ class Scenario:
                 logger.debug("Liquidating %s: with debt %d.", pos.user, pos.debt)
             pct = round(damage / controller.total_debt() * 100, 2)
             args = (
-                "%.2f%% of debt (%d positions) was incorrectly "
+                "%.2f%% of debt (%d positions) were incorrectly "
                 "loaded with <0 health (%d crvUSD) in %s Controller.",
                 pct,
                 n,
                 damage / 1e18,
                 name,
             )
-            if pct > 1:
-                logger.warning(*args)
-            else:
-                logger.debug(*args)
+            logger.debug(*args)
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
@@ -387,6 +392,48 @@ class Scenario:
                 controller.total_debt(),
                 llamma.name,
             )
+
+    def total_debt(self) -> int:
+        """
+        Get total debt in all controllers.
+        """
+        return sum((controller.total_debt() for controller in self.controllers))
+
+    def resample_liquidity(self) -> None:
+        """
+        Resample the liquidity in stableswap pools as a
+        function of the current total debt.
+        """
+        cfg = self.liquidity_config
+        total_debt = self.total_debt() / 1e18
+        mean_liquidity = sum(
+            (
+                cfg[spool.address]["mean_vector"][get_crvusd_index(spool)]
+                for spool in self.stableswap_pools
+            )
+        )
+        scale_factor = total_debt / (mean_liquidity * cfg["target_ratio"])
+
+        for spool in self.stableswap_pools:
+            spool.remove_liquidity(spool.totalSupply, [0, 0])
+            assert spool.totalSupply == 0
+            assert spool.balances == [0, 0]
+
+            # Resample
+            lp = LiquidityProvider()
+            lp.add_liquidity(
+                spool,
+                np.array(cfg[spool.address]["mean_vector"]),
+                np.array(cfg[spool.address]["covariance_matrix"]),
+                scale_factor,
+            )
+            self.lps[lp.address] = lp
+
+    def total_crvusd_liquidity(self) -> int:
+        """Total crvUSD liquidity in StableSwap Pools."""
+        return sum(
+            (spool.balances[get_crvusd_index(spool)] for spool in self.stableswap_pools)
+        )
 
 
 def find_active_band(llamma: SimLLAMMAPool) -> None:

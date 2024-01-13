@@ -103,6 +103,16 @@ def get_borrower_kde(market: str, start: int, end: int) -> gaussian_kde:
     return kde
 
 
+def get_liquidity_config(start: int, end: int) -> dict:
+    """
+    Return the matching liquidity config dict.
+    """
+    fn = os.path.join(BASE_DIR, "liquidity", f"{start}_{end}.json")
+    with open(fn, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    return cfg
+
+
 def get_price_config(freq: str, start: int, end: int) -> dict:
     """
     Return the latest price config dict.

@@ -132,6 +132,6 @@ def worker(
     try:
         result = strategy(scenario, params, i)
     except AssertionError as e:
-        logger.exception("Failed run %d with exception %s", i, e)
+        logger.critical("Failed run %d with exception %s", i, e)
         return None
     return result

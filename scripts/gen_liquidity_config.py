@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("start", type=str, help="ISO8601 start date.")
     parser.add_argument("end", type=str, help="ISO8601 end date.")
     parser.add_argument(
-        "-p", "--plot", action="store_true", help="Plot KDE", required=False
+        "-p", "--plot", action="store_true", help="Plot Debt:Liquidity", required=False
     )
     args = parser.parse_args()
     plot = args.plot
