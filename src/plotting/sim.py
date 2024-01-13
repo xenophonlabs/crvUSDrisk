@@ -215,3 +215,48 @@ def plot_reserves(llamma: SimLLAMMAPool) -> plt.Figure:
     ax.legend()
 
     return f
+
+
+def plot_debt_to_liquidity(debts: pd.DataFrame, liquidity: pd.DataFrame) -> plt.Figure:
+    """
+    Plot crvUSD debt in LLAMMA vs liquidity in StableSwap pools over
+    time.
+    """
+    f, ax = plt.subplots()
+
+    ax2 = ax.twinx()
+
+    ax.fill_between(
+        debts.index,
+        0,
+        debts["debt"] / 1e6,
+        label="crvUSD Debt",
+        color="indianred",
+        alpha=0.7,
+    )
+    ax.fill_between(
+        liquidity.index,
+        0,
+        liquidity["liquidity"] / 1e6,
+        label="crvUSD Liquidity",
+        color="royalblue",
+        alpha=0.7,
+    )
+    ax.set_ylabel("Total crvUSD (Millions)")
+    ax.tick_params(axis="x", rotation=45)
+
+    ratio = (debts["debt"] / liquidity["liquidity"]).dropna()
+    ax2.axhline(
+        ratio.mean(),
+        color="black",
+        linestyle="--",
+        label="Mean Debt:Liquidity Ratio",
+        lw=1,
+    )
+    ax2.set_ylabel("Debt:Liquidity Ratio")
+
+    ax.set_title("crvUSD Debt in LLAMMA vs Liquidity in StableSwap Pools")
+
+    f.legend(loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3)
+
+    return f

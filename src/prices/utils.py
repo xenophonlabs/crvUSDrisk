@@ -83,7 +83,7 @@ def gen_price_config(
 
     with open(fn, "w", encoding="utf-8") as f:
         logger.info("Writing price config to %s.", fn)
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
     if plot:
         coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()

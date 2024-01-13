@@ -2,12 +2,19 @@
 Utility functions.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Set, Dict
+from typing import TYPE_CHECKING, Set, Dict, List
 import asyncio
+from collections import defaultdict
 import requests as req
 import pandas as pd
 import numpy as np
-from crvusdsim.network.subgraph import get_user_snapshots
+from crvusdsim.network.subgraph import get_user_snapshots, _stableswap_snapshot
+from crvusdsim.pool import (
+    StableCoin,
+    CurveStableSwapPoolMetaData,
+    CurveStableSwapPool,
+    SimCurveStableSwapPool,
+)
 from curvesim.network.utils import sync
 
 if TYPE_CHECKING:
@@ -54,7 +61,11 @@ USER_STATE_FLOAT_COLS = [
 ]
 USER_STATE_INT_COLS = ["n", "n1", "n2", "timestamp"]
 
+
+### HISTORICAL ANALYSIS FOR DEBT & LIQUIDITY SAMPLING ###
+
 get_user_snapshots = sync(get_user_snapshots)
+stableswap_snapshot = sync(_stableswap_snapshot)
 
 
 def get_historical_user_snapshots(address: str, start: int, end: int) -> pd.DataFrame:
@@ -87,6 +98,66 @@ def get_historical_user_snapshots(address: str, start: int, end: int) -> pd.Data
     df = df.dropna(axis=1)
 
     return df.set_index("id")
+
+
+def group_user_states(user_states: pd.DataFrame) -> pd.DataFrame:
+    """
+    Group user states df by datetime.
+    """
+    user_states["datetime"] = pd.to_datetime(user_states["timestamp"], unit="s")
+
+    return user_states.groupby("datetime").agg(
+        debt=("debt", "sum"),
+        collateral=("collateral", "sum"),
+        num_loans=("debt", "count"),
+    )
+
+
+def extract_pool_stats(_snapshot: dict) -> tuple:
+    """
+    Get the total supply from a snapshot.
+    """
+    snapshot = _snapshot.copy()
+    snapshot["coins"] = [StableCoin(**coin_kwargs) for coin_kwargs in snapshot["coins"]]
+    spool_metadata = CurveStableSwapPoolMetaData(
+        snapshot, CurveStableSwapPool, SimCurveStableSwapPool
+    )
+
+    spool = SimCurveStableSwapPool(**spool_metadata.init_kwargs())
+
+    return (
+        *[b * r / 1e36 for b, r in zip(spool.balances, spool.rates)],
+        spool.totalSupply / 1e18,
+    )
+
+
+def make_df_stableswap_stats_df(stats: list) -> pd.DataFrame:
+    """
+    Convert a list of stats into a DataFrame.
+    """
+    df = pd.DataFrame(stats, columns=["timestamp", "peg", "crvUSD", "supply"])
+    return df.set_index(pd.to_datetime(df["timestamp"], unit="s"))
+
+
+def get_historical_stableswap_stats(
+    addresses: List[str], start: int, end: int
+) -> Dict[str, pd.DataFrame]:
+    """
+    Get the historical balance and total LP token supply
+    for input stableswap pools.
+
+    TODO should this really be a list or dict?
+    TODO might need to add event loop!
+    """
+    dfs = defaultdict(list)
+    ts = start
+    while ts < end:
+        snapshots = stableswap_snapshot(addresses, end_ts=ts)
+        for i, address in enumerate(addresses):
+            dfs[address].append([ts, *extract_pool_stats(snapshots[i])])
+        ts += 60 * 60 * 24
+
+    return {address: make_df_stableswap_stats_df(df) for address, df in dfs.items()}
 
 
 def get_event_loop() -> asyncio.AbstractEventLoop:
