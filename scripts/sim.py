@@ -10,7 +10,7 @@ import argparse
 import pickle
 from datetime import datetime
 from multiprocessing import cpu_count
-from src.sim import run_scenario
+from src.sim import simulate
 from src.logging import get_logger
 from src.sim.results import MonteCarloResults
 
@@ -30,7 +30,7 @@ def with_analysis(
     with cProfile.Profile() as pr:
         try:
             global output
-            output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+            output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)
@@ -48,7 +48,7 @@ def without_analysis(
     """
     start = datetime.now()
     global output
-    output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+    output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)
@@ -95,8 +95,9 @@ if __name__ == "__main__":
     # output = without_analysis(scenario, markets, num_iter, ncpu)
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    dir_ = os.path.join(RESULTS_DIR, scenario)
+    dir_ = os.path.join(RESULTS_DIR, scenario, "_".join(sorted(markets)))
     os.makedirs(dir_, exist_ok=True)
-    fn = os.path.join(dir_, f"{'_'.join(markets)}_{num_iter}.pkl")
+    i = len(os.listdir(dir_)) + 1
+    fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")
     with open(fn, "wb") as f:
         pickle.dump(output, f)

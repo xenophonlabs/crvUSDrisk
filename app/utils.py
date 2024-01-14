@@ -12,7 +12,7 @@ from dash import html
 from dash.development.base_component import Component
 import pandas as pd
 from src.data_transfer_objects import TokenDTO
-from src.sim import run_scenario
+from src.sim import simulate
 from src.sim.results import MonteCarloResults
 from src.logging import get_logger
 from src.modules import ExternalMarket
@@ -54,7 +54,7 @@ def run_sim(scenario: str, markets: List[str], num_iter: int) -> MonteCarloResul
     Run the simulation with the input parameters and return the output object
     """
     start = datetime.now()
-    output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=cpu_count())
+    output = simulate(scenario, markets, num_iter=num_iter, ncpu=cpu_count())
     end = datetime.now()
     diff = end - start
     logger.info("Done. Total runtime: %s", diff)
