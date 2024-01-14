@@ -276,6 +276,36 @@ class PegKeeperMetric(Metric):
         return val
 
 
+class LiquidityMetric(Metric):
+    """
+    Tracks total crvUSD liquidity in stableswap pools.
+    """
+
+    key_metric = "Total crvUSD Liquidity"
+
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Total crvUSD Liquidity": ["mean", "min"]}
+
+        for spool in self.scenario.stableswap_pools:
+            cfg[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = ["mean", "min"]
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
+        """Compute crvUSD liquidity."""
+        val = {}
+
+        total_liquidity = 0
+        for spool in self.scenario.stableswap_pools:
+            liquidity = spool.balances[get_crvusd_index(spool)] / 1e18
+            val[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = liquidity
+            total_liquidity += liquidity
+
+        val["Total crvUSD Liquidity"] = total_liquidity
+
+        return val
+
+
 class MiscMetric(Metric):
     """
     Miscellaneous metrics that are useful to look at and sanity check.
