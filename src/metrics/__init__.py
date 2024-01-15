@@ -12,6 +12,7 @@ from .metrics import (
     PegStrengthMetric,
     LiquidationsMetric,
     PegKeeperMetric,
+    LiquidityMetric,
     MiscMetric,
 )
 
@@ -26,6 +27,7 @@ DEFAULT_METRICS = [
     PegStrengthMetric,
     LiquidationsMetric,
     PegKeeperMetric,
+    LiquidityMetric,
     MiscMetric,
 ]
 

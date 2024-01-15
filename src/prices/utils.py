@@ -6,7 +6,7 @@ prices based on historical data. This includes:
     a. We use a Log-Likelihood MLE for estimating OU parameters.
 """
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -83,7 +83,7 @@ def gen_price_config(
 
     with open(fn, "w", encoding="utf-8") as f:
         logger.info("Writing price config to %s.", fn)
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
     if plot:
         coin_ids = df.drop(["timestamp"], axis=1).columns.tolist()
@@ -208,7 +208,7 @@ def process_prices(df: pd.DataFrame, freq: str = "1d") -> Tuple[dict, pd.DataFra
     return params, cov
 
 
-def log_likelihood(params, X, dt):
+def log_likelihood(params: tuple, X: pd.Series, dt: float) -> float:
     """
     Log-likelihood for OU process based
     on: http://www.investmentscience.com/Content/howtoArticles/MLE_for_OR_mean_reverting.pdf
@@ -297,7 +297,7 @@ def estimate_ou_parameters_mle(X: pd.Series, dt: float) -> tuple:
 ### ========== Generate Simulated Prices ========== ###
 
 
-def gen_dW(dt, shape):
+def gen_dW(dt: float, shape: Union[tuple, int]) -> np.ndarray:
     """
     Generate a Wiener process of shape `shape`.
     """
@@ -307,7 +307,15 @@ def gen_dW(dt, shape):
     return np.sqrt(dt) * np.random.randn(shape)
 
 
-def gen_ou(theta, mu, sigma, dt, S0, N, dW=None):
+def gen_ou(
+    theta: float,
+    mu: float,
+    sigma: float,
+    dt: float,
+    S0: float,
+    N: int,
+    dW: np.ndarray | None = None,
+) -> np.ndarray:
     """
     Generate an Ornstein-Uhlenbeck process.
     Optionally correlated with other tokens.
@@ -349,7 +357,9 @@ def gen_ou(theta, mu, sigma, dt, S0, N, dW=None):
     return S
 
 
-def gen_gbm(mu, sigma, dt, S0, N, dW=None):
+def gen_gbm(
+    mu: float, sigma: float, dt: float, S0: float, N: int, dW: np.ndarray | None = None
+) -> np.ndarray:
     """
     Generate a simple GBM process.
     Optionally correlated with other tokens.
@@ -392,7 +402,7 @@ def gen_cor_prices(
     timestamps: bool = False,
     gran: int | None = None,
     now: pd.Timestamp | None = None,
-):
+) -> pd.DataFrame:
     """
     Generate a matrix of correlated GBMs using
     Cholesky decomposition.
@@ -440,8 +450,6 @@ def gen_cor_prices(
     # Initialize the price matrix and simulate the paths
     S = np.zeros((N, n))
 
-    # TODO convert all CG id references to ERC20 addresses
-    # and delete the STABLE_CG_IDS dict
     for i, coin in enumerate(coins):
         if coin in STABLE_CG_IDS:
             theta, mu, sigma = (
@@ -470,18 +478,6 @@ def gen_cor_prices(
 
 
 ### ========== Outdated ========== ###
-
-
-# def gen_cor_matrix(n_coins, sparse_cor):
-#     cor_matrix = np.identity(n_coins)
-#     for i in range(n_coins):
-#         for j in range(n_coins):
-#             pair = sorted([i, j])
-#             if i == j:
-#                 cor_matrix[i][j] = 1.0
-#             else:
-#                 cor_matrix[i][j] = sparse_cor[str(pair[0])][str(pair[1])]
-#     return cor_matrix
 
 
 # def gen_cor_jump_gbm2(coins, cor_matrix, T, dt):

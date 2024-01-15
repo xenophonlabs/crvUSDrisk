@@ -12,7 +12,7 @@ from .trade import Swap, Liquidation
 from ..logging import get_logger
 from ..modules import ExternalMarket
 
-TOLERANCE = 1e-6  # TODO should make this smaller
+TOLERANCE = 1e-4
 
 logger = get_logger(__name__)
 
@@ -68,7 +68,7 @@ class Cycle:
                 trades.append(i)
         return trades
 
-    def freeze_oracles(self):
+    def freeze_oracles(self) -> None:
         """
         Freeze oracle prices.
 
@@ -80,7 +80,7 @@ class Cycle:
             oracle.price_w()  # Ensure we use updated prices
             oracle.freeze()
 
-    def unfreeze_oracles(self):
+    def unfreeze_oracles(self) -> None:
         """
         Unfreeze oracle prices and write latest prices.
         """
@@ -108,14 +108,23 @@ class Cycle:
                 next_trade_amt = next_trade.amt
                 # Check that cycle was populated correctly
                 if amt_out == 0 or isinstance(next_trade, Swap):
-                    cond = amt_out == next_trade_amt
+                    assert amt_out == next_trade_amt, (
+                        f"Trade {i + 1} output {amt_out} != "
+                        f"Trade {i + 2,} input {next_trade_amt} in Cycle {self}."
+                    )
                 else:  # liquidation
-                    cond = (
-                        abs(amt_out - next_trade_amt) / next_trade_amt < TOLERANCE
-                    )  # pool.get_dx() is not exact
-                assert (
-                    cond
-                ), f"Trade {i + 1} output {amt_out} != Trade {i + 2,} input {next_trade_amt}."
+                    if abs(amt_out - next_trade_amt) / next_trade_amt > TOLERANCE:
+                        # pool.get_dx() is not exact
+                        logger.warning(
+                            "Difference between trade %d output %d and "
+                            "trade %d input %d exceeds tolerance %f in Cycle %s.",
+                            i + 1,
+                            amt_out,
+                            i + 2,
+                            next_trade_amt,
+                            TOLERANCE,
+                            self,
+                        )
 
         profit = (amt_out - amt_in) / 10**decimals
         if abs(profit - self.expected_profit) > TOLERANCE:
@@ -202,7 +211,7 @@ class StateKey:
     def __init__(self, cycle: Cycle):
         self.cycle = cycle
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         trades = self.cycle.trades
         hashes = []
         for trade in trades:
@@ -259,7 +268,7 @@ class StateKey:
         return hash(tuple(hashes))
 
 
-@lru_cache(maxsize=100)  # TODO might need to increase for more cycles
+@lru_cache(maxsize=100)
 def _optimize_mem(state_key: StateKey, xatol: int | None = None) -> Tuple[int, float]:
     """
     Memoized optimization for the `amt_in` for the

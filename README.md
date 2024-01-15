@@ -65,6 +65,8 @@ We provide sample simulation results for the `baseline` scenario in [this](https
 
 ## Running Simulations
 
+To run simulations, please create `logs` and `results` folders in your root directory.
+
 ### From the Dashboard
 
 Select a `scenario`, `market`, and number of iterations (model runs) for you scenario and click the simulate button. Your terminal will begin to print the logs for the simulation. 
@@ -76,7 +78,7 @@ Select a `scenario`, `market`, and number of iterations (model runs) for you sce
 Alternatively, you may run a simulation via the `scripts/sim.py` script as follows:
 
 ```bash
-python3 -m scripts.sim baseline_macro wsteth 100 -mp &> logs/sim.log
+python3 -m scripts.sim baseline_macro "wsteth,wbtc" 100 -mp &> logs/sim.log
 ```
 
 Make sure to create the `logs` directory to view simulation logs/warnings, or remove the `&> logs/sim.log` redirection.

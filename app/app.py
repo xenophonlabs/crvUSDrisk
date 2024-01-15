@@ -39,6 +39,7 @@ from .utils import (
     run_sim,
     plot_quotes,
     plot_regression,
+    create_card,
 )
 
 plt.switch_backend("Agg")
@@ -62,6 +63,8 @@ DIV_KWARGS = {
 SCROLL_DIV_KWARGS = {"style": {"maxHeight": "500px", "overflow": "scroll"}}
 
 TAB_KWARGS = {"label_style": {"color": "black"}}
+
+QUANTILE = 0.99
 
 global output
 output = None
@@ -224,9 +227,15 @@ def _generate_content(output: MonteCarloResults):
     output.summary  # force compute and cache
 
     metadata = clean_metadata(output.metadata)
-    price_config = metadata["template"].pricepaths.config.copy()
+    template = metadata["template"]
+    price_config = template.pricepaths.config.copy()
     for k, v in price_config["params"].items():
         v.update({"start_price": price_config["curr_prices"][k]})
+
+    market_options = [
+        {"label": alias, "value": LLAMMA_ALIASES[alias]}
+        for alias in template.market_names
+    ]
 
     aggregate_columns = [
         {"label": "Key Metrics", "value": "Key Metrics", "disabled": True},
@@ -253,20 +262,85 @@ def _generate_content(output: MonteCarloResults):
 
     assets = [
         {"label": ADDRESS_TO_SYMBOL[asset], "value": asset}
-        for asset in [c.address for c in metadata["template"].coins]
+        for asset in [c.address for c in template.coins]
     ]
 
     worst_depeg_agg = output.summary.loc[
-        output.summary[["Peg Strength Min", "Peg Strength Max"]]
+        output.summary[["Aggregator Price Min", "Aggregator Price Max"]]
         .subtract(1)
         .abs()
         .stack()
         .idxmax()
     ]
 
+    cov_matrix = pd.DataFrame(price_config["cov"])
+    std_devs = np.sqrt(np.diag(cov_matrix))
+    std_dev_matrix = np.outer(std_devs, std_devs)
+    corr_matrix = cov_matrix / std_dev_matrix
+    corr_matrix = pd.DataFrame(
+        corr_matrix, index=cov_matrix.index, columns=cov_matrix.columns
+    )
+
+    var_body = html.Div(
+        [
+            html.H4(
+                f"VaR: {output.summary['Bad Debt Max'].quantile(QUANTILE):,.0f} crvUSD"
+            )
+        ]
+    )
+
+    lar_body = html.Div(
+        [
+            html.H4(
+                f"LaR: {output.summary['Debt Liquidated Max'].quantile(QUANTILE):,.0f} crvUSD"
+            )
+        ]
+    )
+
+    for controller in template.controllers:
+        _controller = entity_str(controller, "controller")
+
+        controller_bad_debt = output.summary[f"Bad Debt On {_controller} Max"].quantile(
+            QUANTILE
+        )
+        var_body.children.append(
+            html.H6(f"VaR on {_controller}: {controller_bad_debt:,.0f} crvUSD")
+        )
+
+        collateral_liquidated = output.summary[
+            f"Debt Liquidated On {entity_str(controller, 'controller')} Max"
+        ].quantile(QUANTILE)
+        lar_body.children.append(
+            html.H6(f"LaR on {_controller}: {collateral_liquidated:,.0f} crvUSD")
+        )
+
+    var_card = create_card(
+        "Value at Risk",
+        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time.",
+        var_body,
+    )
+
+    lar_card = create_card(
+        "Liquidations at Risk",
+        "Liquidations at Risk (LaR) is the p99 maximum debt liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated debt under the input assumptions will only ever exceed LaR 1% of the time.",
+        lar_body,
+    )
+
+    blar_body = html.Div(
+        [
+            html.H4(
+                f"BLaR: {output.summary['Borrower Loss Max'].quantile(QUANTILE):,.0f} USD"
+            )
+        ]
+    )
+    blar_card = create_card(
+        "Borrower Losses at Risk",
+        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
+        blar_body,
+    )
+
     spools = [
-        entity_str(spool, "stableswap").title()
-        for spool in metadata["template"].stableswap_pools
+        entity_str(spool, "stableswap").title() for spool in template.stableswap_pools
     ]
     worst_depeg_spool = None
     worst_depeg_spool_val = None
@@ -282,23 +356,21 @@ def _generate_content(output: MonteCarloResults):
             worst_depeg_spool = "/".join(spool.split("_")[1:]).upper()
             worst_depeg_spool_val = val
     worst_depeg_spool, worst_depeg_spool_val
-
     depeg_str = html.Div(
         [
-            html.H5(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.3f}"),
-            html.H5(
+            html.H4(f"Worst Depeg in Aggregator: {worst_depeg_agg:,.3f}"),
+            html.H4(
                 f"Worst Depeg in StableSwap: {worst_depeg_spool_val:,.3f} in {worst_depeg_spool}"
             ),
         ]
     )
-
-    cov_matrix = pd.DataFrame(price_config["cov"])
-    std_devs = np.sqrt(np.diag(cov_matrix))
-    std_dev_matrix = np.outer(std_devs, std_devs)
-    corr_matrix = cov_matrix / std_dev_matrix
-    corr_matrix = pd.DataFrame(
-        corr_matrix, index=cov_matrix.index, columns=cov_matrix.columns
+    depeg_card = create_card(
+        "Worst Depeg",
+        "The worst depeg (up or down) observed over the simulated runs for the Aggregator or any StableSwap pool.",
+        depeg_str,
     )
+
+    metric_cards = dbc.CardGroup([var_card, lar_card, blar_card, depeg_card])
 
     layout = html.Div(
         [
@@ -394,76 +466,7 @@ def _generate_content(output: MonteCarloResults):
                                     "Summarized metrics, histograms, and raw data across all model runs.",
                                     style={"textAlign": "center"},
                                 ),
-                                dbc.CardGroup(
-                                    [
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Value at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"VaR: {output.summary['Bad Debt Max'].quantile(0.99):,.0f} crvUSD"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Liquidations at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Liquidations at Risk (LaR) is the p99 maximum collateral liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated collateral under the input assumptions will only ever exceed LaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"LaR: {output.summary['Collateral Liquidated Max'].quantile(0.99):,.0f} {ADDRESS_TO_SYMBOL[metadata['template'].llamma.COLLATERAL_TOKEN.address]}"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Borrower Losses at Risk",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time."
-                                                    ),
-                                                    html.H5(
-                                                        f"BLaR: {output.summary['Borrower Loss Max'].quantile(0.99):,.0f} USD"
-                                                    ),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                        dbc.Card(
-                                            dbc.CardBody(
-                                                [
-                                                    html.H4(
-                                                        "Worst Depeg",
-                                                        className="card-title",
-                                                    ),
-                                                    html.P(
-                                                        "The worst depeg (up or down) observed over the simulated runs for the Aggregator or any StableSwap pool."
-                                                    ),
-                                                    html.H5(depeg_str),
-                                                ],
-                                            ),
-                                            style={"textAlign": "center"},
-                                        ),
-                                    ]
-                                ),
+                                metric_cards,
                                 html.Br(),
                                 html.H4(
                                     "Metric Histograms", style={"textAlign": "center"}
@@ -572,8 +575,8 @@ def _generate_content(output: MonteCarloResults):
                                             dbc.Input(
                                                 id="run-dropdown",
                                                 type="number",
-                                                min=1,
-                                                max=len(output.data),
+                                                min=0,
+                                                max=len(output.data) - 1,
                                                 step=1,
                                                 value=0,
                                             ),
@@ -715,14 +718,14 @@ def _generate_content(output: MonteCarloResults):
                                 html.Br(),
                                 html.Br(),
                                 html.H4(
-                                    "Module Metadata", style={"textAlign": "center"}
+                                    "Market Metadata", style={"textAlign": "center"}
                                 ),
-                                html.Div(
-                                    dcc.Markdown(
-                                        f"```json\n{json.dumps(metadata['template'].llamma.metadata, indent=4)}\n```"
-                                    ),
-                                    **SCROLL_DIV_KWARGS,
+                                dbc.Select(
+                                    options=market_options,
+                                    id="market-metadata-dropdown",
+                                    value=market_options[0]["value"],
                                 ),
+                                html.Div(id="market-metadata-container"),
                             ],
                             **DIV_KWARGS,
                         ),
@@ -805,7 +808,7 @@ def update_run_data_table(value: int):
     if not output or value is None:
         return no_update
     return dbc.Table.from_dataframe(
-        output.data[value - 1].df.reset_index(names=["Time"]).round(DECIMALS),
+        output.data[value].df.reset_index(names=["Time"]).round(DECIMALS),
         **DBC_TABLE_KWARGS,
     )
 
@@ -860,7 +863,7 @@ def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
 def update_run_prices(value: int, show_all: bool):
     if not output or value is None:
         return no_update
-    df = output.data[value - 1].pricepaths.prices
+    df = output.data[value].pricepaths.prices
     cols = [col for col in df.columns if col != "timestamp"]
     titles = [ADDRESS_TO_SYMBOL[col] for col in cols]
     n, m = make_square(len(cols))
@@ -897,6 +900,28 @@ def update_run_prices(value: int, show_all: bool):
     )
 
     return fig
+
+
+@callback(
+    Output("market-metadata-container", "children"),
+    Input("market-metadata-dropdown", "value"),
+)
+def update_metadata_container(value):
+    if output is None:
+        return no_update
+
+    llamma = None
+    for _llamma in output.metadata["template"].llammas:
+        if _llamma.address == value:
+            llamma = _llamma
+            break
+
+    return (
+        html.Div(
+            dcc.Markdown(f"```json\n{json.dumps(llamma.metadata, indent=4)}\n```"),
+            **SCROLL_DIV_KWARGS,
+        ),
+    )
 
 
 if __name__ == "__main__":

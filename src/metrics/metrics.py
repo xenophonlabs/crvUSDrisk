@@ -1,4 +1,5 @@
 """Provides classes for each metric."""
+from typing import List, Dict
 import numpy as np
 from .base import Metric
 from .utils import entity_str
@@ -15,14 +16,24 @@ class BadDebtMetric(Metric):
 
     key_metric = "Bad Debt"
 
-    def _config(self):
-        return {"Bad Debt": ["mean", "max"]}
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Bad Debt": ["mean", "max"]}
+        for controller in self.scenario.controllers:
+            cfg[f"Bad Debt on {entity_str(controller, 'controller')}"] = ["mean", "max"]
+        return cfg
 
-    def compute(self, **kwargs):
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute bad debt."""
-        healths = kwargs.get("healths")
-        debts = kwargs.get("debts")
-        return {"Bad Debt": debts[np.where(healths < 0)].sum() / 1e18}
+        total = 0
+        val = {}
+        for controller in self.scenario.controllers:
+            healths = kwargs["healths"][controller.address]
+            debts = kwargs["debts"][controller.address]
+            bad_debt = debts[np.where(healths < 0)].sum() / 1e18
+            val[f"Bad Debt on {entity_str(controller, 'controller')}"] = bad_debt
+            total += bad_debt
+        val["Bad Debt"] = total
+        return val
 
 
 class SystemHealthMetric(Metric):
@@ -36,14 +47,30 @@ class SystemHealthMetric(Metric):
 
     key_metric = "System Health"
 
-    def _config(self):
-        return {"System Health": ["mean", "min"]}
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"System Health": ["mean", "min"]}
+        for controller in self.scenario.controllers:
+            cfg[f"System Health on {entity_str(controller, 'controller')}"] = [
+                "mean",
+                "min",
+            ]
+        return cfg
 
-    def compute(self, **kwargs):
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute system health."""
-        healths = kwargs.get("healths")
-        debts = kwargs.get("debts")
-        return {"System Health": (healths * debts).sum() / debts.sum() / 1e18}
+        val = {}
+        all_healths = np.array([])
+        all_debts = np.array([])
+        for controller in self.scenario.controllers:
+            healths = kwargs["healths"][controller.address]
+            debts = kwargs["debts"][controller.address]
+            all_healths = np.append(all_healths, healths)
+            all_debts = np.append(all_debts, debts)
+            val[f"System Health on {entity_str(controller, 'controller')}"] = (
+                (healths * debts).sum() / debts.sum() / 1e18
+            )
+        val["System Health"] = (all_healths * all_debts).sum() / all_debts.sum() / 1e18
+        return val
 
 
 class BorrowerLossMetric(Metric):
@@ -71,14 +98,14 @@ class BorrowerLossMetric(Metric):
 
     key_metric = "Borrower Loss"
 
-    def _config(self):
+    def _config(self) -> Dict[str, List[str]]:
         return {
             "Borrower Loss": ["max"],  # == last
             "Hard Liquidation Losses": ["max"],  # == last
             "Soft Liquidation Losses": ["max"],  # == last
         }
 
-    def compute(self, **kwargs):
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute borrower loss."""
         hard_loss = self.scenario.liquidator.borrower_loss
         soft_loss = self.scenario.arbitrageur.borrower_loss
@@ -102,31 +129,59 @@ class ValueLeakageMetric(Metric):
 
     key_metric = "Value Leakage"
 
-    def _config(self):
-        return {
-            "Value Leakage": ["max"],
-            "Keeper Profit": ["max"],  # Using virtual price
-            "Keeper Count": ["max"],
-            "Liquidator Profit": ["max"],
-            "Liquidator Count": ["max"],
-            "Arbitrageur Profit": ["max"],  # == last
-            "Arbitrageur Count": ["max"],
-        }
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Value Leakage": ["max"]}
 
-    def compute(self, **kwargs):
-        liquidator_profit = self.scenario.liquidator.profit
-        arbitrageur_profit = self.scenario.arbitrageur.profit
-        keeper_profit = self.scenario.keeper.profit
-        value_leakage = liquidator_profit + arbitrageur_profit + keeper_profit
-        return {
-            "Value Leakage": value_leakage,
-            "Keeper Profit": keeper_profit,
-            "Keeper Count": self.scenario.keeper.count,
-            "Liquidator Profit": liquidator_profit,
-            "Liquidator Count": self.scenario.liquidator.count,
-            "Arbitrageur Profit": arbitrageur_profit,
-            "Arbitrageur Count": self.scenario.arbitrageur.count,
-        }
+        cfg["Keeper Profit"] = ["max"]
+        cfg["Keeper Count"] = ["max"]
+        for pk in self.scenario.peg_keepers:
+            _pk = entity_str(pk, "pk")
+            cfg[f"Keeper Profit on {_pk}"] = ["max"]
+            cfg[f"Keeper Count on {_pk}"] = ["max"]
+
+        cfg["Liquidator Profit"] = ["max"]
+        cfg["Liquidator Count"] = ["max"]
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+            cfg[f"Liquidator Profit on {_controller}"] = ["max"]
+            cfg[f"Liquidator Count on {_controller}"] = ["max"]
+
+        cfg["Arbitrageur Profit"] = ["max"]
+        cfg["Arbitrageur Count"] = ["max"]
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
+        val = {}
+
+        keeper = self.scenario.keeper
+        val["Keeper Profit"] = keeper.profit()
+        val["Keeper Count"] = keeper.count()
+        for pk in self.scenario.peg_keepers:
+            _pk = entity_str(pk, "pk")
+            val[f"Keeper Profit on {_pk}"] = keeper.profit(pk.address)
+            val[f"Keeper Count on {_pk}"] = keeper.count(pk.address)
+
+        liquidator = self.scenario.liquidator
+        val["Liquidator Profit"] = liquidator.profit()
+        val["Liquidator Count"] = liquidator.count()
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+            val[f"Liquidator Profit on {_controller}"] = liquidator.profit(
+                controller.address
+            )
+            val[f"Liquidator Count on {_controller}"] = liquidator.count(
+                controller.address
+            )
+
+        val["Arbitrageur Profit"] = self.scenario.arbitrageur.profit()
+        val["Arbitrageur Count"] = self.scenario.arbitrageur.count()
+
+        val["Value Leakage"] = (
+            val["Liquidator Profit"] + val["Arbitrageur Profit"] + val["Keeper Profit"]
+        )
+
+        return val
 
 
 class PegStrengthMetric(Metric):
@@ -134,19 +189,19 @@ class PegStrengthMetric(Metric):
     Calculates the strength of the crvUSD peg.
     """
 
-    key_metric = "Peg Strength"
+    key_metric = "Aggregator Price"
 
-    def _config(self):
+    def _config(self) -> Dict[str, List[str]]:
         cfg = {
-            "Peg Strength": ["mean", "min", "max"],
+            "Aggregator Price": ["mean", "min", "max"],
         }
         for spool in self.scenario.stableswap_pools:
             cfg[f"{entity_str(spool, 'stableswap')} Price"] = ["mean", "min", "max"]
         return cfg
 
-    def compute(self, **kwargs):
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute peg strength."""
-        val = {"Peg Strength": self.scenario.aggregator.price() / 1e18}
+        val = {"Aggregator Price": self.scenario.aggregator.price() / 1e18}
         for spool in self.scenario.stableswap_pools:
             i = get_crvusd_index(spool)
             val[f"{entity_str(spool, 'stableswap')} Price"] = (
@@ -160,22 +215,41 @@ class LiquidationsMetric(Metric):
     Calculates the hard liquidation volume.
     """
 
-    key_metric = "Collateral Liquidated"
+    key_metric = "Debt Liquidated"
 
-    def _config(self):
-        return {
-            "Collateral Liquidated": ["max"],
-            "Debt Repaid": ["max"],
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {
+            "Debt Liquidated": ["max"],
             "Liquidation Count": ["max"],
         }
 
-    def compute(self, **kwargs):
+        for controller in self.scenario.controllers:
+            cfg[f"Debt Liquidated on {entity_str(controller, 'controller')}"] = ["max"]
+            cfg[f"Collateral Liquidated on {entity_str(controller, 'controller')}"] = [
+                "max"
+            ]
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute liquidation metrics."""
-        return {
-            "Collateral Liquidated": self.scenario.liquidator.collateral_liquidated,
-            "Debt Repaid": self.scenario.liquidator.debt_repaid,
-            "Liquidation Count": self.scenario.liquidator.count,
-        }
+        val = {}
+        liquidator = self.scenario.liquidator
+        total_debt_liquidated = 0.0
+        for controller in self.scenario.controllers:
+            _controller = entity_str(controller, "controller")
+
+            debt_liquidated = liquidator.debt_repaid[controller.address]
+            collateral_liquidated = liquidator.collateral_liquidated[controller.address]
+
+            val[f"Debt Liquidated on {_controller}"] = debt_liquidated
+            val[f"Collateral Liquidated on {_controller}"] = collateral_liquidated
+
+            total_debt_liquidated += debt_liquidated
+
+        val["Debt Liquidated"] = total_debt_liquidated
+
+        return val
 
 
 class PegKeeperMetric(Metric):
@@ -185,7 +259,7 @@ class PegKeeperMetric(Metric):
 
     key_metric = "PK Debt"
 
-    def _config(self):
+    def _config(self) -> Dict[str, List[str]]:
         cfg = {
             "PK Debt": ["mean", "max"],
         }
@@ -193,7 +267,7 @@ class PegKeeperMetric(Metric):
             cfg[f"{entity_str(pk, 'pk')} Debt"] = ["mean", "max"]
         return cfg
 
-    def compute(self, **kwargs):
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute PK debt."""
         val = {}
         for pk in self.scenario.peg_keepers:
@@ -202,32 +276,71 @@ class PegKeeperMetric(Metric):
         return val
 
 
+class LiquidityMetric(Metric):
+    """
+    Tracks total crvUSD liquidity in stableswap pools.
+    """
+
+    key_metric = "Total crvUSD Liquidity"
+
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Total crvUSD Liquidity": ["mean", "min"]}
+
+        for spool in self.scenario.stableswap_pools:
+            cfg[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = ["mean", "min"]
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
+        """Compute crvUSD liquidity."""
+        val = {}
+
+        total_liquidity = 0
+        for spool in self.scenario.stableswap_pools:
+            liquidity = spool.balances[get_crvusd_index(spool)] / 1e18
+            val[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = liquidity
+            total_liquidity += liquidity
+
+        val["Total crvUSD Liquidity"] = total_liquidity
+
+        return val
+
+
 class MiscMetric(Metric):
     """
     Miscellaneous metrics that are useful to look at and sanity check.
     """
 
-    key_metric = "crvUSD Total Supply"
+    key_metric = "Total Debt"
 
-    def _config(self):
-        return {
-            "crvUSD Total Supply": ["max"],
-            f"{entity_str(self.scenario.controller, 'controller')} Total Debt": [
-                "mean"
-            ],
-            f"{entity_str(self.scenario.llamma, 'llamma')} Price": ["mean"],
-            f"{entity_str(self.scenario.llamma, 'llamma')} Oracle Price": ["mean"],
-        }
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Total Debt": ["mean"]}
 
-    def compute(self, **kwargs):
+        for controller in self.scenario.controllers:
+            cfg[f"{entity_str(controller, 'controller')} Total Debt"] = ["mean"]
+
+        for llamma in self.scenario.llammas:
+            cfg[f"{entity_str(llamma, 'llamma')} Price"] = ["mean"]
+            cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = ["mean"]
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute miscellaneous metrics."""
-        llamma = self.scenario.llamma
-        controller = self.scenario.controller
-        debts = kwargs.get("debts")
-        return {
-            "crvUSD Total Supply": self.scenario.stablecoin.totalSupply / 1e18,
-            f"{entity_str(controller, 'controller')} Total Debt": debts.sum() / 1e18,
-            f"{entity_str(llamma, 'llamma')} Price": llamma.get_p() / 1e18,
-            f"{entity_str(llamma, 'llamma')} Oracle Price": llamma.price_oracle()
-            / 1e18,
-        }
+        val = {}
+
+        total_debt = 0
+        for controller in self.scenario.controllers:
+            debt = kwargs["debts"][controller.address].sum() / 1e18
+            val[f"{entity_str(controller, 'controller')} Total Debt"] = debt
+            total_debt += debt
+
+        val["Total Debt"] = total_debt
+
+        for llamma in self.scenario.llammas:
+            val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18
+            val[f"{entity_str(llamma, 'llamma')} Oracle Price"] = (
+                llamma.price_oracle() / 1e18
+            )
+
+        return val

@@ -2,14 +2,28 @@
 Provides the `Scenario` class for running simulations.
 """
 
-from typing import List, Tuple, Set, cast
+from typing import List, Tuple, Set, cast, Dict
 from itertools import combinations
 from datetime import datetime
 import pandas as pd
-from crvusdsim.pool import get  # type: ignore
+from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
+from crvusdsim.pool.sim_interface import SimController, SimLLAMMAPool
+from curvesim.pool.sim_interface import SimCurveCryptoPool
+from scipy.stats import gaussian_kde
+import numpy as np
+from .utils import rebind_markets
 from ..prices import PriceSample, PricePaths
-from ..configs import TOKEN_DTOs, get_scenario_config, get_price_config, CRVUSD_DTO
+from ..configs import (
+    TOKEN_DTOs,
+    get_scenario_config,
+    get_price_config,
+    get_borrower_kde,
+    get_liquidity_config,
+    CRVUSD_DTO,
+    ALIASES_LLAMMA,
+    MODELLED_MARKETS,
+)
 from ..configs.tokens import WETH, WSTETH, SFRXETH
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
@@ -17,7 +31,7 @@ from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
 from ..utils.poolgraph import PoolGraph
 from ..logging import get_logger
-from ..utils import get_quotes
+from ..utils import get_quotes, get_crvusd_index
 
 logger = get_logger(__name__)
 
@@ -30,8 +44,14 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, scenario: str, market_name: str):
-        self.market_name = market_name
+    def __init__(self, scenario: str, market_names: List[str]):
+        for alias in market_names.copy():
+            if alias[:2] == "0x":
+                alias = ALIASES_LLAMMA[alias]
+            assert alias.lower() in MODELLED_MARKETS, ValueError(
+                f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
+            )
+        self.market_names = market_names
         self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
         self.description: str = config["description"]
@@ -46,6 +66,22 @@ class Scenario:
         self.generate_pricepaths()
         self.generate_markets()
         self.generate_agents()
+
+        # FIXME this costs a lot of memory to store
+        # but prevents us from having to read it from disk
+        # which would cause thread locks.
+        self.kde: Dict[str, gaussian_kde] = {}
+        for controller in self.controllers:
+            pool = controller.AMM
+            self.kde[pool.address] = get_borrower_kde(
+                pool.address,
+                config["borrowers"]["start"],
+                config["borrowers"]["end"],
+            )
+
+        self.liquidity_config = get_liquidity_config(
+            config["liquidity"]["start"], config["liquidity"]["end"]
+        )
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -81,78 +117,90 @@ class Scenario:
         """
         self.pricepaths: PricePaths = PricePaths(self.num_steps, self.price_config)
 
+    @property
+    def arbed_pools(self) -> list:
+        """
+        Return the pools that are arbed.
+        By default the arbitrageur will arbitrage all
+        crvUSD pools against External Markets.
+
+        This includes LLAMMAs and StableSwap pools.
+        """
+        return self.stableswap_pools + self.llammas + list(self.markets.values())
+
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
         self.arbitrageur: Arbitrageur = Arbitrageur()
         self.liquidator: Liquidator = Liquidator()
         self.keeper: Keeper = Keeper()
-        self.borrower: Borrower = Borrower()
-        self.liquidity_provider: LiquidityProvider = LiquidityProvider()
 
         # Set liquidator paths
-        self.liquidator.set_paths(self.controller, self.stableswap_pools, self.markets)
+        self.liquidator.set_paths(self.controllers, self.stableswap_pools, self.markets)
+
         # Set arbitrage cycles
-        self.graph = PoolGraph(
-            self.stableswap_pools + [self.llamma] + list(self.markets.values())
-        )
+        self.graph = PoolGraph(self.arbed_pools)
         self.arb_cycle_length = self.config["arb_cycle_length"]
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
-        # For convenience
-        self.agents = [
-            self.arbitrageur,
-            self.liquidator,
-            self.keeper,
-            self.borrower,
-            self.liquidity_provider,
-        ]
+        self.borrowers: Dict[str, Borrower] = {}
+        self.lps: Dict[str, LiquidityProvider] = {}
 
     def generate_sim_market(self) -> None:
         """
         Generate the crvusd modules to simulate, including
         LLAMMAs, Controllers, StableSwap pools, etc.
         """
-        # TODO handle generation of multiple markets
-        logger.info("Fetching sim_market from subgraph.")
-        sim_market = get(
-            self.market_name, bands_data="controller", use_simple_oracle=False
+        sim_markets: List[SimMarketInstance] = []
+        for market_name in self.market_names:
+            logger.info("Fetching %s market from subgraph", market_name)
+
+            sim_market = get(
+                market_name, bands_data="controller", use_simple_oracle=False
+            )
+
+            metadata = sim_market.pool.metadata
+
+            logger.info(
+                "Market snapshot as %s",
+                datetime.fromtimestamp(int(metadata["timestamp"])),
+            )
+            logger.info(
+                "Bands snapshot as %s",
+                datetime.fromtimestamp(int(metadata["bands"][0]["timestamp"])),
+            )
+            logger.info(
+                "Users snapshot as %s",
+                datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
+            )
+
+            # huge memory consumption
+            del sim_market.pool.metadata["bands"]
+            del sim_market.pool.metadata["userStates"]
+
+            sim_markets.append(sim_market)
+
+        # Rebind all markets to use the same shared resources
+        rebind_markets(sim_markets)
+
+        # Set scenario attributes
+        self.llammas = [sim_market.pool for sim_market in sim_markets]
+        self.controllers = [sim_market.controller for sim_market in sim_markets]
+        self.oracles = cast(
+            List[Oracle], [sim_market.price_oracle for sim_market in sim_markets]
         )
+        self.policies = [sim_market.policy for sim_market in sim_markets]
+        self.stableswap_pools = sim_markets[0].stableswap_pools
+        self.aggregator = sim_markets[0].aggregator
+        self.peg_keepers = sim_markets[0].peg_keepers
+        self.factory = sim_markets[0].factory
+        self.stablecoin = sim_markets[0].stablecoin
 
-        metadata = sim_market.pool.metadata
-
-        logger.info(
-            "Market snapshot as %s", datetime.fromtimestamp(int(metadata["timestamp"]))
-        )
-        logger.info(
-            "Bands snapshot as %s",
-            datetime.fromtimestamp(int(metadata["bands"][0]["timestamp"])),
-        )
-        logger.info(
-            "Users snapshot as %s",
-            datetime.fromtimestamp(int(metadata["userStates"][0]["timestamp"])),
-        )
-
-        # NOTE huge memory consumption
-        del sim_market.pool.metadata["bands"]
-        del sim_market.pool.metadata["userStates"]  # TODO compare these before deleting
-
-        self.llamma = sim_market.pool
-        self.controller = sim_market.controller
-        self.stableswap_pools = sim_market.stableswap_pools
-        self.aggregator = sim_market.aggregator
-        self.price_oracle = cast(Oracle, sim_market.price_oracle)
-        self.peg_keepers = sim_market.peg_keepers
-        self.policy = sim_market.policy
-        self.factory = sim_market.factory
-        self.stablecoin = sim_market.stablecoin
-        self.tricrypto = sim_market.tricrypto
-
-        # Convenient reference to all pools
-        # TODO add all crvUSD pools (tBTC TriCrypto!)
-        self.pools = [self.llamma] + self.stableswap_pools
+        self.tricryptos: Set[SimCurveCryptoPool] = set()
+        for sim_market in sim_markets:
+            self.tricryptos.update(sim_market.tricrypto)
 
         self.coins: Set[TokenDTO] = set()
-        for pool in self.pools:
+        for pool in self.llammas + self.stableswap_pools:
             for a in pool.coin_addresses:
                 if a.lower() != CRVUSD_DTO.address.lower():
                     self.coins.add(TOKEN_DTOs[a.lower()])
@@ -168,7 +216,7 @@ class Scenario:
         for pair in self.pairs:
             self.markets[pair].update_price(sample.prices)
 
-    def prepare_for_run(self) -> None:
+    def prepare_for_run(self, resample: bool = True) -> None:
         """
         Prepare all modules for a simulation run.
 
@@ -176,6 +224,10 @@ class Scenario:
         1. Run a single step of price arbitrages.
         2. Liquidate users that were loaded underwater.
         """
+        if resample:
+            self.setup_borrowers()  # randomly sample positions
+            self.resample_liquidity()  # resample crvUSD liquidity
+
         sample = self.pricepaths[0]
         ts = int(sample.timestamp.timestamp())
 
@@ -188,60 +240,67 @@ class Scenario:
         # Equilibrate pool prices
         arbitrageur = Arbitrageur()  # diff arbitrageur
         arbitrageur.arbitrage(self.cycles, sample)
-        logger.info(
+        logger.debug(
             "Equilibrated prices with %d arbitrages with total profit %d",
-            arbitrageur.count,
-            arbitrageur.profit,
+            arbitrageur.count(),
+            arbitrageur.profit(),
         )
 
         # Liquidate users that were loaded underwater
-        controller = self.controller
-        to_liquidate = controller.users_to_liquidate()
-        n = len(to_liquidate)
-        if n > 0:
-            logger.info("%d users were loaded underwater.", n)
+        for controller in self.controllers:
+            name = controller.AMM.name.replace("Curve.fi Stablecoin ", "")
+            logger.debug("Validating loaded positions in %s Controller.", name)
 
-        # Check that only a small portion of debt is liquidatable at start
-        damage = 0
-        for pos in to_liquidate:
-            damage += pos.debt
-            logger.info("Liquidating %s: with debt %d.", pos.user, pos.debt)
-        pct = round(damage / controller.total_debt() * 100, 2)
-        args = (
-            "%.2f%% of debt was incorrectly loaded with sub-zero health (%d crvUSD)",
-            pct,
-            damage / 1e18,
-        )
-        if pct > 1:
-            logger.warning(*args)
-        else:
-            logger.info(*args)
+            to_liquidate = controller.users_to_liquidate()
+            n = len(to_liquidate)
 
-        controller.after_trades(do_liquidate=True)  # liquidations
+            # Check that only a small portion of debt is liquidatable at start
+            damage = 0
+            for pos in to_liquidate:
+                damage += pos.debt
+                logger.debug("Liquidating %s: with debt %d.", pos.user, pos.debt)
+            pct = round(damage / controller.total_debt() * 100, 2)
+            args = (
+                "%.2f%% of debt (%d positions) were incorrectly "
+                "loaded with <0 health (%d crvUSD) in %s Controller.",
+                pct,
+                n,
+                damage / 1e18,
+                name,
+            )
+            logger.debug(*args)
+
+            controller.after_trades(do_liquidate=True)  # liquidations
 
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
         self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
 
-        self.llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
-        self.llamma.prev_p_o_time = ts
-        self.llamma.rate_time = ts
-        self.price_oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
+        for llamma in self.llammas:
+            llamma._increment_timestamp(ts)  #  pylint: disable=protected-access
+            llamma.prev_p_o_time = ts
+            llamma.rate_time = ts
 
-        self.controller._increment_timestamp(ts)  #  pylint: disable=protected-access
+        for oracle in self.oracles:
+            oracle._increment_timestamp(ts)  #  pylint: disable=protected-access
+
+        for controller in self.controllers:
+            controller._increment_timestamp(ts)  #  pylint: disable=protected-access
 
         for spool in self.stableswap_pools:
             spool._increment_timestamp(ts)  #  pylint: disable=protected-access
             spool.ma_last_time = ts
-        for tpool in self.tricrypto:
+
+        for tpool in self.tricryptos:
             tpool._increment_timestamp(ts)  #  pylint: disable=protected-access
             tpool.last_prices_timestamp = ts
+
         for pk in self.peg_keepers:
             pk._increment_timestamp(ts)  #  pylint: disable=protected-access
 
     def update_tricrypto_prices(self, sample: PriceSample) -> None:
         """Update TriCrypto prices with a new sample."""
-        for tpool in self.tricrypto:
+        for tpool in self.tricryptos:
             tpool.prepare_for_run(
                 pd.DataFrame(
                     [
@@ -257,14 +316,14 @@ class Scenario:
     def update_staked_prices(self, sample: PriceSample) -> None:
         """Update staked prices with a new sample."""
         # Need to know which assets (staked and base)
-        oracle = self.price_oracle
-        llamma = self.llamma  # TODO need to know which llamma is associated with oracle
-        if hasattr(oracle, "staked_oracle"):
-            derivative = llamma.COLLATERAL_TOKEN.address
-            base = WETH
-            assert derivative in [WSTETH, SFRXETH]
-            p_staked = int(sample.prices[derivative][base] * 10**18)
-            oracle.staked_oracle.update(p_staked)
+        for llamma in self.llammas:
+            oracle = cast(Oracle, llamma.price_oracle_contract)
+            if hasattr(oracle, "staked_oracle"):
+                derivative = llamma.COLLATERAL_TOKEN.address
+                base = WETH
+                assert derivative in [WSTETH, SFRXETH]
+                p_staked = int(sample.prices[derivative][base] * 10**18)
+                oracle.staked_oracle.update(p_staked)
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
@@ -273,13 +332,20 @@ class Scenario:
         self.update_tricrypto_prices(sample)
         self.update_staked_prices(sample)
 
-        self.llamma.prepare_for_trades(ts)  # this increments oracle timestamp
-        self.controller.prepare_for_trades(ts)
+        for llamma in self.llammas:
+            llamma.prepare_for_trades(ts)  # this increments oracle timestamp
+
+        for controller in self.controllers:
+            controller.prepare_for_trades(ts)
+
         self.aggregator.prepare_for_trades(ts)
+
         for spool in self.stableswap_pools:
             spool.prepare_for_trades(ts)
-        for tpool in self.tricrypto:
+
+        for tpool in self.tricryptos:
             tpool.prepare_for_trades(ts)
+
         for peg_keeper in self.peg_keepers:
             peg_keeper.prepare_for_trades(ts)
 
@@ -291,10 +357,127 @@ class Scenario:
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
         self.arbitrageur.arbitrage(self.cycles, prices)
-        self.liquidator.perform_liquidations(self.controller, prices)
+        self.liquidator.perform_liquidations(self.controllers, prices)
         self.keeper.update(self.peg_keepers)
-        # TODO what is the right order for the actions?
-        # TODO need to incorporate LPs add/remove liquidity
-        # ^ currently USDT pool has more liquidity and this doesn't change since we
-        # only model swaps.
-        # TODO borrower
+        # TODO LP
+
+    def setup_borrowers(self) -> None:
+        """
+        Setup borrowers for the scenario.
+        - Shift AMM price up slightly
+        - Clear debt positions
+        - Resample new debt positions from KDE
+        - (AMM price shifts back down in `prepare_for_run`)
+        """
+        for controller in self.controllers:
+            llamma = controller.AMM
+            llamma.price_oracle_contract.freeze()
+            reset_controller_price(controller)
+            clear_controller(controller)
+            num_loans = self.config["borrowers"]["num_loans"][
+                ALIASES_LLAMMA[llamma.address]
+            ]
+            for _ in range(num_loans):
+                borrower = Borrower()
+                success = borrower.create_loan(controller, self.kde[llamma.address])
+                if not success:
+                    break
+                self.borrowers[borrower.address] = borrower
+            llamma.price_oracle_contract.unfreeze()
+            find_active_band(llamma)
+            del self.kde[llamma.address]  # free up memory
+            logger.debug(
+                "Resampled %d loans with total debt %d in %s.",
+                num_loans,
+                controller.total_debt(),
+                llamma.name,
+            )
+
+    def total_debt(self) -> int:
+        """
+        Get total debt in all controllers.
+        """
+        return sum((controller.total_debt() for controller in self.controllers))
+
+    def resample_liquidity(self) -> None:
+        """
+        Resample the liquidity in stableswap pools as a
+        function of the current total debt.
+        """
+        cfg = self.liquidity_config
+        total_debt = self.total_debt() / 1e18
+        mean_liquidity = sum(
+            (
+                cfg[spool.address]["mean_vector"][get_crvusd_index(spool)]
+                for spool in self.stableswap_pools
+            )
+        )
+        scale_factor = total_debt / (mean_liquidity * cfg["target_ratio"])
+
+        for spool in self.stableswap_pools:
+            spool.remove_liquidity(spool.totalSupply, [0, 0])
+            assert spool.totalSupply == 0
+            assert spool.balances == [0, 0]
+
+            # Resample
+            lp = LiquidityProvider()
+            lp.add_liquidity(
+                spool,
+                np.array(cfg[spool.address]["mean_vector"]),
+                np.array(cfg[spool.address]["covariance_matrix"]),
+                scale_factor,
+            )
+            self.lps[lp.address] = lp
+
+    def total_crvusd_liquidity(self) -> int:
+        """Total crvUSD liquidity in StableSwap Pools."""
+        return sum(
+            (spool.balances[get_crvusd_index(spool)] for spool in self.stableswap_pools)
+        )
+
+
+def find_active_band(llamma: SimLLAMMAPool) -> None:
+    """Find the active band for a LLAMMA."""
+    min_band = llamma.min_band
+    for n in range(llamma.min_band, llamma.max_band):
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
+            min_band += 1
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
+            llamma.active_band = n
+            break
+    llamma.min_band = min_band
+
+
+def clear_controller(controller: SimController) -> None:
+    """Clear all controller states."""
+    users = list(controller.loan.keys())
+    for user in users:
+        debt = controller._debt(user)[0]  # pylint: disable=protected-access
+        if debt > 0:
+            controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
+        controller.repay(debt, user)
+        del controller.loan[user]
+
+    assert controller.n_loans == 0
+    assert len(controller.loan) == 0
+    assert controller.total_debt() == 0
+
+
+def reset_controller_price(controller: SimController) -> None:
+    """
+    Reset controller price.
+    """
+    llamma = controller.AMM
+
+    min_band = llamma.min_band - 3  # Offset by a little bit
+    active_band = min_band + 1
+
+    llamma.active_band = active_band
+    llamma.min_band = min_band
+
+    p = llamma.p_oracle_up(active_band)
+    llamma.price_oracle_contract.last_price = p
+
+    ts = controller._block_timestamp  # pylint: disable=protected-access
+    controller.prepare_for_trades(ts + 60 * 60)
+    llamma.prepare_for_trades(ts + 60 * 60)

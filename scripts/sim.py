@@ -1,3 +1,8 @@
+"""
+Script to run a Monte Carlo simulation.
+"""
+from typing import List
+import os
 import cProfile
 import pstats
 import pdb
@@ -5,17 +10,27 @@ import argparse
 import pickle
 from datetime import datetime
 from multiprocessing import cpu_count
-from src.sim import run_scenario
+from src.sim import simulate
 from src.logging import get_logger
+from src.sim.results import MonteCarloResults
 
 logger = get_logger(__name__)
 
+BASE_DIR = os.getcwd()
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
-def with_analysis(scenario, markets, num_iter, ncpu):
+
+def with_analysis(
+    scenario: str, markets: List[str], num_iter: int, ncpu: int
+) -> MonteCarloResults:
+    """
+    Run simulation with profiling and debugging.
+    """
     with cProfile.Profile() as pr:
         try:
             global output
-            output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+            output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)
@@ -25,17 +40,25 @@ def with_analysis(scenario, markets, num_iter, ncpu):
     return output
 
 
-def without_analysis(scenario, markets, num_iter, ncpu):
+def without_analysis(
+    scenario: str, markets: List[str], num_iter: int, ncpu: int
+) -> MonteCarloResults:
+    """
+    Run simulation without any analysis.
+    """
     start = datetime.now()
     global output
-    output = run_scenario(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+    output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)
     return output
 
 
-def analysis_help():
+def analysis_help() -> None:
+    """
+    Help for analysis.
+    """
     print("Call `output.summary` for a DF of summary metrics.")
     print("Call `output.plot_runs(<metric_id>)` to plot the input metric for all runs.")
     print("Call `output.metric_map` to get a list of metrics and their ids.")
@@ -59,16 +82,22 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    markets = args.markets.split(",")[0]  # TODO handle multiple markets
+    markets = args.markets.split(",")
+    scenario = args.scenario
+    num_iter = args.num_iter
 
     if args.multiprocess:
         ncpu = cpu_count()
     else:
         ncpu = 1
 
-    output = with_analysis(args.scenario, args.markets, args.num_iter, ncpu)
-    # output = without_analysis(args.scenario, args.markets, args.num_iter, ncpu)
+    output = with_analysis(scenario, markets, num_iter, ncpu)
+    # output = without_analysis(scenario, markets, num_iter, ncpu)
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    with open(f"results/{args.scenario}.pkl", "wb") as f:
+    dir_ = os.path.join(RESULTS_DIR, scenario, "_".join(sorted(markets)))
+    os.makedirs(dir_, exist_ok=True)
+    i = len(os.listdir(dir_)) + 1
+    fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")
+    with open(fn, "wb") as f:
         pickle.dump(output, f)

@@ -2,7 +2,8 @@
 from __future__ import annotations
 from abc import ABC
 from functools import cached_property
-from typing import TYPE_CHECKING
+from collections import defaultdict
+from typing import TYPE_CHECKING, Dict
 from ..logging import get_logger
 
 logger = get_logger(__name__)
@@ -19,25 +20,22 @@ TOLERANCE = -10  # USD
 class Agent(ABC):
     """Base class for agents."""
 
-    _profit: float = 0.0
-    _count: int = 0
-    _volume: int = 0
-    _borrower_loss: float = 0.0
+    def __init__(self) -> None:
+        self._profit: Dict[str, float] = defaultdict(float)
+        self._count: Dict[str, int] = defaultdict(int)
+        self._borrower_loss = 0.0
 
-    @property
-    def profit(self) -> float:
+    def profit(self, address: str | None = None) -> float:
         """Return the profit."""
-        return self._profit
+        if not address:
+            return sum(self._profit.values())
+        return self._profit[address]
 
-    @property
-    def count(self) -> int:
+    def count(self, address: str | None = None) -> int:
         """Return the count."""
-        return self._count
-
-    @property
-    def volume(self) -> int:
-        """Return the volume."""
-        return self._volume
+        if not address:
+            return sum(self._count.values())
+        return self._count[address]
 
     @property
     def borrower_loss(self) -> float:
@@ -49,7 +47,7 @@ class Agent(ABC):
         """Agent name."""
         return type(self).__name__
 
-    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample):
+    def update_borrower_losses(self, cycle: Cycle, prices: PriceSample) -> None:
         """
         Update the borrower loss. Applicable to
         the Liquidator and Arbitrageur child classes.

@@ -1,0 +1,36 @@
+{
+    "name": "High Volatility",
+    "description": "High volatility scenario running on a short timescale. Price drifts for collateral assets are set to 0, and volatilities are set to their historical highs (p99 intraday volatility). Debt positions are randomly re-sampled from an empirical Gaussian KDE and crvUSD liquidity is randomly resampled from a multivariate Gaussian distribution. The sampled debt:liquidity ratio is centered around the historical average ratio.",
+    "freq": "5min",
+    "N": 288,
+    "quotes": {
+        "start": 1700438400,
+        "end": 1703030400
+    },
+    "prices": {
+        "start": 1697068800,
+        "end": 1704585600
+    },
+    "borrowers": {
+        "start": 1696132800,
+        "end": 1704085200,
+        "num_loans": {
+            "wsteth": 350,
+            "weth": 175,
+            "sfrxeth": 75,
+            "wbtc": 250
+        }
+    },
+    "liquidity": {
+        "start": 1696132800,
+        "end": 1704085200
+    },
+    "volatility": {
+        "WBTC": 1.877968,
+        "tBTC": 1.877968,
+        "WETH": 2.445831,
+        "sfrxETH": 2.445831,
+        "wstETH": 2.445831
+    },
+    "arb_cycle_length": 3
+}
