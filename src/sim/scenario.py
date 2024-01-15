@@ -458,6 +458,12 @@ def clear_controller(controller: SimController) -> None:
             controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
         controller.repay(debt, user)
         del controller.loan[user]
+    
+    for band in range(controller.AMM.min_band, controller.AMM.max_band):
+        # Might be some dust left due to discrepancy between user
+        # snapshot and band snapshot
+        controller.AMM.bands_x[band] = 0
+        controller.AMM.bands_y[band] = 0
 
     assert controller.n_loans == 0
     assert len(controller.loan) == 0
