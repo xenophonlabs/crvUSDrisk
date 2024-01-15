@@ -1,5 +1,4 @@
 """Provides utility functions for the application."""
-from copy import deepcopy
 from typing import List
 import base64
 import pickle

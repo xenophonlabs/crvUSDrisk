@@ -15,7 +15,7 @@ from crvusdsim.pool.sim_interface import (
     SimCurveStableSwapPool,
 )
 from crvusdsim.pool.sim_interface.sim_controller import DEFAULT_LIQUIDATOR
-from ..market import ExternalMarket
+from ..modules import ExternalMarket
 from ..types import SimPoolType
 from ..logging import get_logger
 

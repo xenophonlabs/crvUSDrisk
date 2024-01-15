@@ -10,7 +10,7 @@ from crvusdsim.pool import SimLLAMMAPool, SimCurveStableSwapPool
 from curvesim.pool import SimCurvePool
 from .trade import Swap, Liquidation
 from ..logging import get_logger
-from ..market import ExternalMarket
+from ..modules import ExternalMarket
 
 TOLERANCE = 1e-4
 

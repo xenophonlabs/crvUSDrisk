@@ -25,7 +25,7 @@ from ..configs import (
     MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH
-from ..market import ExternalMarket
+from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType

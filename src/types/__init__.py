@@ -2,7 +2,7 @@
 from typing import TypeAlias, Dict, Tuple
 from crvusdsim.pool.sim_interface import SimLLAMMAPool, SimCurveStableSwapPool
 from curvesim.pool.sim_interface import SimCurvePool
-from ..market import ExternalMarket
+from ..modules import ExternalMarket
 from ..data_transfer_objects import TokenDTO
 
 SimPoolType: TypeAlias = (
