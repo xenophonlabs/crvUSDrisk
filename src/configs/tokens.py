@@ -37,6 +37,7 @@ COINGECKO_IDS = {
     TBTC: "tbtc",
 }
 STABLE_CG_IDS = [COINGECKO_IDS[coin] for coin in STABLES]
+COINGECKO_IDS_INV = {v: k for k, v in COINGECKO_IDS.items()}
 
 # TODO script to update these with new tokens
 
