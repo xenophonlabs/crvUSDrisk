@@ -1,0 +1,29 @@
+{
+    "name": "crvUSD Liquidity Crunch",
+    "description": "crvUSD Liquidity Crunch scenario running on a short timescale. Price drifts for collateral assets are set to 0. Debt positions are randomly re-sampled from an empirical Gaussian KDE and crvUSD liquidity is randomly resampled from a multivariate Gaussian distribution. Instead of centering the simulated debt:liquidity ratio around the historical mean (i.e. the baseline scenario), we center it at the 99th percentile of the historical distribution. This means the simulated crvUSD liquidity will be, in expectation, the highest its been in the observed period. Due to randomness, many simulations will consider crvUSD liquidity levels that are even higher than the 99th percentile. Note that a high debt:liquidity ratio means there is much more debt to liquidate than liquidity with which to liquidate it.",
+    "freq": "5min",
+    "N": 288,
+    "quotes": {
+        "start": 1700438400,
+        "end": 1703030400
+    },
+    "prices": {
+        "start": 1697068800,
+        "end": 1704585600
+    },
+    "borrowers": {
+        "start": 1696132800,
+        "end": 1704085200,
+        "num_loans": {
+            "wsteth": 350,
+            "weth": 175,
+            "sfrxeth": 75,
+            "wbtc": 250
+        }
+    },
+    "liquidity": {
+        "start": 1696132800,
+        "end": 1704085200
+    },
+    "arb_cycle_length": 3
+}

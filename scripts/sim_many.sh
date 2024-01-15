@@ -1,15 +1,14 @@
 #!/bin/bash
 
 # Define the scenarios, markets, number of iterations, and number of runs
-scenarios=("baseline_micro" "baseline_macro" "high_volatility")
+scenarios=("baseline_micro" "high_volatility"  "baseline_macro")
 markets="sfrxeth,wbtc,weth,wsteth"
 markets_str="sfrxeth_wbtc_weth_wsteth"
 num_iters=1000
 num_runs=5
 
-for scenario in "${scenarios[@]}"; do
-    # Execute the script num_runs times for each scenario
-    for (( i=1; i<=num_runs; i++ )); do
+for (( i=1; i<=num_runs; i++ )); do
+    for scenario in "${scenarios[@]}"; do
         log_file="logs/${scenario}/${markets_str}/log_${num_iters}_iters_${i}.log"
         echo $log_file
         mkdir -p "$(dirname "$log_file")"

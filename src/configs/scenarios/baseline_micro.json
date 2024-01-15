@@ -1,6 +1,6 @@
 {
     "name": "Baseline Micro",
-    "description": "Baseline scenario running on a short timescale. Price drifts for collateral assets are set to 0. Debt positions are randomly re-sampled from an empirical Gaussian KDE.",
+    "description": "Baseline scenario running on a short timescale. Price drifts for collateral assets are set to 0. Debt positions are randomly re-sampled from an empirical Gaussian KDE and crvUSD liquidity is randomly resampled from a multivariate Gaussian distribution. The sampled debt:liquidity ratio is centered around the historical average ratio.",
     "freq": "5min",
     "N": 288,
     "quotes": {

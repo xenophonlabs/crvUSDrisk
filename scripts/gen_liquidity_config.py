@@ -89,6 +89,7 @@ def main(start: datetime, end: datetime, plot: bool) -> None:
 
     ratio = (debts["debt"] / liquidity["liquidity"]).dropna()
     target_ratio = ratio.mean()
+    stressed_ratio = ratio.quantile(0.99)
 
     config = {}
     for address, df in stableswap_stats.items():
@@ -99,6 +100,7 @@ def main(start: datetime, end: datetime, plot: bool) -> None:
         }
 
     config["target_ratio"] = target_ratio
+    config["stressed_ratio"] = stressed_ratio
 
     fn = os.path.join(CONFIG_DIR, f"{start_ts}_{end_ts}.json")
     with open(fn, "w") as f:

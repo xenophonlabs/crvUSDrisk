@@ -25,7 +25,7 @@ from ..configs import (
     MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH
-from ..modules import ExternalMarket
+from ..market import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
 from ..types import MarketsType
@@ -82,6 +82,7 @@ class Scenario:
         self.liquidity_config = get_liquidity_config(
             config["liquidity"]["start"], config["liquidity"]["end"]
         )
+        self.target_liquidity_ratio = self.liquidity_config["target_ratio"]
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -412,7 +413,7 @@ class Scenario:
                 for spool in self.stableswap_pools
             )
         )
-        scale_factor = total_debt / (mean_liquidity * cfg["target_ratio"])
+        scale_factor = total_debt / (mean_liquidity * self.target_liquidity_ratio)
 
         for spool in self.stableswap_pools:
             spool.remove_liquidity(spool.totalSupply, [0, 0])

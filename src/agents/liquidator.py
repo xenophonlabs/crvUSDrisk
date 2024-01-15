@@ -7,7 +7,7 @@ from crvusdsim.pool.crvusd.controller import Position
 from crvusdsim.pool.sim_interface import SimController
 from crvusdsim.pool.sim_interface.sim_stableswap import SimCurveStableSwapPool
 from .agent import Agent
-from ..modules import ExternalMarket
+from ..market import ExternalMarket
 from ..trades.cycle import Swap, Liquidation, Cycle
 from ..utils import get_crvusd_index
 from ..configs import TOKEN_DTOs, DEFAULT_PROFIT_TOLERANCE

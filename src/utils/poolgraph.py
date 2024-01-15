@@ -5,7 +5,7 @@ DFS algorithm to find all cycles of a given length.
 """
 from typing import List, Tuple, Set, Dict
 from ..trades import Swap, Cycle
-from ..modules import ExternalMarket
+from ..market import ExternalMarket
 from ..types import SimPoolType
 from ..logging import get_logger
 

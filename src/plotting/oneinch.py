@@ -5,7 +5,7 @@ and generated price impact curves.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from ..modules import ExternalMarket
+from ..market import ExternalMarket
 from .utils import save
 
 S = 5

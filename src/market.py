@@ -10,11 +10,11 @@ from typing import Tuple, Dict, TYPE_CHECKING, List
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
-from ..data_transfer_objects import TokenDTO
-from ..logging import get_logger
+from .data_transfer_objects import TokenDTO
+from .logging import get_logger
 
 if TYPE_CHECKING:
-    from ..types import PairwisePricesType
+    from .types import PairwisePricesType
 
 
 logger = get_logger(__name__)
