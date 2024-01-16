@@ -19,9 +19,7 @@ class LiquidityProvider(Agent):
     def add_liquidity(
         self,
         pool: SimCurveStableSwapPool,
-        mean: np.ndarray,
-        cov: np.ndarray,
-        scale_factor: int,
+        amounts: np.ndarray,
     ) -> None:
         """
         Resample liquidity amounts from a multivariate normal distribution,
@@ -29,14 +27,6 @@ class LiquidityProvider(Agent):
 
         TODO what sanity checks here?
         """
-        while True:
-            # Make sure we get positive amounts
-            _amounts = np.random.multivariate_normal(mean * scale_factor, cov, 1)[0]
-            amounts = [int(b * 1e36 / r) for b, r in zip(_amounts, pool.rates)]
-            if all(amount > 0 for amount in amounts):
-                break
-
         for coin, amount in zip(pool.coins, amounts):
-            assert amount > 0, amount
             coin._mint(self.address, amount)  # pylint: disable=protected-access
         pool.add_liquidity(amounts, _receiver=self.address)

@@ -36,7 +36,7 @@ def plot(
 
 def main() -> None:
     """Generate price impact plots for each token pair."""
-    scenario = Scenario("baseline_micro", ["wsteth"])
+    scenario = Scenario("baseline", ["wsteth"])
     scenario.update_market_prices(scenario.pricepaths[0])
 
     quotes = scenario.generate_markets()  # regenerate to fetch quotes

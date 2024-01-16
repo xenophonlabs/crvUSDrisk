@@ -70,7 +70,7 @@ class SingleSimProcessor:
 
         return res
 
-    def metric_kwargs(self) -> Dict[str, Any]:
+    def metric_kwargs(self) -> dict:
         """
         Get kwargs for all metrics. This prevents
         us from repeating expensive operations like
@@ -79,11 +79,19 @@ class SingleSimProcessor:
         kwargs: Dict[str, Any] = {
             "healths": {},
             "debts": {},
+            "total_debt_controller": {},
         }
 
+        total = 0
         for controller in self.scenario.controllers:
             kwargs["healths"][controller.address] = controller_healths(controller)
-            kwargs["debts"][controller.address] = controller_debts(controller)
+            debts = controller_debts(controller)
+            total_controller = debts.sum() / 1e18
+            kwargs["debts"][controller.address] = debts
+            kwargs["total_debt_controller"][controller.address] = total_controller
+            total += total_controller
+
+        kwargs["total_debt"] = total
 
         return kwargs
 

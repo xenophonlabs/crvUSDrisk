@@ -2,7 +2,7 @@
 Provides utility functions for the simulation.
 """
 from typing import List
-from crvusdsim.pool import SimMarketInstance
+from crvusdsim.pool import SimMarketInstance, SimController, SimLLAMMAPool
 
 
 def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
@@ -96,3 +96,56 @@ def validate_binds(sim_markets: List[SimMarketInstance]) -> None:
                 assert sim_market.__dict__[k] is master
             else:
                 assert sim_market.__dict__[k] is not master
+
+
+def find_active_band(llamma: SimLLAMMAPool) -> None:
+    """Find the active band for a LLAMMA."""
+    min_band = llamma.min_band
+    for n in range(llamma.min_band, llamma.max_band):
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
+            min_band += 1
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
+            llamma.active_band = n
+            break
+    llamma.min_band = min_band
+
+
+def clear_controller(controller: SimController) -> None:
+    """Clear all controller states."""
+    users = list(controller.loan.keys())
+    for user in users:
+        debt = controller._debt(user)[0]  # pylint: disable=protected-access
+        if debt > 0:
+            controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
+        controller.repay(debt, user)
+        del controller.loan[user]
+
+    for band in range(controller.AMM.min_band, controller.AMM.max_band):
+        # Might be some dust left due to discrepancy between user
+        # snapshot and band snapshot
+        controller.AMM.bands_x[band] = 0
+        controller.AMM.bands_y[band] = 0
+
+    assert controller.n_loans == 0
+    assert len(controller.loan) == 0
+    assert controller.total_debt() == 0
+
+
+def reset_controller_price(controller: SimController) -> None:
+    """
+    Reset controller price.
+    """
+    llamma = controller.AMM
+
+    min_band = llamma.min_band - 3  # Offset by a little bit
+    active_band = min_band + 1
+
+    llamma.active_band = active_band
+    llamma.min_band = min_band
+
+    p = llamma.p_oracle_up(active_band)
+    llamma.price_oracle_contract.last_price = p
+
+    ts = controller._block_timestamp  # pylint: disable=protected-access
+    controller.prepare_for_trades(ts + 60 * 60)
+    llamma.prepare_for_trades(ts + 60 * 60)

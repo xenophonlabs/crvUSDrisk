@@ -78,7 +78,7 @@ Select a `scenario`, `market`, and number of iterations (model runs) for you sce
 Alternatively, you may run a simulation via the `scripts/sim.py` script as follows:
 
 ```bash
-python3 -m scripts.sim baseline_macro "wsteth,wbtc" 100 -mp &> logs/sim.log
+python3 -m scripts.sim baseline "wsteth,wbtc" 100 -mp &> logs/sim.log
 ```
 
 Make sure to create the `logs` directory to view simulation logs/warnings, or remove the `&> logs/sim.log` redirection.

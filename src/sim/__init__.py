@@ -7,7 +7,7 @@ The basic model for a scenario is to:
     This includes Curve assets (like LLAMMAs, Controllers,
     Stableswap pools), as well as External Markets, and Agents 
     (e.g. Liquidator, Arbitrageur).
-2. Apply scenario shocks required for the scenario. For example, the "baseline_micro"
+2. Apply scenario shocks required for the scenario. For example, the "baseline"
     scenario will apply enforce 0-drift on collateral GBMs, whereas the "high volatility" 
     scenario will increase the volatility parameter.
 3. Run the simulation. The `Scenario` template is copied into multiple parallel
@@ -19,7 +19,7 @@ import multiprocessing as mp
 from typing import List, Type
 from copy import deepcopy
 from queue import Queue
-from .strategies import STRATEGIES, Strategy
+from .strategy import Strategy
 from .processing import MonteCarloProcessor
 from .results import MonteCarloResults, SingleSimResults
 from .scenario import Scenario
@@ -64,7 +64,7 @@ def simulate(
         An object containing the results for the simulation.
     """
     metrics = metrics or DEFAULT_METRICS
-    scenario_template = Scenario(config, market_names)
+    scenario_template = Scenario(config, market_names)  # shocks applied here
     metadata = {
         "scenario": config,
         "num_iter": num_iter,
@@ -82,9 +82,7 @@ def simulate(
         scenario_template.freq,
     )
 
-    strategy = STRATEGIES[config](metrics)
-    strategy.apply_shocks(scenario_template)
-
+    strategy = Strategy(metrics)
     mcaggregator = MonteCarloProcessor(metadata)
 
     if ncpu > 1:
@@ -112,7 +110,10 @@ def simulate(
             scenario = deepcopy(scenario_template)
             mcaggregator.collect(strategy(scenario, {}, i + 1))
 
-    return mcaggregator.process()
+    mcresult = mcaggregator.process()
+    # Force computation of summary to cache it
+    mcresult.summary  # pylint: disable=pointless-statement
+    return mcresult
 
 
 def worker(

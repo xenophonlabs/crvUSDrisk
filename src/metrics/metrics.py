@@ -1,5 +1,5 @@
 """Provides classes for each metric."""
-from typing import List, Dict
+from typing import List, Dict, cast
 import numpy as np
 from .base import Metric
 from .utils import entity_str
@@ -10,16 +10,14 @@ class BadDebtMetric(Metric):
     """
     Calculates the bad debt in a LLAMMA/Controller
     at  the current timestep.
-
-    TODO extend to multiple LLAMMAs & Controllers?
     """
 
-    key_metric = "Bad Debt"
+    key_metric = "Bad Debt Pct"
 
     def _config(self) -> Dict[str, List[str]]:
-        cfg = {"Bad Debt": ["mean", "max"]}
+        cfg = {"Bad Debt Pct": ["max"]}
         for controller in self.scenario.controllers:
-            cfg[f"Bad Debt on {entity_str(controller, 'controller')}"] = ["mean", "max"]
+            cfg[f"Bad Debt Pct on {entity_str(controller, 'controller')}"] = ["max"]
         return cfg
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
@@ -30,9 +28,12 @@ class BadDebtMetric(Metric):
             healths = kwargs["healths"][controller.address]
             debts = kwargs["debts"][controller.address]
             bad_debt = debts[np.where(healths < 0)].sum() / 1e18
-            val[f"Bad Debt on {entity_str(controller, 'controller')}"] = bad_debt
+            val[f"Bad Debt Pct on {entity_str(controller, 'controller')}"] = (
+                bad_debt / kwargs["total_debt_controller"][controller.address] * 100
+            )
             total += bad_debt
-        val["Bad Debt"] = total
+        total_debt = cast(float, kwargs["total_debt"])
+        val["Bad Debt Pct"] = total / total_debt * 100
         return val
 
 
@@ -41,8 +42,6 @@ class SystemHealthMetric(Metric):
     Calculates the weighted average
     system health in a LLAMMA/Controller at the
     current timestep.
-
-    TODO extend to multiple LLAMMAs & Controllers?
     """
 
     key_metric = "System Health"
@@ -96,24 +95,25 @@ class BorrowerLossMetric(Metric):
     $ indicates MTM USD value at current *market* prices (use aggregator price for crvUSD).
     """
 
-    key_metric = "Borrower Loss"
+    key_metric = "Borrower Loss Pct"
 
     def _config(self) -> Dict[str, List[str]]:
         return {
-            "Borrower Loss": ["max"],  # == last
-            "Hard Liquidation Losses": ["max"],  # == last
-            "Soft Liquidation Losses": ["max"],  # == last
+            "Borrower Loss Pct": ["max"],  # == last
+            "Hard Liquidation Loss Pct": ["max"],  # == last
+            "Soft Liquidation Loss Pct": ["max"],  # == last
         }
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute borrower loss."""
-        hard_loss = self.scenario.liquidator.borrower_loss
-        soft_loss = self.scenario.arbitrageur.borrower_loss
-        borrower_loss = hard_loss + soft_loss
+        total_debt = cast(float, kwargs["total_debt"])
+        hard_loss = self.scenario.liquidator.borrower_loss / total_debt * 100
+        soft_loss = self.scenario.arbitrageur.borrower_loss / total_debt * 100
+        borrower_loss = hard_loss + soft_loss / total_debt * 100
         return {
-            "Borrower Loss": borrower_loss,
-            "Hard Liquidation Losses": hard_loss,
-            "Soft Liquidation Losses": soft_loss,
+            "Borrower Loss Pct": borrower_loss,
+            "Hard Liquidation Loss Pct": hard_loss,
+            "Soft Liquidation Loss Pct": soft_loss,
         }
 
 
@@ -215,17 +215,15 @@ class LiquidationsMetric(Metric):
     Calculates the hard liquidation volume.
     """
 
-    key_metric = "Debt Liquidated"
+    key_metric = "Debt Liquidated Pct"
 
     def _config(self) -> Dict[str, List[str]]:
         cfg = {
-            "Debt Liquidated": ["max"],
-            "Liquidation Count": ["max"],
+            "Debt Liquidated Pct": ["max"],
         }
 
         for controller in self.scenario.controllers:
-            cfg[f"Debt Liquidated on {entity_str(controller, 'controller')}"] = ["max"]
-            cfg[f"Collateral Liquidated on {entity_str(controller, 'controller')}"] = [
+            cfg[f"Debt Liquidated Pct on {entity_str(controller, 'controller')}"] = [
                 "max"
             ]
 
@@ -238,16 +236,16 @@ class LiquidationsMetric(Metric):
         total_debt_liquidated = 0.0
         for controller in self.scenario.controllers:
             _controller = entity_str(controller, "controller")
-
             debt_liquidated = liquidator.debt_repaid[controller.address]
-            collateral_liquidated = liquidator.collateral_liquidated[controller.address]
-
-            val[f"Debt Liquidated on {_controller}"] = debt_liquidated
-            val[f"Collateral Liquidated on {_controller}"] = collateral_liquidated
-
+            val[f"Debt Liquidated Pct on {_controller}"] = (
+                debt_liquidated
+                / kwargs["total_debt_controller"][controller.address]
+                * 100
+            )
             total_debt_liquidated += debt_liquidated
 
-        val["Debt Liquidated"] = total_debt_liquidated
+        total_debt = cast(float, kwargs["total_debt"])
+        val["Debt Liquidated Pct"] = total_debt_liquidated / total_debt * 100
 
         return val
 
@@ -329,13 +327,12 @@ class MiscMetric(Metric):
         """Compute miscellaneous metrics."""
         val = {}
 
-        total_debt = 0
-        for controller in self.scenario.controllers:
-            debt = kwargs["debts"][controller.address].sum() / 1e18
-            val[f"{entity_str(controller, 'controller')} Total Debt"] = debt
-            total_debt += debt
-
+        total_debt = cast(float, kwargs["total_debt"])
         val["Total Debt"] = total_debt
+
+        for controller in self.scenario.controllers:
+            debt = kwargs["total_debt_controller"][controller.address]
+            val[f"{entity_str(controller, 'controller')} Total Debt"] = debt
 
         for llamma in self.scenario.llammas:
             val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18

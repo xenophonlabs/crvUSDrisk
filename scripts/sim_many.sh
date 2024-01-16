@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the scenarios, markets, number of iterations, and number of runs
-scenarios=("baseline_micro" "high_volatility"  "baseline_macro")
+scenarios=("baseline" "high_volatility"  "internal_crunch")
 markets="sfrxeth,wbtc,weth,wsteth"
 markets_str="sfrxeth_wbtc_weth_wsteth"
 num_iters=1000
