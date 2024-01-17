@@ -19,14 +19,13 @@ class LiquidityProvider(Agent):
     def add_liquidity(
         self,
         pool: SimCurveStableSwapPool,
-        amounts: np.ndarray,
+        amounts_: np.ndarray,
     ) -> None:
         """
         Resample liquidity amounts from a multivariate normal distribution,
         and add it to the given pool.
-
-        TODO what sanity checks here?
         """
+        amounts = [int(amt) for amt in amounts_]
         for coin, amount in zip(pool.coins, amounts):
             coin._mint(self.address, amount)  # pylint: disable=protected-access
         pool.add_liquidity(amounts, _receiver=self.address)

@@ -13,6 +13,7 @@ from multiprocessing import cpu_count
 from src.sim import simulate
 from src.logging import get_logger
 from src.sim.results import MonteCarloResults
+from src.configs import MODELLED_MARKETS
 
 logger = get_logger(__name__)
 
@@ -71,7 +72,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "scenario", type=str, help="Scenario to simulate (from src/configs/scenarios)."
     )
-    parser.add_argument("markets", type=str, help="Comma-separated list of markets.")
     parser.add_argument("num_iter", type=int, help="Number of runs.", default=10)
     parser.add_argument(
         "-mp",
@@ -80,9 +80,15 @@ if __name__ == "__main__":
         help="Multiprocess?",
         required=False,
     )
+    parser.add_argument(
+        "-a",
+        "--analysis",
+        action="store_true",
+        help="Analyze Runtime?",
+        required=False,
+    )
     args = parser.parse_args()
 
-    markets = args.markets.split(",")
     scenario = args.scenario
     num_iter = args.num_iter
 
@@ -91,11 +97,14 @@ if __name__ == "__main__":
     else:
         ncpu = 1
 
-    output = with_analysis(scenario, markets, num_iter, ncpu)
-    # output = without_analysis(scenario, markets, num_iter, ncpu)
+    if args.analysis:
+        output = with_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
+    else:
+        output = without_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
+
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    dir_ = os.path.join(RESULTS_DIR, scenario, "_".join(sorted(markets)))
+    dir_ = os.path.join(RESULTS_DIR, scenario, "_".join(sorted(MODELLED_MARKETS)))
     os.makedirs(dir_, exist_ok=True)
     i = len(os.listdir(dir_)) + 1
     fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")

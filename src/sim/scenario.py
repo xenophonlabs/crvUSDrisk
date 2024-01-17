@@ -58,7 +58,6 @@ class Scenario:
         self.market_names = market_names
         self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
-        self.description: str = config["description"]
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
 
@@ -257,6 +256,8 @@ class Scenario:
                 if not success:
                     break
                 self.borrowers[borrower.address] = borrower
+            leftover = controller.total_debt() - target_debt
+            controller.repay(leftover, borrower.address)
             llamma.price_oracle_contract.unfreeze()
             find_active_band(llamma)
             del self.kde[llamma.address]  # free up memory
@@ -311,6 +312,12 @@ class Scenario:
                 amounts * scale_factor,
             )
             self.lps[lp.address] = lp
+
+        logger.debug(
+            "Resampled total crvUSD liquidity %d with ratio %f",
+            self.total_crvusd_liquidity,
+            self.total_debt / self.total_crvusd_liquidity,
+        )
 
     ### ========== Scenario Shocks ========== ###
 

@@ -71,7 +71,6 @@ def simulate(
         "markets": market_names,
         "num_steps": scenario_template.num_steps,
         "freq": scenario_template.freq,
-        "description": scenario_template.description,
         "template": scenario_template,
     }
 
