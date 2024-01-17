@@ -419,15 +419,15 @@ def _generate_content(output: MonteCarloResults):
                                             str(metadata["markets"]),
                                         ]
                                     ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Brief description: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            str(metadata["description"]),
-                                        ]
-                                    ),
+                                    # html.Li(
+                                    #     [
+                                    #         html.Span(
+                                    #             "Brief description: ",
+                                    #             style={"font-weight": "bold"},
+                                    #         ),
+                                    #         str(metadata["description"]),
+                                    #     ]
+                                    # ),
                                 ]
                             ),
                         ),
@@ -776,7 +776,7 @@ def update_aggregate_graph(value):
     return fig
 
 
-N = 3  # keep every N rows for run graphs
+N = 1  # keep every N rows for run graphs
 
 
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))

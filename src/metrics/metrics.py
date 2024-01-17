@@ -29,10 +29,10 @@ class BadDebtMetric(Metric):
             debts = kwargs["debts"][controller.address]
             bad_debt = debts[np.where(healths < 0)].sum() / 1e18
             val[f"Bad Debt Pct on {entity_str(controller, 'controller')}"] = (
-                bad_debt / kwargs["total_debt_controller"][controller.address] * 100
+                bad_debt / kwargs["initial_debts"][controller.address] * 100
             )
             total += bad_debt
-        total_debt = cast(float, kwargs["total_debt"])
+        total_debt = cast(float, kwargs["total_initial_debt"])
         val["Bad Debt Pct"] = total / total_debt * 100
         return val
 
@@ -47,10 +47,9 @@ class SystemHealthMetric(Metric):
     key_metric = "System Health"
 
     def _config(self) -> Dict[str, List[str]]:
-        cfg = {"System Health": ["mean", "min"]}
+        cfg = {"System Health": ["min"]}
         for controller in self.scenario.controllers:
             cfg[f"System Health on {entity_str(controller, 'controller')}"] = [
-                "mean",
                 "min",
             ]
         return cfg
@@ -106,14 +105,14 @@ class BorrowerLossMetric(Metric):
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
         """Compute borrower loss."""
-        total_debt = cast(float, kwargs["total_debt"])
-        hard_loss = self.scenario.liquidator.borrower_loss / total_debt * 100
-        soft_loss = self.scenario.arbitrageur.borrower_loss / total_debt * 100
-        borrower_loss = hard_loss + soft_loss / total_debt * 100
+        total_debt = cast(float, kwargs["total_initial_debt"])
+        hard_loss = self.scenario.liquidator.borrower_loss
+        soft_loss = self.scenario.arbitrageur.borrower_loss
+        borrower_loss = hard_loss + soft_loss
         return {
-            "Borrower Loss Pct": borrower_loss,
-            "Hard Liquidation Loss Pct": hard_loss,
-            "Soft Liquidation Loss Pct": soft_loss,
+            "Borrower Loss Pct": borrower_loss / total_debt * 100,
+            "Hard Liquidation Loss Pct": hard_loss / total_debt * 100,
+            "Soft Liquidation Loss Pct": soft_loss / total_debt * 100,
         }
 
 
@@ -193,10 +192,10 @@ class PegStrengthMetric(Metric):
 
     def _config(self) -> Dict[str, List[str]]:
         cfg = {
-            "Aggregator Price": ["mean", "min", "max"],
+            "Aggregator Price": ["min", "max"],
         }
         for spool in self.scenario.stableswap_pools:
-            cfg[f"{entity_str(spool, 'stableswap')} Price"] = ["mean", "min", "max"]
+            cfg[f"{entity_str(spool, 'stableswap')} Price"] = ["min", "max"]
         return cfg
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
@@ -238,13 +237,11 @@ class LiquidationsMetric(Metric):
             _controller = entity_str(controller, "controller")
             debt_liquidated = liquidator.debt_repaid[controller.address]
             val[f"Debt Liquidated Pct on {_controller}"] = (
-                debt_liquidated
-                / kwargs["total_debt_controller"][controller.address]
-                * 100
+                debt_liquidated / kwargs["initial_debts"][controller.address] * 100
             )
             total_debt_liquidated += debt_liquidated
 
-        total_debt = cast(float, kwargs["total_debt"])
+        total_debt = cast(float, kwargs["total_initial_debt"])
         val["Debt Liquidated Pct"] = total_debt_liquidated / total_debt * 100
 
         return val
@@ -259,10 +256,10 @@ class PegKeeperMetric(Metric):
 
     def _config(self) -> Dict[str, List[str]]:
         cfg = {
-            "PK Debt": ["mean", "max"],
+            "PK Debt": ["max"],
         }
         for pk in self.scenario.peg_keepers:
-            cfg[f"{entity_str(pk, 'pk')} Debt"] = ["mean", "max"]
+            cfg[f"{entity_str(pk, 'pk')} Debt"] = ["max"]
         return cfg
 
     def compute(self, **kwargs: dict) -> Dict[str, float]:
@@ -282,10 +279,10 @@ class LiquidityMetric(Metric):
     key_metric = "Total crvUSD Liquidity"
 
     def _config(self) -> Dict[str, List[str]]:
-        cfg = {"Total crvUSD Liquidity": ["mean", "min"]}
+        cfg = {"Total crvUSD Liquidity": ["min"]}
 
         for spool in self.scenario.stableswap_pools:
-            cfg[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = ["mean", "min"]
+            cfg[f"{entity_str(spool, 'stableswap')} crvUSD Liquidity"] = ["min"]
 
         return cfg
 
@@ -327,12 +324,13 @@ class MiscMetric(Metric):
         """Compute miscellaneous metrics."""
         val = {}
 
-        total_debt = cast(float, kwargs["total_debt"])
-        val["Total Debt"] = total_debt
-
+        total_debt = 0
         for controller in self.scenario.controllers:
-            debt = kwargs["total_debt_controller"][controller.address]
+            debt = kwargs["debts"][controller.address].sum() / 1e18
             val[f"{entity_str(controller, 'controller')} Total Debt"] = debt
+            total_debt += debt
+
+        val["Total Debt"] = total_debt
 
         for llamma in self.scenario.llammas:
             val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18

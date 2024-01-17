@@ -61,6 +61,7 @@ class Borrower(Agent):
                     logger.warning(
                         "Controller %s won't accept any more debt.", controller.AMM.name
                     )
+                    del controller.loan[self.address]  # remove the key
                     return False
                 controller.create_loan(self.address, collateral, debt, n)
             else:

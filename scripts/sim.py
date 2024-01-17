@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
 
-    dir_ = os.path.join(RESULTS_DIR, scenario, "_".join(sorted(MODELLED_MARKETS)))
+    dir_ = os.path.join(RESULTS_DIR, scenario)
     os.makedirs(dir_, exist_ok=True)
     i = len(os.listdir(dir_)) + 1
     fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")

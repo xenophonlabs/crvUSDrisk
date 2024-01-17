@@ -75,7 +75,8 @@ def simulate(
     }
 
     logger.info(
-        "Running %d simulations with %d steps at frequency %s",
+        "Running scenario %s with %d iterations with %d steps at frequency %s.",
+        config,
         num_iter,
         scenario_template.num_steps,
         scenario_template.freq,

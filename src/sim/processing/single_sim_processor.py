@@ -45,8 +45,7 @@ class SingleSimProcessor:
         self.oracles = scenario.oracles
         self.scenario = scenario
 
-        # Initial state
-        self.initial_state = self.update(scenario.pricepaths[0].timestamp)
+        self.initial_debts = self.controller_debts()
 
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """
@@ -79,21 +78,22 @@ class SingleSimProcessor:
         kwargs: Dict[str, Any] = {
             "healths": {},
             "debts": {},
-            "total_debt_controller": {},
+            "initial_debts": self.initial_debts,
+            "total_initial_debt": sum(self.initial_debts.values()),
         }
 
-        total = 0
         for controller in self.scenario.controllers:
             kwargs["healths"][controller.address] = controller_healths(controller)
-            debts = controller_debts(controller)
-            total_controller = debts.sum() / 1e18
-            kwargs["debts"][controller.address] = debts
-            kwargs["total_debt_controller"][controller.address] = total_controller
-            total += total_controller
-
-        kwargs["total_debt"] = total
+            kwargs["debts"][controller.address] = controller_debts(controller)
 
         return kwargs
+
+    def controller_debts(self) -> Dict[str, float]:
+        """Initial debt of each controller."""
+        return {
+            controller.address: controller.total_debt() / 1e18
+            for controller in self.scenario.controllers
+        }
 
     def process(self) -> SingleSimResults:
         """Process timeseries df into metrics result."""
