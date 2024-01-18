@@ -301,9 +301,9 @@ class LiquidityMetric(Metric):
         return val
 
 
-class MiscMetric(Metric):
+class DebtMetric(Metric):
     """
-    Miscellaneous metrics that are useful to look at and sanity check.
+    Track total debt in each Controller.
     """
 
     key_metric = "Total Debt"
@@ -313,10 +313,6 @@ class MiscMetric(Metric):
 
         for controller in self.scenario.controllers:
             cfg[f"{entity_str(controller, 'controller')} Total Debt"] = ["mean"]
-
-        for llamma in self.scenario.llammas:
-            cfg[f"{entity_str(llamma, 'llamma')} Price"] = ["mean"]
-            cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = ["mean"]
 
         return cfg
 
@@ -332,10 +328,63 @@ class MiscMetric(Metric):
 
         val["Total Debt"] = total_debt
 
+        return val
+
+
+class PriceMetric(Metric):
+    """
+    Track LLAMMA Oracle prices vs market prices.
+    """
+
+    key_metric = "Worst Oracle Error Pct"
+
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Worst Oracle Error Pct": ["max"]}
+
         for llamma in self.scenario.llammas:
+            cfg[f"{entity_str(llamma, 'llamma')} Price"] = []
+            cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = []
+            cfg[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = []
+
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
+        """Compute price errors."""
+        val = {}
+
+        errors = []
+        for llamma in self.scenario.llammas:
+            oracle_price = llamma.price_oracle() / 1e18
+            market_price = self.scenario.curr_price[llamma.COLLATERAL_TOKEN.address]
+            oracle_error_pct = abs(market_price - oracle_price) / oracle_price * 100
+            errors.append(oracle_error_pct)
             val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18
-            val[f"{entity_str(llamma, 'llamma')} Oracle Price"] = (
-                llamma.price_oracle() / 1e18
-            )
+            val[f"{entity_str(llamma, 'llamma')} Oracle Price"] = oracle_price
+            val[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = oracle_error_pct
+
+        val["Net Oracle Error Pct"] = max(errors)
 
         return val
+
+
+# class ProfitsMetric(Metric):
+#     """
+#     Compute the profits to LLAMMA from swaps.
+#     """
+
+#     key_metric = "Net LLAMMA Profit"
+
+#     def _config(self) -> Dict[str, List[str]]:
+#         cfg = {"Net LLAMMA Profit": ["mean"]}
+
+#         for llamma in self.scenario.llammas:
+#             cfg[f"LLAMMA Profit on {entity_str(llamma, 'llamma')}"] = ["mean"]
+
+#         return cfg
+
+#     def compute(self, **kwargs: dict) -> Dict[str, float]:
+#         val = {}
+#         profit = 0.
+#         for llamma in self.scenario.llammas:
+#             profit_ =
+#         return val

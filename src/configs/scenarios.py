@@ -35,6 +35,7 @@ BASE = {
         "end": 1704085200,
     },
     "liquidity": {"start": 1696132800, "end": 1704085200},
+    "subgraph_end_ts": 1705467600,
 }
 
 

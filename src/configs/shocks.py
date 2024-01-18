@@ -12,6 +12,7 @@ We shock four possible parameters:
 NEUTRAL = "neutral"
 ADVERSE = "adverse"
 SEVERE = "severe"
+VERY_SEVERE = "very severe"
 
 # Types
 LIQUIDITY = "liquidity"
@@ -99,19 +100,6 @@ SHOCK_DEBT_SEVERE = {
 
 SHOCK_VOL_ADVERSE = {
     "target": {
-        "WBTC": 1.211855,
-        "tBTC": 1.211855,
-        "WETH": 1.507219,
-        "sfrxETH": 1.507219,
-        "wstETH": 1.507219,
-    },
-    "type": VOL,
-    "tag": ADVERSE,
-    "description": "p95 intraday vol observed since 2020.",
-}
-
-SHOCK_VOL_SEVERE = {
-    "target": {
         "WBTC": 1.877968,
         "tBTC": 1.877968,
         "WETH": 2.445831,
@@ -119,8 +107,21 @@ SHOCK_VOL_SEVERE = {
         "wstETH": 2.445831,
     },
     "type": VOL,
-    "tag": SEVERE,
+    "tag": ADVERSE,
     "description": "p99 intraday vol observed since 2020.",
+}
+
+SHOCK_VOL_SEVERE = {
+    "target": {
+        "WBTC": 2.816952,
+        "tBTC": 2.816952,
+        "WETH": 3.6687465,
+        "sfrxETH": 3.6687465,
+        "wstETH": 3.6687465,
+    },
+    "type": VOL,
+    "tag": SEVERE,
+    "description": "50% worse than the adverse scenario. This is massive volatility.",
 }
 
 ### ========== Liquidity ========== ###
@@ -144,4 +145,11 @@ SHOCK_LIQUIDITY_SEVERE = {
     "type": LIQUIDITY,
     "tag": SEVERE,
     "description": "2x worse liquidity than the neutral scenario.",
+}
+
+SHOCK_LIQUIDITY_VERY_SEVERE = {
+    "target": 10.0,
+    "type": LIQUIDITY,
+    "tag": VERY_SEVERE,
+    "description": "4x worse liquidity than the neutral scenario.",
 }

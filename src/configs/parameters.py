@@ -26,4 +26,11 @@ at the Bad Debt in each controller to see if different collaterals can handle
 different increases.
 """
 
-DEBT_CEILING_SAMPLES = [0.5, 1.5, 2, 5, 10]
+DEBT_CEILING_MULTIPLIER_SAMPLES = [2, 5, 10]
+
+### ============ Loan and Liquidation Discounts ============ ###
+
+# pylint: disable=pointless-string-statement
+"""
+Methodology: 
+"""

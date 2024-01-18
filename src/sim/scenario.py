@@ -60,6 +60,7 @@ class Scenario:
         self.name: str = config["name"]
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
+        self.subgraph_end_ts = config["subgraph_end_ts"]
 
         self.price_config = get_price_config(
             self.freq, self.config["prices"]["start"], self.config["prices"]["end"]
@@ -90,6 +91,8 @@ class Scenario:
         self.liquidity_config = get_liquidity_config(
             config["liquidity"]["start"], config["liquidity"]["end"]
         )
+
+        self.curr_price = self.pricepaths[0]
 
     @property
     def arbed_pools(self) -> list:
@@ -179,7 +182,10 @@ class Scenario:
             logger.info("Fetching %s market from subgraph", market_name)
 
             sim_market = get(
-                market_name, bands_data="controller", use_simple_oracle=False
+                market_name,
+                bands_data="controller",
+                use_simple_oracle=False,
+                end_ts=self.subgraph_end_ts,
             )
 
             metadata = sim_market.pool.metadata
@@ -430,6 +436,9 @@ class Scenario:
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
+        for llamma in self.llammas:
+            llamma.reset_admin_fees()
+
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
         self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
@@ -509,8 +518,11 @@ class Scenario:
 
         sample.prices_usd[CRVUSD_DTO.address] = self.aggregator.price() / 1e18
 
+        self.curr_price = sample
+
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
+        assert prices is self.curr_price  # Check we have prepared for trades
         self.arbitrageur.arbitrage(self.cycles, prices)
         self.liquidator.perform_liquidations(self.controllers, prices)
         self.keeper.update(self.peg_keepers)
