@@ -3,7 +3,8 @@
 scenarios=(
     "baseline" 
     "adverse vol" 
-    "severe vol" "adverse drift"
+    "severe vol" 
+    "adverse drift"
     "severe drift"
     "adverse growth"
     "severe growth"

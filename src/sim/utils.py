@@ -120,7 +120,7 @@ def clear_controller(controller: SimController) -> None:
         debt = controller._debt(user)[0]  # pylint: disable=protected-access
         if debt > 0:
             controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
-        controller.repay(debt, user)
+            controller.repay(debt, user)
         del controller.loan[user]
 
     for band in range(controller.AMM.min_band, controller.AMM.max_band):

@@ -250,7 +250,9 @@ class Scenario:
             reset_controller_price(controller)
             clear_controller(controller)
             ceiling = self.factory.debt_ceiling[controller.address]
-            target_debt = self.target_debt[ALIASES_LLAMMA[llamma.address]] * ceiling
+            target_debt = int(
+                self.target_debt[ALIASES_LLAMMA[llamma.address]] * ceiling
+            )
             while controller.total_debt() < target_debt:
                 borrower = Borrower()
                 success = borrower.create_loan(controller, self.kde[llamma.address])
@@ -258,7 +260,8 @@ class Scenario:
                     break
                 self.borrowers[borrower.address] = borrower
             leftover = controller.total_debt() - target_debt
-            controller.repay(leftover, borrower.address)
+            if success and leftover > 0:
+                controller.repay(leftover, borrower.address)
             llamma.price_oracle_contract.unfreeze()
             find_active_band(llamma)
             del self.kde[llamma.address]  # free up memory
