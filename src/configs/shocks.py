@@ -58,39 +58,38 @@ SHOCK_MU_SEVERE = {
 
 SHOCK_DEBT_NEUTRAL = {
     "target": {
-        "wsteth": 50_000_000,
-        "weth": 15_000_000,
-        "wbtc": 40_000_000,
-        "sfrxeth": 10_000_000,
+        "wsteth": 0.33,
+        "weth": 0.075,
+        "wbtc": 0.2,
+        "sfrxeth": 0.2,
     },
     "type": DEBT,
     "tag": NEUTRAL,
-    "description": "Average debt observed over Q4 2023 (total: 115M).",
+    "description": "Average debt observed over Q4 2023 as pct of debt ceiling (total: 115M).",
 }
 
 SHOCK_DEBT_ADVERSE = {
     "target": {
-        "wsteth": 75_000_000,
-        "weth": 25_000_000,
-        "wbtc": 55_000_000,
-        "sfrxeth": 15_000_000,
+        "wsteth": 0.5,
+        "weth": 0.125,
+        "wbtc": 0.275,
+        "sfrxeth": 0.3,
     },
     "type": DEBT,
     "tag": ADVERSE,
-    "description": "p99 debt oberserved over Q4 2023 (total: 170M).",
+    "description": "p99 debt oberserved over Q4 2023 as pct of debt ceiling (total: 170M).",
 }
 
 SHOCK_DEBT_SEVERE = {
     "target": {
-        "wsteth": 500_000_000,
-        "weth": 150_000_000,
-        "wbtc": 400_000_000,
-        "sfrxeth": 100_000_000,
+        "wsteth": 0.99,
+        "weth": 0.99,
+        "wbtc": 0.99,
+        "sfrxeth": 0.99,
     },
     "type": DEBT,
     "tag": SEVERE,
-    "description": "10x the average debt observed over Q4 2023 (total: 1.15B).",
-    # TODO need to increase debt ceiling for this one
+    "description": "99% of the current debt ceiling (total: 594M)",
 }
 
 

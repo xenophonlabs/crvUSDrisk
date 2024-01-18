@@ -30,7 +30,7 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
         stableswap_seen[spool.address] = spool
 
     for sim_market in sim_markets[1:]:
-        debt_ceiling = sim_market.stablecoin.balanceOf[sim_market.controller.address]
+        debt_ceiling = sim_market.factory.debt_ceiling[sim_market.controller.address]
 
         # Top-level objects
         sim_market.stablecoin = master_stablecoin
@@ -78,6 +78,9 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
             sim_market.policy,
             sim_market.collateral_token,
             debt_ceiling,
+        )
+        master_stablecoin.burnFrom(
+            sim_market.controller.address, sim_market.controller.total_debt()
         )
 
     validate_binds(sim_markets)

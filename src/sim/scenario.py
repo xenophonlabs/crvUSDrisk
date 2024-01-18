@@ -249,7 +249,8 @@ class Scenario:
             llamma.price_oracle_contract.freeze()
             reset_controller_price(controller)
             clear_controller(controller)
-            target_debt = int(self.target_debt[ALIASES_LLAMMA[llamma.address]] * 1e18)
+            ceiling = self.factory.debt_ceiling[controller.address]
+            target_debt = self.target_debt[ALIASES_LLAMMA[llamma.address]] * ceiling
             while controller.total_debt() < target_debt:
                 borrower = Borrower()
                 success = borrower.create_loan(controller, self.kde[llamma.address])
