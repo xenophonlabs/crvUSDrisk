@@ -33,7 +33,7 @@ KNOWN_IDS_MAP = {
 
 
 MAX_RETRIES = 8
-TIMEOUT = 10
+TIMEOUT = 30
 
 
 @retry(
