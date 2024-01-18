@@ -355,7 +355,9 @@ class PriceMetric(Metric):
         errors = []
         for llamma in self.scenario.llammas:
             oracle_price = llamma.price_oracle() / 1e18
-            market_price = self.scenario.curr_price[llamma.COLLATERAL_TOKEN.address]
+            market_price = self.scenario.curr_price.prices_usd[
+                llamma.COLLATERAL_TOKEN.address
+            ]
             oracle_error_pct = abs(market_price - oracle_price) / oracle_price * 100
             errors.append(oracle_error_pct)
             val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18

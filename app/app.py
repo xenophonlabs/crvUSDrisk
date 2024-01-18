@@ -472,7 +472,7 @@ def _generate_content(output: MonteCarloResults):
                                         dbc.Select(
                                             options=aggregate_columns,
                                             id="aggregate-metric-dropdown",
-                                            value="System Health Mean",
+                                            value="System Health Min",
                                         ),
                                         width=4,
                                     ),

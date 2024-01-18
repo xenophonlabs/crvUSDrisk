@@ -166,11 +166,6 @@ class ExternalMarket:
         -------
         int or List[int]
             The price_impact for given trade.
-
-        TODO this should account for trades that happened "recently".
-        Maybe there's a "half-life" at which liquidity replenishes. Mean
-        reverting process: learn the speed of mean-reversion (which is
-        basically a half-life measure). Implement this on the "price" attr.
         """
         model = self.models[i][j]
         x = np.clip(
