@@ -7,6 +7,7 @@ We shock four possible parameters:
 - Total debt in the system
 - Debt : crvUSD liquidity ratio
 """
+from .tokens import WETH, WSTETH, SFRXETH, WBTC, TBTC
 
 # Tags
 NEUTRAL = "neutral"
@@ -19,6 +20,7 @@ LIQUIDITY = "liquidity"
 DEBT = "debt"
 MU = "mu"
 VOL = "vol"
+JUMP = "jump"
 
 ### ============ Mu ============ ###
 
@@ -152,4 +154,24 @@ SHOCK_LIQUIDITY_VERY_SEVERE = {
     "type": LIQUIDITY,
     "tag": VERY_SEVERE,
     "description": "4x worse liquidity than the neutral scenario.",
+}
+
+### ============ Jumps ============ ###
+
+SHOCK_FLASH_CRASH = {
+    "target": {
+        "type": "flash_crash",
+        "coins_j": [WETH, WSTETH, SFRXETH, WBTC, TBTC],
+        "mu_j": [-0.074193, -0.074193, -0.074193, -0.061255, -0.061255],
+        "cov_j": [
+            [0.00095642, 0.00095642, 0.00095642, 0.00083179, 0.00083179],
+            [0.00095642, 0.00095642, 0.00095642, 0.00083179, 0.00083179],
+            [0.00095642, 0.00095642, 0.00095642, 0.00083179, 0.00083179],
+            [0.00083179, 0.00083179, 0.00083179, 0.00072339, 0.00072339],
+            [0.00083179, 0.00083179, 0.00083179, 0.00072339, 0.00072339],
+        ],
+    },
+    "type": JUMP,
+    "tag": SEVERE,
+    "description": "Enforce a 20x std flash crash on all collateral assets.",
 }

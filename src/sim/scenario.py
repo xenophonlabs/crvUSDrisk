@@ -66,12 +66,11 @@ class Scenario:
             self.freq, self.config["prices"]["start"], self.config["prices"]["end"]
         )
 
-        self.target_debt: Dict[
-            str, float
-        ] | None = None  # must be set by scenario shocks!
-        self.target_liquidity_ratio: float | None = (
-            None  # must be set by scenario shocks!
-        )
+        # Shocks | Must be set by scenario shocks!
+        self.jump_params: dict = {}
+        self.target_debt: Dict[str, float] = {}
+        self.target_liquidity_ratio: float = 0.0
+
         self.apply_shocks()
 
         self.generate_sim_market()  # must be first
@@ -153,7 +152,9 @@ class Scenario:
         """
         Generate the pricepaths for the scenario.
         """
-        self.pricepaths: PricePaths = PricePaths(self.num_steps, self.price_config)
+        self.pricepaths: PricePaths = PricePaths(
+            self.num_steps, self.price_config, self.jump_params
+        )
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
@@ -335,15 +336,19 @@ class Scenario:
         """Apply the scenario shocks."""
         for shock in self.config["shocks"]:
             if shock["type"] == "mu":
-                self.shock_mu(shock)
+                self._shock_mu(shock)
             elif shock["type"] == "debt":
-                self.shock_debt(shock)
+                self._shock_debt(shock)
             elif shock["type"] == "liquidity":
-                self.shock_debt_liquidity_ratio(shock)
+                self._shock_debt_liquidity_ratio(shock)
             elif shock["type"] == "vol":
-                self.shock_vol(shock)
+                self._shock_vol(shock)
+            elif shock["type"] == "jump":
+                self._shock_jumps(shock)
+            else:
+                raise ValueError(f"Unknown shock type {shock['type']}.")
 
-    def shock_mu(self, shock: dict) -> None:
+    def _shock_mu(self, shock: dict) -> None:
         """
         Shocks the drift for collateral price GBMs.
         """
@@ -352,13 +357,13 @@ class Scenario:
                 token = TOKEN_DTOs[COINGECKO_IDS_INV[k]]
                 v["mu"] = shock["target"][token.symbol]
 
-    def shock_debt_liquidity_ratio(self, shock: dict) -> None:
+    def _shock_debt_liquidity_ratio(self, shock: dict) -> None:
         """
         Shocks the ratio of Debt : crvUSD Liquidity.
         """
         self.target_liquidity_ratio = shock["target"]
 
-    def shock_vol(self, shock: dict) -> None:
+    def _shock_vol(self, shock: dict) -> None:
         """
         Shocks the volatility for collateral price GBMs.
         """
@@ -367,11 +372,17 @@ class Scenario:
                 token = TOKEN_DTOs[COINGECKO_IDS_INV[k]]
                 v["sigma"] = shock["target"][token.symbol]
 
-    def shock_debt(self, shock: dict) -> None:
+    def _shock_debt(self, shock: dict) -> None:
         """
         Shocks the total amount of debt in the system.
         """
         self.target_debt = shock["target"]
+
+    def _shock_jumps(self, shock: dict) -> None:
+        """
+        Unpack the jump config.
+        """
+        self.jump_params = shock["target"]
 
     ### ========== Scenario Execution ========== ###
 

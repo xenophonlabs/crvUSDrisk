@@ -23,6 +23,7 @@ from .shocks import (
     SHOCK_MU_NEUTRAL,
     SHOCK_DEBT_NEUTRAL,
     SHOCK_LIQUIDITY_NEUTRAL,
+    SHOCK_FLASH_CRASH,
 )
 
 BASE = {
@@ -63,6 +64,7 @@ def make_scenario(shocks: list, name: str) -> dict:
 
 
 SCENARIO_SHOCKS: Dict[str, list] = {
+    # Base Scenarios
     "Baseline": [],
     "Adverse vol": [SHOCK_VOL_ADVERSE],
     "Severe vol": [SHOCK_VOL_SEVERE],
@@ -72,6 +74,8 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     "Severe Growth": [SHOCK_DEBT_SEVERE],
     "Adverse crvUSD Liquidity": [SHOCK_LIQUIDITY_ADVERSE],
     "Severe crvUSD Liquidity": [SHOCK_LIQUIDITY_SEVERE],
+    "Flash crash": [SHOCK_FLASH_CRASH],
+    # Severe Vol Composites
     "Severe vol and adverse drift": [SHOCK_VOL_SEVERE, SHOCK_MU_ADVERSE],
     "Severe vol and severe drift": [SHOCK_VOL_SEVERE, SHOCK_MU_SEVERE],
     "Severe vol and adverse growth": [SHOCK_VOL_SEVERE, SHOCK_DEBT_ADVERSE],
@@ -82,6 +86,17 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     ],
     "Severe vol and severe crvUSD liquidity": [
         SHOCK_VOL_SEVERE,
+        SHOCK_LIQUIDITY_SEVERE,
+    ],
+    # Flash Crash Composites
+    "Flash crash and adverse growth": [SHOCK_FLASH_CRASH, SHOCK_DEBT_ADVERSE],
+    "Flash crash and severe growth": [SHOCK_FLASH_CRASH, SHOCK_DEBT_SEVERE],
+    "Flash crash and adverse crvUSD liquidity": [
+        SHOCK_FLASH_CRASH,
+        SHOCK_LIQUIDITY_ADVERSE,
+    ],
+    "Flash crash and severe crvUSD liquidity": [
+        SHOCK_FLASH_CRASH,
         SHOCK_LIQUIDITY_SEVERE,
     ],
 }

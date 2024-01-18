@@ -63,7 +63,7 @@ class PricePaths:
     and implements an iterator over `PriceSample`s.
     """
 
-    def __init__(self, num_steps: int, config: dict):
+    def __init__(self, num_steps: int, config: dict, jump_params: dict):
         """
         Generate price paths from config file.
         TODO integrate with curvesim PriceSampler?
@@ -84,6 +84,7 @@ class PricePaths:
             config["params"],
             timestamps=True,
             gran=get_gran(freq),
+            jump_params=jump_params,
         )
 
         self.T = num_steps * dt
