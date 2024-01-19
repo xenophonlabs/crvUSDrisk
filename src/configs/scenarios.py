@@ -23,7 +23,10 @@ from .shocks import (
     SHOCK_MU_NEUTRAL,
     SHOCK_DEBT_NEUTRAL,
     SHOCK_LIQUIDITY_NEUTRAL,
-    SHOCK_FLASH_CRASH,
+    SHOCK_FLASH_CRASH_ADVERSE,
+    SHOCK_FLASH_CRASH_SEVERE,
+    SHOCK_DEPEG_ADVERSE,
+    SHOCK_DEPEG_SEVERE,
 )
 
 BASE = {
@@ -74,7 +77,10 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     "Severe Growth": [SHOCK_DEBT_SEVERE],
     "Adverse crvUSD Liquidity": [SHOCK_LIQUIDITY_ADVERSE],
     "Severe crvUSD Liquidity": [SHOCK_LIQUIDITY_SEVERE],
-    "Flash crash": [SHOCK_FLASH_CRASH],
+    "Adverse flash crash": [SHOCK_FLASH_CRASH_ADVERSE],
+    "Severe flash crash": [SHOCK_FLASH_CRASH_SEVERE],
+    "Adverse depeg": [SHOCK_DEPEG_ADVERSE],
+    "Severe depeg": [SHOCK_DEPEG_SEVERE],
     # Severe Vol Composites
     "Severe vol and adverse drift": [SHOCK_VOL_SEVERE, SHOCK_MU_ADVERSE],
     "Severe vol and severe drift": [SHOCK_VOL_SEVERE, SHOCK_MU_SEVERE],
@@ -89,16 +95,25 @@ SCENARIO_SHOCKS: Dict[str, list] = {
         SHOCK_LIQUIDITY_SEVERE,
     ],
     # Flash Crash Composites
-    "Flash crash and adverse growth": [SHOCK_FLASH_CRASH, SHOCK_DEBT_ADVERSE],
-    "Flash crash and severe growth": [SHOCK_FLASH_CRASH, SHOCK_DEBT_SEVERE],
-    "Flash crash and adverse crvUSD liquidity": [
-        SHOCK_FLASH_CRASH,
+    "Adverse flash crash and adverse growth": [
+        SHOCK_FLASH_CRASH_ADVERSE,
+        SHOCK_DEBT_ADVERSE,
+    ],
+    "Adverse flash crash and severe growth": [
+        SHOCK_FLASH_CRASH_ADVERSE,
+        SHOCK_DEBT_SEVERE,
+    ],
+    "Adverse flash crash and adverse crvUSD liquidity": [
+        SHOCK_FLASH_CRASH_ADVERSE,
         SHOCK_LIQUIDITY_ADVERSE,
     ],
-    "Flash crash and severe crvUSD liquidity": [
-        SHOCK_FLASH_CRASH,
+    "Adverse flash crash and severe crvUSD liquidity": [
+        SHOCK_FLASH_CRASH_ADVERSE,
         SHOCK_LIQUIDITY_SEVERE,
     ],
+    # Depeg Composites
+    # "Adverse depeg and adverse growth": [SHOCK_DEPEG_ADVERSE, SHOCK_DEBT_ADVERSE],
+    # "Adverse depeg and severe growth": [SHOCK_DEPEG_ADVERSE, SHOCK_DEBT_SEVERE],
 }
 
 SCENARIOS = {

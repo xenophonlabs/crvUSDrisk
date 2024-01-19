@@ -1,21 +1,29 @@
 #!/bin/bash
 
 scenarios=(
-    "baseline" 
-    "adverse vol" 
-    "severe vol" 
-    # "adverse drift"
-    # "severe drift"
-    "adverse growth"
-    "severe growth"
-    "adverse crvusd liquidity"
-    "severe crvusd liquidity"
-    # "severe vol and adverse drift"
-    # "severe vol and severe drift"
-    "severe vol and adverse growth"
-    "severe vol and severe growth"
-    "severe vol and adverse crvusd liquidity"
-    "severe vol and severe crvusd liquidity"
+    "baseline",
+    "adverse vol",
+    "severe vol",
+    # "adverse drift",
+    # "severe drift",
+    "adverse growth",
+    "severe growth",
+    "adverse crvusd liquidity",
+    "severe crvusd liquidity",
+    "adverse flash crash",
+    "severe flash crash",
+    "adverse depeg",
+    "severe depeg",
+    # "severe vol and adverse drift",
+    # "severe vol and severe drift",
+    "severe vol and adverse growth",
+    "severe vol and severe growth",
+    "severe vol and adverse crvusd liquidity",
+    "severe vol and severe crvusd liquidity",
+    "adverse flash crash and adverse growth",
+    "adverse flash crash and severe growth",
+    "adverse flash crash and adverse crvusd liquidity",
+    "adverse flash crash and severe crvusd liquidity"
 )
 num_iters=100
 num_runs=5

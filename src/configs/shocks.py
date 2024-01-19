@@ -7,7 +7,7 @@ We shock four possible parameters:
 - Total debt in the system
 - Debt : crvUSD liquidity ratio
 """
-from .tokens import WETH, WSTETH, SFRXETH, WBTC, TBTC
+from .tokens import WETH, WSTETH, SFRXETH, WBTC, TBTC, USDC
 
 # Tags
 NEUTRAL = "neutral"
@@ -158,7 +158,26 @@ SHOCK_LIQUIDITY_VERY_SEVERE = {
 
 ### ============ Jumps ============ ###
 
-SHOCK_FLASH_CRASH = {
+SHOCK_FLASH_CRASH_ADVERSE = {
+    "target": {
+        "type": "flash_crash",
+        "coins_j": [WETH, WSTETH, SFRXETH, WBTC, TBTC],
+        "mu_j": [-0.022666, -0.022666, -0.022666, -0.018658, -0.018658],
+        "cov_j": [
+            [0.00017597, 0.00017597, 0.00017597, 0.00014909, 0.00014909],
+            [0.00017597, 0.00017597, 0.00017597, 0.00014909, 0.00014909],
+            [0.00017597, 0.00017597, 0.00017597, 0.00014909, 0.00014909],
+            [0.00014909, 0.00014909, 0.00014909, 0.00012631, 0.00012631],
+            [0.00014909, 0.00014909, 0.00014909, 0.00012631, 0.00012631],
+        ],
+    },
+    "type": JUMP,
+    "tag": ADVERSE,
+    "description": "Enforce a 5x std flash crash on all collateral assets.",
+}
+
+
+SHOCK_FLASH_CRASH_SEVERE = {
     "target": {
         "type": "flash_crash",
         "coins_j": [WETH, WSTETH, SFRXETH, WBTC, TBTC],
@@ -174,4 +193,26 @@ SHOCK_FLASH_CRASH = {
     "type": JUMP,
     "tag": SEVERE,
     "description": "Enforce a 20x std flash crash on all collateral assets.",
+}
+
+SHOCK_DEPEG_ADVERSE = {
+    "target": {
+        "type": "depeg",
+        "coins_j": [USDC],
+        "size": -0.2,
+    },
+    "type": JUMP,
+    "tag": ADVERSE,
+    "description": "Enforce a 20% depeg on USDC.",
+}
+
+SHOCK_DEPEG_SEVERE = {
+    "target": {
+        "type": "depeg",
+        "coins_j": [USDC],
+        "size": -0.99,
+    },
+    "type": JUMP,
+    "tag": SEVERE,
+    "description": "Enforce a 99% depeg on USDC.",
 }

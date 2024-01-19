@@ -342,9 +342,9 @@ class PriceMetric(Metric):
         cfg = {"Worst Oracle Error Pct": ["max"]}
 
         for llamma in self.scenario.llammas:
-            cfg[f"{entity_str(llamma, 'llamma')} Price"] = []
-            cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = []
-            cfg[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = []
+            cfg[f"{entity_str(llamma, 'llamma')} Price"] = ["mean"]
+            cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = ["mean"]
+            cfg[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = ["max"]
 
         return cfg
 
@@ -364,7 +364,7 @@ class PriceMetric(Metric):
             val[f"{entity_str(llamma, 'llamma')} Oracle Price"] = oracle_price
             val[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = oracle_error_pct
 
-        val["Net Oracle Error Pct"] = max(errors)
+        val["Worst Oracle Error Pct"] = max(errors)
 
         return val
 

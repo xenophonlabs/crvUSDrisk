@@ -315,6 +315,7 @@ def gen_ou(
     S0: float,
     N: int,
     dW: np.ndarray | None = None,
+    jump_size: float = 0.0,
 ) -> np.ndarray:
     """
     Generate an Ornstein-Uhlenbeck process.
@@ -336,6 +337,8 @@ def gen_ou(
         Number of steps to simulate.
     dW : np.array | None
         Correlated Wiener process.
+    jump_size: float
+        Size of jump. Not in log form.
 
     Returns
     -------
@@ -348,11 +351,16 @@ def gen_ou(
     # Pre-calculate constants
     exp_minus_theta_dt = np.exp(-theta * dt)
     sqrt_variance_dt = np.sqrt((1 - np.exp(-2 * theta * dt)) / (2 * theta))
+    midpoint = N // 2
     for t in range(1, N):
+        jump = 0.0
+        if t == midpoint:
+            jump = jump_size
         S[t] = (
             S[t - 1] * exp_minus_theta_dt
             + mu * (1 - exp_minus_theta_dt)
             + sigma * sqrt_variance_dt * dW[t - 1]
+            + jump
         )
     return S
 
@@ -481,6 +489,11 @@ def gen_cor_prices(
             jump_sizes = {
                 c: jump_sizes[i] for i, c in enumerate(jump_params["coins_j"])
             }
+        elif jump_params["type"] == "depeg":
+            jump_sizes = np.array([jump_params["size"]])
+            jump_sizes = {
+                c: jump_sizes[i] for i, c in enumerate(jump_params["coins_j"])
+            }
         else:
             raise NotImplementedError
 
@@ -491,13 +504,19 @@ def gen_cor_prices(
                 params[coin]["mu"],
                 params[coin]["sigma"],
             )
-            S[:, i] = gen_ou(theta, mu, sigma, dt, S0s[coin], N)
+            jump_size = 0.0
+            if (
+                jump_params
+                and jump_params["type"] == "depeg"
+                and COINGECKO_IDS_INV[coin] in jump_params["coins_j"]
+            ):
+                jump_size = jump_sizes[COINGECKO_IDS_INV[coin]]
+            S[:, i] = gen_ou(theta, mu, sigma, dt, S0s[coin], N, jump_size=jump_size)
         else:
             mu, sigma = params[coin]["mu"], params[coin]["sigma"]
             jump_size = 1.0
             if jump_params and jump_params["type"] == "flash_crash":
                 jump_size = jump_sizes[COINGECKO_IDS_INV[coin]]
-                assert 0 < jump_size < 1  # downward jump
             S[:, i] = gen_gbm(
                 mu, sigma, dt, S0s[coin], N, dW_correlated[:, i], jump_size=jump_size
             )
