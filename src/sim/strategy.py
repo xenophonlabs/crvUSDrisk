@@ -24,7 +24,6 @@ class Strategy:
     def __call__(
         self,
         scenario: Scenario,
-        parameters: dict,
         i: int | None = None,
     ) -> SingleSimResults:
         """

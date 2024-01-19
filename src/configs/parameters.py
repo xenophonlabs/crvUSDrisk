@@ -1,13 +1,28 @@
 """
 Provides the configs for simulating alternate
-parameter sets. Parameters we test:
+parameter sets and the functions required to
+enforce parameter changes.
+
+Parameters we currently test:
 
 - Market Debt ceilings
 - Loan and Liquidation Discounts
 - Oracle chainlink limits
-- PK Debt ceilings
 - LLAMMA fees
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..sim import Scenario
+
+DEBT_CEILING = "debt_ceiling"
+CHAINLINK_LIMIT = "chainlink_limit"
+
+MODELED_PARAMETERS = [
+    DEBT_CEILING,
+    CHAINLINK_LIMIT,
+]
 
 ### ============ Debt Ceilings ============ ###
 
@@ -26,7 +41,8 @@ at the Bad Debt in each controller to see if different collaterals can handle
 different increases.
 """
 
-DEBT_CEILING_MULTIPLIER_SAMPLES = [2, 5, 10]
+DEBT_CEILING_SAMPLES = [1, 2, 5, 10]
+DEBT_CEILING_SWEEP = [{DEBT_CEILING: sample} for sample in DEBT_CEILING_SAMPLES]
 
 ### ============ Loan and Liquidation Discounts ============ ###
 
@@ -34,3 +50,15 @@ DEBT_CEILING_MULTIPLIER_SAMPLES = [2, 5, 10]
 """
 Methodology: 
 """
+
+### ============ Functions ============ ###
+
+
+def set_debt_ceilings(scenario: Scenario, target: float) -> None:
+    """
+    Multiplies the debt ceiling of the input controller.
+    """
+    for controller in scenario.controllers:
+        debt_ceiling = controller.FACTORY.debt_ceiling[controller.address]
+        new_debt_ceiling = int(debt_ceiling * target)
+        controller.FACTORY.set_debt_ceiling(controller.address, new_debt_ceiling)

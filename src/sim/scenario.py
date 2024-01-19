@@ -2,7 +2,7 @@
 Provides the `Scenario` class for running simulations.
 """
 
-from typing import List, Tuple, Set, cast, Dict
+from typing import List, Tuple, Set, cast, Dict, Any
 from itertools import combinations
 from datetime import datetime
 import pandas as pd
@@ -16,6 +16,7 @@ from .utils import (
     clear_controller,
     reset_controller_price,
     find_active_band,
+    parse_markets,
 )
 from ..prices import PriceSample, PricePaths
 from ..configs import (
@@ -26,9 +27,9 @@ from ..configs import (
     get_liquidity_config,
     CRVUSD_DTO,
     ALIASES_LLAMMA,
-    MODELLED_MARKETS,
 )
 from ..configs.tokens import WETH, WSTETH, SFRXETH, STABLE_CG_IDS, COINGECKO_IDS_INV
+from ..configs.parameters import DEBT_CEILING, set_debt_ceilings
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -48,15 +49,15 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, scenario: str, market_names: List[str]):
-        for alias in market_names.copy():
-            if alias[:2] == "0x":
-                alias = ALIASES_LLAMMA[alias]
-            assert alias.lower() in MODELLED_MARKETS, ValueError(
-                f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
-            )
-        self.market_names = market_names
+    def __init__(
+        self,
+        scenario: str,
+        market_names: List[str],
+        params: Dict[str, Any] | None = None,
+    ):
+        self.market_names = parse_markets(market_names)
         self.config = config = get_scenario_config(scenario)
+        self.params = params or {}
         self.name: str = config["name"]
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
@@ -177,6 +178,8 @@ class Scenario:
         """
         Generate the crvusd modules to simulate, including
         LLAMMAs, Controllers, StableSwap pools, etc.
+
+        Applies the input parameter changes.
         """
         sim_markets: List[SimMarketInstance] = []
         for market_name in self.market_names:
@@ -241,6 +244,9 @@ class Scenario:
             for pair in combinations(self.coins, 2)
             for sorted_pair in [sorted(pair)]
         ]
+
+        if DEBT_CEILING in self.params:
+            set_debt_ceilings(self, self.params[DEBT_CEILING])
 
     def resample_debt(self) -> None:
         """

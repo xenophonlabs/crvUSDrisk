@@ -3,6 +3,23 @@ Provides utility functions for the simulation.
 """
 from typing import List
 from crvusdsim.pool import SimMarketInstance, SimController, SimLLAMMAPool
+from ..configs import ALIASES_LLAMMA, MODELLED_MARKETS
+
+
+def parse_markets(market_names: List[str]) -> List[str]:
+    """
+    Parse list of market names.
+    """
+    aliases = []
+    for alias in market_names:
+        alias = alias.lower()
+        if alias[:2] == "0x":
+            alias = ALIASES_LLAMMA[alias]
+        assert alias in MODELLED_MARKETS, ValueError(
+            f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
+        )
+        aliases.append(alias)
+    return aliases
 
 
 def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
