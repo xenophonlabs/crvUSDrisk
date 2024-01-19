@@ -1,28 +1,28 @@
 #!/bin/bash
 
 scenarios=(
-    "baseline",
-    "adverse vol",
-    "severe vol",
-    # "adverse drift",
-    # "severe drift",
-    "adverse growth",
-    "severe growth",
-    "adverse crvusd liquidity",
-    "severe crvusd liquidity",
-    "adverse flash crash",
-    "severe flash crash",
-    "adverse depeg",
-    "severe depeg",
-    # "severe vol and adverse drift",
-    # "severe vol and severe drift",
-    "severe vol and adverse growth",
-    "severe vol and severe growth",
-    "severe vol and adverse crvusd liquidity",
-    "severe vol and severe crvusd liquidity",
-    "adverse flash crash and adverse growth",
-    "adverse flash crash and severe growth",
-    "adverse flash crash and adverse crvusd liquidity",
+    "baseline"
+    "adverse vol"
+    "severe vol"
+    # "adverse drift"
+    # "severe drift"
+    "adverse growth"
+    "severe growth"
+    "adverse crvusd liquidity"
+    "severe crvusd liquidity"
+    "adverse flash crash"
+    "severe flash crash"
+    "adverse depeg"
+    "severe depeg"
+    # "severe vol and adverse drift"
+    # "severe vol and severe drift"
+    "severe vol and adverse growth"
+    "severe vol and severe growth"
+    "severe vol and adverse crvusd liquidity"
+    "severe vol and severe crvusd liquidity"
+    "adverse flash crash and adverse growth"
+    "adverse flash crash and severe growth"
+    "adverse flash crash and adverse crvusd liquidity"
     "adverse flash crash and severe crvusd liquidity"
 )
 num_iters=100
@@ -35,7 +35,7 @@ echo $log_file
 
 for (( i=1; i<=num_runs; i++ )); do
     for scenario in "${scenarios[@]}"; do
-        echo "Running Scenario: ${scenario}, run: ${i}"
+        echo "Running Scenario: ${scenario} run: ${i}"
         python3 -m scripts.sim "$scenario" "$num_iters" -mp &>> "$log_file"
     done
 done
