@@ -41,7 +41,8 @@ at the Bad Debt in each controller to see if different collaterals can handle
 different increases.
 """
 
-DEBT_CEILING_SAMPLES = [1, 2, 5, 10]
+# DEBT_CEILING_SAMPLES = [1, 2, 5, 10]
+DEBT_CEILING_SAMPLES = [2, 10]
 DEBT_CEILING_SWEEP = [{DEBT_CEILING: sample} for sample in DEBT_CEILING_SAMPLES]
 
 ### ============ Loan and Liquidation Discounts ============ ###

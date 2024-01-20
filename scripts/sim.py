@@ -31,7 +31,7 @@ def with_analysis(
     with cProfile.Profile() as pr:
         try:
             global output
-            output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+            output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
         except Exception:
             pdb.post_mortem()
     stats = pstats.Stats(pr)
@@ -49,7 +49,7 @@ def without_analysis(
     """
     start = datetime.now()
     global output
-    output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)
+    output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)

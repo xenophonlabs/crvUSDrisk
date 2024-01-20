@@ -6,7 +6,7 @@ import os
 import pickle
 from datetime import datetime
 from multiprocessing import cpu_count
-from src.sim import sweep
+from src.sim import simulate
 from src.logging import get_logger
 from src.sim.results import MonteCarloResults
 from src.configs import MODELLED_MARKETS
@@ -30,7 +30,9 @@ def run(
     Run simulation without any analysis.
     """
     start = datetime.now()
-    outputs = sweep(scenario, markets, num_iter=num_iter, ncpu=ncpu, to_sweep=to_sweep)
+    outputs = simulate(
+        scenario, markets, num_iter=num_iter, ncpu=ncpu, to_sweep=to_sweep
+    )
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)
@@ -74,8 +76,8 @@ scenarios = [
     "severe vol and severe growth"
     # "severe vol and adverse crvusd liquidity"
     # "severe vol and severe crvusd liquidity"
-    # "adverse flash crash and adverse growth"
-    # "adverse flash crash and severe growth"
+    "adverse flash crash and adverse growth"
+    "adverse flash crash and severe growth"
     # "adverse flash crash and adverse crvusd liquidity"
     # "adverse flash crash and severe crvusd liquidity"
 ]

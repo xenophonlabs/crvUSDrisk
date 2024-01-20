@@ -53,11 +53,9 @@ class Scenario:
         self,
         scenario: str,
         market_names: List[str],
-        params: Dict[str, Any] | None = None,
     ):
         self.market_names = parse_markets(market_names)
         self.config = config = get_scenario_config(scenario)
-        self.params = params or {}
         self.name: str = config["name"]
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
@@ -245,9 +243,6 @@ class Scenario:
             for sorted_pair in [sorted(pair)]
         ]
 
-        if DEBT_CEILING in self.params:
-            set_debt_ceilings(self, self.params[DEBT_CEILING])
-
     def resample_debt(self) -> None:
         """
         Setup borrowers for the scenario.
@@ -389,6 +384,16 @@ class Scenario:
         Unpack the jump config.
         """
         self.jump_params = shock["target"]
+
+    ### ========== Parameter Sweeps ========== ###
+
+    def apply_parameters(self, params: Dict[str, Any]) -> None:
+        """
+        Apply parameter changes.
+        """
+        for key, target in params.items():
+            if key == DEBT_CEILING:
+                set_debt_ceilings(self, target)
 
     ### ========== Scenario Execution ========== ###
 

@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 
 
 # pylint: disable=too-many-arguments, too-many-locals
-def sweep(
+def simulate(
     config: str,
     market_names: List[str],
     num_iter: int = 1,
@@ -70,88 +70,72 @@ def sweep(
     """
     metrics = metrics or DEFAULT_METRICS
     mcresults = []
-    to_sweep = to_sweep or []
+    to_sweep = to_sweep or [{}]
+
+    template = Scenario(config, market_names)  # shocks applied here
 
     for params in to_sweep:
-        mcresults.append(
-            simulate(config, market_names, num_iter, metrics, ncpu, params)
+        scenario_template = deepcopy(template)
+        scenario_template.apply_parameters(params)
+
+        if params:
+            for k in params:
+                assert k in MODELED_PARAMETERS, f"Invalid parameter type: {k}"
+            logger.info("Trying parameter set: %s", params)
+
+        metadata = {
+            "scenario": config,
+            "num_iter": num_iter,
+            "markets": market_names,
+            "num_steps": scenario_template.num_steps,
+            "freq": scenario_template.freq,
+            "template": scenario_template,
+            "params": params,
+        }
+
+        logger.info(
+            "Running scenario %s with %d iterations with %d steps at frequency %s.",
+            config,
+            num_iter,
+            scenario_template.num_steps,
+            scenario_template.freq,
         )
 
+        strategy = Strategy(metrics)
+        mcaggregator = MonteCarloProcessor(metadata)
+
+        if ncpu > 1:
+            mp.set_start_method("spawn", force=True)  # safer than `fork` on Unix
+            logger.info("Running simulation in parallel on %d cores", ncpu)
+            with multiprocessing_logging_queue() as logging_queue:
+                strategy_args_list: list = [
+                    (deepcopy(scenario_template), i + 1) for i in range(num_iter)
+                ]
+
+                wrapped_args_list = [
+                    (strategy, logging_queue, *args) for args in strategy_args_list
+                ]
+
+                with mp.Pool(ncpu) as pool:
+                    results = pool.starmap(worker, wrapped_args_list)
+                    pool.close()
+                    pool.join()
+
+                for result in results:
+                    if result:
+                        mcaggregator.collect(result)
+        else:
+            for i in range(num_iter):
+                scenario = deepcopy(scenario_template)
+                mcaggregator.collect(strategy(scenario, i + 1))
+
+        mcresult = mcaggregator.process()
+        # Force computation of summary to cache it
+        mcresult.summary  # pylint: disable=pointless-statement
+
+        mcresults.append(mcresult)
+
     return mcresults
-
-
-def simulate(
-    config: str,
-    market_names: List[str],
-    num_iter: int = 1,
-    metrics: List[Type[Metric]] | None = None,
-    ncpu: int = mp.cpu_count(),
-    params: Dict[str, Any] | None = None,
-) -> MonteCarloResults:
-    """
-    Run a simulation scenario for given parameters.
-    """
-    metrics = metrics or DEFAULT_METRICS
-
-    if params:
-        for k in params:
-            assert k in MODELED_PARAMETERS, f"Invalid parameter type: {k}"
-        logger.info("Trying parameter set: %s", params)
-
-    # TODO would be better to only init the scenario once,
-    # and then deepcopy/modify with parameters.
-    scenario_template = Scenario(config, market_names, params)  # shocks applied here
-
-    metadata = {
-        "scenario": config,
-        "num_iter": num_iter,
-        "markets": market_names,
-        "num_steps": scenario_template.num_steps,
-        "freq": scenario_template.freq,
-        "template": scenario_template,
-        "params": params,
-    }
-
-    logger.info(
-        "Running scenario %s with %d iterations with %d steps at frequency %s.",
-        config,
-        num_iter,
-        scenario_template.num_steps,
-        scenario_template.freq,
-    )
-
-    strategy = Strategy(metrics)
-    mcaggregator = MonteCarloProcessor(metadata)
-
-    if ncpu > 1:
-        mp.set_start_method("spawn", force=True)  # safer than `fork` on Unix
-        logger.info("Running simulation in parallel on %d cores", ncpu)
-        with multiprocessing_logging_queue() as logging_queue:
-            strategy_args_list: list = [
-                (deepcopy(scenario_template), i + 1) for i in range(num_iter)
-            ]
-
-            wrapped_args_list = [
-                (strategy, logging_queue, *args) for args in strategy_args_list
-            ]
-
-            with mp.Pool(ncpu) as pool:
-                results = pool.starmap(worker, wrapped_args_list)
-                pool.close()
-                pool.join()
-
-            for result in results:
-                if result:
-                    mcaggregator.collect(result)
-    else:
-        for i in range(num_iter):
-            scenario = deepcopy(scenario_template)
-            mcaggregator.collect(strategy(scenario, i + 1))
-
-    mcresult = mcaggregator.process()
-    # Force computation of summary to cache it
-    mcresult.summary  # pylint: disable=pointless-statement
-    return mcresult
 
 
 def worker(

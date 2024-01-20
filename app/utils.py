@@ -53,7 +53,7 @@ def run_sim(scenario: str, markets: List[str], num_iter: int) -> MonteCarloResul
     Run the simulation with the input parameters and return the output object
     """
     start = datetime.now()
-    output = simulate(scenario, markets, num_iter=num_iter, ncpu=cpu_count())
+    output = simulate(scenario, markets, num_iter=num_iter, ncpu=cpu_count())[0]
     end = datetime.now()
     diff = end - start
     logger.info("Done. Total runtime: %s", diff)
