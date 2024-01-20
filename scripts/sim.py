@@ -1,12 +1,8 @@
 """
-Script to run a Monte Carlo simulation.
+Script to run a parameter sweep.
 """
-from typing import List
+from typing import List, Dict, Any
 import os
-import cProfile
-import pstats
-import pdb
-import argparse
 import pickle
 from datetime import datetime
 from multiprocessing import cpu_count
@@ -14,6 +10,7 @@ from src.sim import simulate
 from src.logging import get_logger
 from src.sim.results import MonteCarloResults
 from src.configs import MODELLED_MARKETS
+from src.configs.parameters import DEBT_CEILING_SWEEP
 
 logger = get_logger(__name__)
 
@@ -22,91 +19,88 @@ RESULTS_DIR = os.path.join(BASE_DIR, "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
-def with_analysis(
-    scenario: str, markets: List[str], num_iter: int, ncpu: int
-) -> MonteCarloResults:
-    """
-    Run simulation with profiling and debugging.
-    """
-    with cProfile.Profile() as pr:
-        try:
-            global output
-            output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
-        except Exception:
-            pdb.post_mortem()
-    stats = pstats.Stats(pr)
-    stats.sort_stats(pstats.SortKey.CUMULATIVE)
-    stats.print_stats()
-    stats.dump_stats("./logs/sim.prof")
-    return output
-
-
-def without_analysis(
-    scenario: str, markets: List[str], num_iter: int, ncpu: int
-) -> MonteCarloResults:
+def run(
+    scenario: str,
+    markets: List[str],
+    num_iter: int,
+    ncpu: int,
+    to_sweep: List[Dict[str, Any]],
+) -> List[MonteCarloResults]:
     """
     Run simulation without any analysis.
     """
     start = datetime.now()
-    global output
-    output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
+    outputs = simulate(
+        scenario, markets, num_iter=num_iter, ncpu=ncpu, to_sweep=to_sweep
+    )
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)
-    return output
+    return outputs
 
 
-def analysis_help() -> None:
+def save(
+    scenario: str,
+    swept_var: str,
+    swept_val: Any,
+    output: MonteCarloResults,
+) -> None:
     """
-    Help for analysis.
+    Save scenario results.
     """
-    print("Call `output.summary` for a DF of summary metrics.")
-    print("Call `output.plot_runs(<metric_id>)` to plot the input metric for all runs.")
-    print("Call `output.metric_map` to get a list of metrics and their ids.")
-    print("Call `output.plot_summary()` to plot histograms of summary metrics.")
-    print("Call `output.data[i].plot_prices()` to plot the prices used for run `i`.")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate price config for sim.")
-    parser.add_argument(
-        "scenario", type=str, help="Scenario to simulate (from src/configs/scenarios)."
-    )
-    parser.add_argument("num_iter", type=int, help="Number of runs.", default=10)
-    parser.add_argument(
-        "-mp",
-        "--multiprocess",
-        action="store_true",
-        help="Multiprocess?",
-        required=False,
-    )
-    parser.add_argument(
-        "-a",
-        "--analysis",
-        action="store_true",
-        help="Analyze Runtime?",
-        required=False,
-    )
-    args = parser.parse_args()
-
-    scenario = args.scenario
-    num_iter = args.num_iter
-
-    if args.multiprocess:
-        ncpu = cpu_count()
-    else:
-        ncpu = 1
-
-    if args.analysis:
-        output = with_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
-    else:
-        output = without_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
-
-    logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
-
-    dir_ = os.path.join(RESULTS_DIR, scenario)
+    dir_ = os.path.join(RESULTS_DIR, f"sweep_{swept_var}_{swept_val}", scenario)
     os.makedirs(dir_, exist_ok=True)
     i = len(os.listdir(dir_)) + 1
-    fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")
+    fn = os.path.join(dir_, f"results_{i}.pkl")
     with open(fn, "wb") as f:
         pickle.dump(output, f)
+
+
+scenarios = [
+    # "baseline",
+    # "adverse vol",
+    "severe vol",
+    # # "adverse drift",
+    # # "severe drift",
+    # "adverse growth",
+    # "severe growth",
+    # "adverse crvusd liquidity",
+    # "severe crvusd liquidity",
+    # "adverse flash crash",
+    # "severe flash crash",
+    # "adverse depeg",
+    # "severe depeg",
+    # # "severe vol and adverse drift",
+    # # "severe vol and severe drift",
+    "severe vol and adverse growth",
+    "severe vol and severe growth",
+    # "severe vol and adverse crvusd liquidity",
+    # "severe vol and severe crvusd liquidity",
+    "adverse flash crash and adverse growth",
+    "adverse flash crash and severe growth",
+    # "adverse flash crash and adverse crvusd liquidity",
+    # "adverse flash crash and severe crvusd liquidity",
+]
+
+to_sweep = DEBT_CEILING_SWEEP
+
+if __name__ == "__main__":
+    num_iter = 100
+    num_rounds = 3
+    ncpu = cpu_count()
+
+    for _ in range(num_rounds):
+        for scenario in scenarios:
+            try:
+                outputs = run(
+                    scenario, MODELLED_MARKETS, num_iter, ncpu, to_sweep=to_sweep
+                )
+                for output, params in zip(outputs, to_sweep):
+                    assert len(params) == 1, "Only handle sweeping one param at a time."
+                    swept_var = list(params.keys())[0]
+                    swept_val = params[swept_var]
+                    save(scenario, swept_var, swept_val, output)
+            except Exception as e:
+                logger.critical("Failed scenario %s", scenario)
+
+    logger.info("Done.")
