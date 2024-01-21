@@ -17,9 +17,10 @@ scenarios = [
     "severe vol and severe growth",
 ]
 
-sweep(
-    "debt_ceilings",
-    scenarios,
-    num_iter=250,
-    to_sweep=DEBT_CEILING_SWEEP,
-)
+if __name__ == "__main__":
+    sweep(
+        "debt_ceilings",
+        scenarios,
+        num_iter=250,
+        to_sweep=DEBT_CEILING_SWEEP,
+    )

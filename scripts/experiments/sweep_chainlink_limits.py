@@ -13,9 +13,10 @@ scenarios = [
     "severe vol and very severe crvUSD liquidity",
 ]
 
-sweep(
-    "chainlink_limits",
-    scenarios,
-    num_iter=250,
-    to_sweep=CHAINLINK_LIMIT_SWEEP,
-)
+if __name__ == "__main__":
+    sweep(
+        "chainlink_limits",
+        scenarios,
+        num_iter=250,
+        to_sweep=CHAINLINK_LIMIT_SWEEP,
+    )

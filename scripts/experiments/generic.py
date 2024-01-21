@@ -39,9 +39,10 @@ scenarios = [
     # "adverse flash crash and severe crvusd liquidity",
 ]
 
-sweep(
-    "generic",
-    scenarios,
-    num_iter=250,
-    to_sweep=[{}],
-)
+if __name__ == "__main__":
+    sweep(
+        "generic",
+        scenarios,
+        num_iter=250,
+        to_sweep=[{}],
+    )
