@@ -68,6 +68,8 @@ def simulate(
     List[MetricsResult]
         A list of objects containing simulation results for each parameter set.
     """
+    logger.info("Running scenario %s with %d iterations.", config, num_iter)
+
     metrics = metrics or DEFAULT_METRICS
     mcresults = []
     to_sweep = to_sweep or [{}]
@@ -92,14 +94,6 @@ def simulate(
             "template": scenario_template,
             "params": params,
         }
-
-        logger.info(
-            "Running scenario %s with %d iterations with %d steps at frequency %s.",
-            config,
-            num_iter,
-            scenario_template.num_steps,
-            scenario_template.freq,
-        )
 
         strategy = Strategy(metrics)
         mcaggregator = MonteCarloProcessor(metadata)
