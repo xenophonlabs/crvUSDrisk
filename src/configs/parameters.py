@@ -11,7 +11,8 @@ Parameters we currently test:
 - LLAMMA fees
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price.base import Oracle
 
 if TYPE_CHECKING:
     from ..sim import Scenario
@@ -28,7 +29,7 @@ MODELED_PARAMETERS = [
 
 # pylint: disable=pointless-string-statement
 """
-Methodology: being as conservative as possible, we can say that
+Notes: being as conservative as possible, we can say that
 (like) 99% of the debt ceiling is realized as debt. Of course, this
 means that users would be paying really high rates, but let's pretend
 that's reasonable.
@@ -44,12 +45,12 @@ different increases.
 DEBT_CEILING_SAMPLES = [1, 2, 5, 10]
 DEBT_CEILING_SWEEP = [{DEBT_CEILING: sample} for sample in DEBT_CEILING_SAMPLES]
 
-### ============ Loan and Liquidation Discounts ============ ###
+### ============ Chainlink Limits ============ ###
 
-# pylint: disable=pointless-string-statement
-"""
-Methodology: 
-"""
+CHAINLINK_LIMIT_SAMPLES = [int(l * 1e18) for l in [0.015, 0.05, 0.1, 0.15]]
+CHAINLINK_LIMIT_SWEEP = [
+    {CHAINLINK_LIMIT: sample} for sample in CHAINLINK_LIMIT_SAMPLES
+]
 
 ### ============ Functions ============ ###
 
@@ -62,3 +63,14 @@ def set_debt_ceilings(scenario: Scenario, target: float) -> None:
         debt_ceiling = controller.FACTORY.debt_ceiling[controller.address]
         new_debt_ceiling = int(debt_ceiling * target)
         controller.FACTORY.set_debt_ceiling(controller.address, new_debt_ceiling)
+
+
+def set_chainlink_limits(scenario: Scenario, target: float) -> None:
+    """
+    Sets the chainlink limit for each oracle with the target
+    bounds.
+    """
+    for llamma in scenario.llammas:
+        oracle = cast(Oracle, llamma.price_oracle_contract)
+        decimals = llamma.COLLATERAL_TOKEN.decimals
+        oracle.set_chainlink(oracle.price(), decimals, target)  # tiny bounds

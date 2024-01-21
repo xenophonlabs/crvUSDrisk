@@ -28,8 +28,20 @@ from ..configs import (
     CRVUSD_DTO,
     ALIASES_LLAMMA,
 )
-from ..configs.tokens import WETH, WSTETH, SFRXETH, STABLE_CG_IDS, COINGECKO_IDS_INV
-from ..configs.parameters import DEBT_CEILING, set_debt_ceilings
+from ..configs.tokens import (
+    WETH,
+    WSTETH,
+    SFRXETH,
+    STABLE_CG_IDS,
+    COINGECKO_IDS_INV,
+    WETH_DTO,
+)
+from ..configs.parameters import (
+    DEBT_CEILING,
+    set_debt_ceilings,
+    CHAINLINK_LIMIT,
+    set_chainlink_limits,
+)
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -394,6 +406,10 @@ class Scenario:
         for key, target in params.items():
             if key == DEBT_CEILING:
                 set_debt_ceilings(self, target)
+            elif key == CHAINLINK_LIMIT:
+                set_chainlink_limits(self, target)
+            else:
+                raise ValueError(f"Invalid parameter type: {key}.")
 
     ### ========== Scenario Execution ========== ###
 
@@ -458,8 +474,8 @@ class Scenario:
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
-        for llamma in self.llammas:
-            llamma.reset_admin_fees()
+            for llamma in self.llammas:
+                llamma.reset_admin_fees()
 
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
@@ -502,24 +518,32 @@ class Scenario:
                 )
             )
 
-    def update_staked_prices(self, sample: PriceSample) -> None:
-        """Update staked prices with a new sample."""
-        # Need to know which assets (staked and base)
+    def update_oracle_prices(self, sample: PriceSample) -> None:
+        """
+        The crvusdsim oracles require us to update the
+        staked prices for staked tokens (e.g. wstETH).
+
+        When sweeping chainlink limits, we also must update
+        the chainlink aggregator oracle prices.
+        """
         for llamma in self.llammas:
             oracle = cast(Oracle, llamma.price_oracle_contract)
+            collat = llamma.COLLATERAL_TOKEN
             if hasattr(oracle, "staked_oracle"):
-                derivative = llamma.COLLATERAL_TOKEN.address
-                base = WETH
-                assert derivative in [WSTETH, SFRXETH]
-                p_staked = int(sample.prices[derivative][base] * 10**18)
+                assert collat.address in [WSTETH, SFRXETH]
+                p_staked = int(sample.prices[collat.address][WETH] * 10**18)
                 oracle.staked_oracle.update(p_staked)
+                collat = WETH_DTO  # use WETH for chainlink aggregator
+            if oracle.chainlink_aggregator is not None:
+                p = int(sample.prices_usd[collat.address] * 10**collat.decimals)
+                oracle.set_chainlink_price(p)
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
         self.update_market_prices(sample)
         self.update_tricrypto_prices(sample)
-        self.update_staked_prices(sample)
+        self.update_oracle_prices(sample)
 
         for llamma in self.llammas:
             llamma.prepare_for_trades(ts)  # this increments oracle timestamp
@@ -545,6 +569,6 @@ class Scenario:
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
         assert prices is self.curr_price  # Check we have prepared for trades
+        self.keeper.update(self.peg_keepers)
         self.arbitrageur.arbitrage(self.cycles, prices)
         self.liquidator.perform_liquidations(self.controllers, prices)
-        self.keeper.update(self.peg_keepers)
