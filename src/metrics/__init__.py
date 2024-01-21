@@ -15,6 +15,7 @@ from .metrics import (
     LiquidityMetric,
     DebtMetric,
     PriceMetric,
+    ProfitsMetric,
 )
 
 if TYPE_CHECKING:
@@ -31,6 +32,7 @@ DEFAULT_METRICS = [
     LiquidityMetric,
     DebtMetric,
     PriceMetric,
+    ProfitsMetric,
 ]
 
 __all__ = [

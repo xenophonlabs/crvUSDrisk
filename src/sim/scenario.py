@@ -80,6 +80,7 @@ class Scenario:
         # Shocks | Must be set by scenario shocks!
         self.jump_params: dict = {}
         self.target_debt: Dict[str, float] = {}
+        self.target_debt_multiplier = 1.0
         self.target_liquidity_ratio: float = 0.0
 
         self.apply_shocks()
@@ -271,11 +272,14 @@ class Scenario:
             clear_controller(controller)
             ceiling = self.factory.debt_ceiling[controller.address]
             target_debt = int(
-                self.target_debt[ALIASES_LLAMMA[llamma.address]] * ceiling
+                ceiling * self.target_debt[ALIASES_LLAMMA[llamma.address]]
             )
+            multiplier = self.target_debt_multiplier
             while controller.total_debt() < target_debt:
                 borrower = Borrower()
-                success = borrower.create_loan(controller, self.kde[llamma.address])
+                success = borrower.create_loan(
+                    controller, self.kde[llamma.address], multiplier=multiplier
+                )
                 if not success:
                     break
                 self.borrowers[borrower.address] = borrower
@@ -405,6 +409,7 @@ class Scenario:
         """
         for key, target in params.items():
             if key == DEBT_CEILING:
+                self.target_debt_multiplier = target
                 set_debt_ceilings(self, target)
             elif key == CHAINLINK_LIMIT:
                 set_chainlink_limits(self, target)

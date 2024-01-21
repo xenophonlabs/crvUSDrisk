@@ -26,8 +26,6 @@ class SingleSimProcessor:
     """
     Stores and processes metrics data
     for a single simulation.
-
-    TODO narrow down to the useful ones.
     """
 
     def __init__(self, scenario: Scenario, metrics: List[Type[Metric]]) -> None:

@@ -1,9 +1,12 @@
 """Provides classes for each metric."""
 from typing import List, Dict, cast
+from collections import defaultdict
 import numpy as np
 from .base import Metric
 from .utils import entity_str
 from ..utils import get_crvusd_index
+from ..configs.tokens import CRVUSD
+from ..sim.scenario import Scenario
 
 
 class BadDebtMetric(Metric):
@@ -369,24 +372,63 @@ class PriceMetric(Metric):
         return val
 
 
-# class ProfitsMetric(Metric):
-#     """
-#     Compute the profits to LLAMMA from swaps.
-#     """
+class ProfitsMetric(Metric):
+    """
+    Compute the profits to LLAMMA from swaps as a
+    percentage of total debt.
+    """
 
-#     key_metric = "Net LLAMMA Profit"
+    key_metric = "Net LLAMMA Profit Pct"
 
-#     def _config(self) -> Dict[str, List[str]]:
-#         cfg = {"Net LLAMMA Profit": ["mean"]}
+    def __init__(self, scenario: Scenario):
+        super().__init__(scenario)
+        # Track cumulative fees
+        self.bands_fees_x: Dict[str, int] = defaultdict(int)
+        self.bands_fees_y: Dict[str, int] = defaultdict(int)
+        self.profit: Dict[str, float] = defaultdict(float)
 
-#         for llamma in self.scenario.llammas:
-#             cfg[f"LLAMMA Profit on {entity_str(llamma, 'llamma')}"] = ["mean"]
+    def _config(self) -> Dict[str, List[str]]:
+        cfg = {"Net LLAMMA Profit Pct": ["mean"]}
 
-#         return cfg
+        for llamma in self.scenario.llammas:
+            cfg[f"LLAMMA Profit on {entity_str(llamma, 'llamma')} Pct"] = ["mean"]
 
-#     def compute(self, **kwargs: dict) -> Dict[str, float]:
-#         val = {}
-#         profit = 0.
-#         for llamma in self.scenario.llammas:
-#             profit_ =
-#         return val
+        return cfg
+
+    def compute(self, **kwargs: dict) -> Dict[str, float]:
+        val = {}
+
+        prices = self.scenario.curr_price.prices_usd
+        crvusd_price = prices[CRVUSD]
+
+        profit = 0.0
+        for controller in self.scenario.controllers:
+            llamma = controller.AMM
+
+            # Note that all fees accrue to bands_fees_x because
+            # admin fees are 0.
+            llamma_bands_fees_x = sum(llamma.bands_fees_x.values())
+            llamma_bands_fees_y = sum(llamma.bands_fees_y.values())
+
+            bands_fees_x = llamma_bands_fees_x - self.bands_fees_x[llamma.address]
+            bands_fees_y = llamma_bands_fees_y - self.bands_fees_y[llamma.address]
+
+            profit_x = bands_fees_x * crvusd_price / 1e18
+            profit_y = bands_fees_y * prices[llamma.COLLATERAL_TOKEN.address] / 1e18
+            profit_llamma = self.profit[llamma.address] + profit_x + profit_y  # cum
+
+            val[f"LLAMMA Profit on {entity_str(llamma, 'llamma')} Pct"] = (
+                profit_llamma / kwargs["initial_debts"][controller.address] * 100
+            )
+            profit += profit_llamma
+
+            # Update
+            self.bands_fees_x[llamma.address] = llamma_bands_fees_x
+            self.bands_fees_y[llamma.address] = llamma_bands_fees_y
+            self.profit[llamma.address] = profit_llamma
+
+        val["Net LLAMMA Profit Pct"] = (
+            profit / cast(float, kwargs["total_initial_debt"]) * 100
+        )
+
+        return val
