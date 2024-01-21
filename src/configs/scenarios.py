@@ -27,6 +27,7 @@ from .shocks import (
     SHOCK_FLASH_CRASH_SEVERE,
     SHOCK_DEPEG_ADVERSE,
     SHOCK_DEPEG_SEVERE,
+    SHOCK_LIQUIDITY_VERY_SEVERE,
 )
 
 BASE = {
@@ -77,6 +78,7 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     "Severe Growth": [SHOCK_DEBT_SEVERE],
     "Adverse crvUSD Liquidity": [SHOCK_LIQUIDITY_ADVERSE],
     "Severe crvUSD Liquidity": [SHOCK_LIQUIDITY_SEVERE],
+    "Very severe crvUSD Liquidity": [SHOCK_LIQUIDITY_VERY_SEVERE],
     "Adverse flash crash": [SHOCK_FLASH_CRASH_ADVERSE],
     "Severe flash crash": [SHOCK_FLASH_CRASH_SEVERE],
     "Adverse depeg": [SHOCK_DEPEG_ADVERSE],
@@ -93,6 +95,10 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     "Severe vol and severe crvUSD liquidity": [
         SHOCK_VOL_SEVERE,
         SHOCK_LIQUIDITY_SEVERE,
+    ],
+    "Severe vol and very severe crvUSD liquidity": [
+        SHOCK_VOL_SEVERE,
+        SHOCK_LIQUIDITY_VERY_SEVERE,
     ],
     # Flash Crash Composites
     "Adverse flash crash and adverse growth": [

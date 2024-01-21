@@ -136,10 +136,10 @@ SHOCK_LIQUIDITY_NEUTRAL = {
 }
 
 SHOCK_LIQUIDITY_ADVERSE = {
-    "target": 3.018794,
+    "target": 3.5,
     "type": LIQUIDITY,
     "tag": ADVERSE,
-    "description": "p99 debt:liquidity ratio for crvUSD over Q4 2023.",
+    "description": "p99.9 debt:liquidity ratio for crvUSD over Q4 2023.",
 }
 
 SHOCK_LIQUIDITY_SEVERE = {

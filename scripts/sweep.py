@@ -23,8 +23,8 @@ def run(
     scenario: str,
     markets: List[str],
     num_iter: int,
-    ncpu: int,
     to_sweep: List[Dict[str, Any]],
+    ncpu: int,
 ) -> List[MonteCarloResults]:
     """
     Run simulation without any analysis.
@@ -40,67 +40,45 @@ def run(
 
 
 def save(
+    experiment: str,
     scenario: str,
-    swept_var: str,
-    swept_val: Any,
     output: MonteCarloResults,
+    swept_var: str | None = None,
+    swept_val: Any | None = None,
 ) -> None:
     """
     Save scenario results.
     """
-    dir_ = os.path.join(RESULTS_DIR, f"sweep_{swept_var}_{swept_val}", scenario)
+    if swept_var:
+        dir_ = os.path.join(RESULTS_DIR, experiment, f"sweep_{swept_var}_{swept_val}")
+    else:
+        dir_ = os.path.join(RESULTS_DIR, experiment, "no_sweep")
+
     os.makedirs(dir_, exist_ok=True)
-    i = len(os.listdir(dir_)) + 1
-    fn = os.path.join(dir_, f"results_{i}.pkl")
+    fn = os.path.join(dir_, f"{scenario.replace(' ', '_')}.pkl")
     with open(fn, "wb") as f:
         pickle.dump(output, f)
 
 
-scenarios = [
-    # "baseline",
-    # "adverse vol",
-    "severe vol",
-    # # "adverse drift",
-    # # "severe drift",
-    # "adverse growth",
-    # "severe growth",
-    # "adverse crvusd liquidity",
-    # "severe crvusd liquidity",
-    # "adverse flash crash",
-    # "severe flash crash",
-    # "adverse depeg",
-    # "severe depeg",
-    # # "severe vol and adverse drift",
-    # # "severe vol and severe drift",
-    "severe vol and adverse growth",
-    "severe vol and severe growth",
-    # "severe vol and adverse crvusd liquidity",
-    # "severe vol and severe crvusd liquidity",
-    "adverse flash crash and adverse growth",
-    "adverse flash crash and severe growth",
-    # "adverse flash crash and adverse crvusd liquidity",
-    # "adverse flash crash and severe crvusd liquidity",
-]
-
-to_sweep = DEBT_CEILING_SWEEP
-
-if __name__ == "__main__":
-    num_iter = 100
-    num_rounds = 3
-    ncpu = cpu_count()
-
-    for _ in range(num_rounds):
-        for scenario in scenarios:
-            try:
-                outputs = run(
-                    scenario, MODELLED_MARKETS, num_iter, ncpu, to_sweep=to_sweep
-                )
-                for output, params in zip(outputs, to_sweep):
+def sweep(
+    experiment: str,
+    scenarios: List[str],
+    num_iter: int,
+    to_sweep: List[Dict[str, float]],
+    ncpu: int = cpu_count(),
+) -> None:
+    for scenario in scenarios:
+        try:
+            outputs = run(scenario, MODELLED_MARKETS, num_iter, to_sweep, ncpu)
+            for output, params in zip(outputs, to_sweep):
+                if params:
                     assert len(params) == 1, "Only handle sweeping one param at a time."
                     swept_var = list(params.keys())[0]
                     swept_val = params[swept_var]
-                    save(scenario, swept_var, swept_val, output)
-            except Exception as e:
-                logger.critical("Failed scenario %s", scenario)
+                    save(experiment, scenario, output, swept_var, swept_val)
+                else:
+                    save(experiment, scenario, output)
+        except Exception as e:
+            logger.critical("Failed scenario %s with exception %s", scenario, str(e))
 
     logger.info("Done.")
