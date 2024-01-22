@@ -15,6 +15,7 @@ by the `MonteCarloProcessor`.
 """
 
 from typing import List, Dict, Union, Type, Any
+from collections import defaultdict
 import pandas as pd
 from ..results import SingleSimResults
 from ..scenario import Scenario
@@ -28,6 +29,7 @@ class SingleSimProcessor:
     for a single simulation.
     """
 
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, scenario: Scenario, metrics: List[Type[Metric]]) -> None:
         self.metrics = init_metrics(metrics, scenario)
 
@@ -44,6 +46,7 @@ class SingleSimProcessor:
         self.scenario = scenario
 
         self.initial_debts = self.controller_debts()
+        self.debt_by_band = self.get_debt_by_band()
 
     def update(self, ts: int, inplace: bool = False) -> Dict[str, Union[float, int]]:
         """
@@ -93,10 +96,55 @@ class SingleSimProcessor:
             for controller in self.scenario.controllers
         }
 
+    def get_debt_by_band(self) -> Dict[str, Dict[int, float]]:
+        """
+        Get the debt by band for each controller.
+        """
+        debt_by_band: Dict[str, Dict[int, float]] = {}
+        for controller in self.scenario.controllers:
+            debt_by_band[controller.address] = defaultdict(float)
+            llamma = controller.AMM
+            for user in controller.loan:
+                debt = controller.debt(user) / 1e18
+                n1, n2 = llamma.read_user_tick_numbers(user)
+                n = n2 - n1 + 1
+                for band in range(n1, n2 + 1):
+                    debt_by_band[controller.address][band] += debt / n
+        return debt_by_band
+
+    def active_debt(self) -> Dict[str, float]:
+        """
+        Get the
+        """
+        active_bands = defaultdict(set)
+        for controller in self.scenario.controllers:
+            llamma = controller.AMM
+            for band, val in llamma.bands_fees_x.items():
+                if val > 0:
+                    active_bands[controller.address].add(band)
+            for band, val in llamma.bands_fees_y.items():
+                if val > 0:
+                    active_bands[controller.address].add(band)
+        print(active_bands)
+        active_debt: Dict[str, float] = defaultdict(int)
+        for controller in self.scenario.controllers:
+            for band in active_bands[controller.address]:
+                active_debt[controller.address] += self.debt_by_band[
+                    controller.address
+                ][band]
+        return active_debt
+
     def process(self) -> SingleSimResults:
         """Process timeseries df into metrics result."""
+        active_debt = self.active_debt()
         self.prune()
-        return SingleSimResults(self.results, self.pricepaths, self.metrics)
+        return SingleSimResults(
+            self.results,
+            self.pricepaths,
+            self.metrics,
+            self.initial_debts,
+            active_debt,
+        )
 
     def prune(self) -> None:
         """Prune size."""

@@ -388,10 +388,10 @@ class ProfitsMetric(Metric):
         self.profit: Dict[str, float] = defaultdict(float)
 
     def _config(self) -> Dict[str, List[str]]:
-        cfg = {"Net LLAMMA Profit Pct": ["mean"]}
+        cfg = {"Net LLAMMA Profit Pct": ["max"]}
 
         for llamma in self.scenario.llammas:
-            cfg[f"LLAMMA Profit on {entity_str(llamma, 'llamma')} Pct"] = ["mean"]
+            cfg[f"LLAMMA Profit on {entity_str(llamma, 'llamma')} Pct"] = ["max"]
 
         return cfg
 

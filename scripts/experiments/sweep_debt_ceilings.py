@@ -7,7 +7,7 @@ We sweep debt ceilings by multiplying existing debt
 ceilings by a scalar for all markets simultaneously.
 """
 from ..sweep import sweep
-from ...src.configs.parameters import DEBT_CEILING_SWEEP
+from src.configs.parameters import DEBT_CEILING_SWEEP
 
 scenarios = [
     "baseline",

@@ -3,6 +3,7 @@
 data/*
 logs/*
 results/*
+figs/results/*
 *dev.ipynb
 
 # Byte-compiled / optimized / DLL files

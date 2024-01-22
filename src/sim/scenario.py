@@ -5,6 +5,7 @@ Provides the `Scenario` class for running simulations.
 from typing import List, Tuple, Set, cast, Dict, Any
 from itertools import combinations
 from datetime import datetime
+from collections import defaultdict
 import pandas as pd
 from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
@@ -479,8 +480,10 @@ class Scenario:
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
-            for llamma in self.llammas:
-                llamma.reset_admin_fees()
+        for llamma in self.llammas:
+            llamma.reset_admin_fees()
+            llamma.bands_fees_x = defaultdict(int)
+            llamma.bands_fees_y = defaultdict(int)
 
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""

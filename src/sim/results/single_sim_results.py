@@ -14,22 +14,39 @@ FIGSIZE = (10, 10)
 
 
 @dataclass
-class SingleSimResults:  # pylint: disable=too-few-public-methods
+class SingleSimResults:
     """
     Stores metrics data for a single simulation
     """
 
+    # pylint: disable=too-many-arguments
     def __init__(
-        self, df: pd.DataFrame, pricepaths: PricePaths, metrics: List[Metric]
+        self,
+        df: pd.DataFrame,
+        pricepaths: PricePaths,
+        metrics: List[Metric],
+        initial_debt: Dict[str, float],
+        active_debt: Dict[str, float],
     ) -> None:
         self.df = df.set_index("timestamp")
         self.pricepaths = pricepaths
         self.metrics = metrics
+        self.initial_debt = initial_debt
+        self.active_debt = active_debt
 
     @property
     def metric_map(self) -> Dict[str, int]:
         """Return the metric map."""
         return {type(metric).__name__: i for i, metric in enumerate(self.metrics)}
+
+    @property
+    def pct_debt_active(self) -> Dict[str, float]:
+        """Return the percentage of debt active."""
+        return {
+            k: v / self.initial_debt[k] * 100
+            for k, v in self.active_debt.items()
+            if v != 0
+        }
 
     def plot_metric(
         self, metric_index: int, axs: Any = None, show: bool = True, i: int = -1

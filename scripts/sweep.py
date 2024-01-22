@@ -10,7 +10,6 @@ from src.sim import simulate
 from src.logging import get_logger
 from src.sim.results import MonteCarloResults
 from src.configs import MODELLED_MARKETS
-from src.configs.parameters import DEBT_CEILING_SWEEP
 
 logger = get_logger(__name__)
 
@@ -64,7 +63,7 @@ def sweep(
     experiment: str,
     scenarios: List[str],
     num_iter: int,
-    to_sweep: List[Dict[str, float]],
+    to_sweep: List[Dict[str, Any]],
     ncpu: int = cpu_count(),
 ) -> None:
     for scenario in scenarios:

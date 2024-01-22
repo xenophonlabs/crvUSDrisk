@@ -2,7 +2,7 @@
 Script to sweep the chainlink oracle limits.
 """
 from ..sweep import sweep
-from ...src.configs.parameters import CHAINLINK_LIMIT_SWEEP
+from src.configs.parameters import CHAINLINK_LIMIT_SWEEP
 
 scenarios = [
     "baseline",
