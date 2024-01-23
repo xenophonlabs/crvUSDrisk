@@ -66,6 +66,11 @@ def sweep(
     to_sweep: List[Dict[str, Any]],
     ncpu: int = cpu_count(),
 ) -> None:
+    """
+    Run simulations for all combinations of (scenario, params)
+    for params in to_sweep.
+    """
+    start = datetime.now()
     for scenario in scenarios:
         try:
             outputs = run(scenario, MODELLED_MARKETS, num_iter, to_sweep, ncpu)
@@ -77,7 +82,9 @@ def sweep(
                     save(experiment, scenario, output, swept_var, swept_val)
                 else:
                     save(experiment, scenario, output)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.critical("Failed scenario %s with exception %s", scenario, str(e))
-
-    logger.info("Done.")
+    end = datetime.now()
+    diff = end - start
+    logger.info("Finished experiment %s.", experiment)
+    logger.info("Total experiment runtime: %s.", diff)

@@ -32,6 +32,7 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 logger = get_logger(__name__)
 
 
+# pylint: disable=too-many-locals
 def main(start: datetime, end: datetime, plot: bool) -> None:
     """
     Get the historical stableswap balances and user states in
@@ -101,7 +102,7 @@ def main(start: datetime, end: datetime, plot: bool) -> None:
     config["target_ratio"] = target_ratio
 
     fn = os.path.join(CONFIG_DIR, f"{start_ts}_{end_ts}.json")
-    with open(fn, "w") as f:
+    with open(fn, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
     if plot:
@@ -117,8 +118,9 @@ if __name__ == "__main__":
         "-p", "--plot", action="store_true", help="Plot Debt:Liquidity", required=False
     )
     args = parser.parse_args()
-    plot = args.plot
-    start = datetime.fromisoformat(args.start)
-    end = datetime.fromisoformat(args.end)
 
-    main(start, end, plot)
+    _plot = args.plot
+    _start = datetime.fromisoformat(args.start)
+    _end = datetime.fromisoformat(args.end)
+
+    main(_start, _end, _plot)

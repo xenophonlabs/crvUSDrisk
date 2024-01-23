@@ -30,9 +30,8 @@ def with_analysis(
     """
     with cProfile.Profile() as pr:
         try:
-            global output
             output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pdb.post_mortem()
     stats = pstats.Stats(pr)
     stats.sort_stats(pstats.SortKey.CUMULATIVE)
@@ -48,23 +47,11 @@ def without_analysis(
     Run simulation without any analysis.
     """
     start = datetime.now()
-    global output
     output = simulate(scenario, markets, num_iter=num_iter, ncpu=ncpu)[0]
     end = datetime.now()
     diff = end - start
     logger.info("Total runtime: %s", diff)
     return output
-
-
-def analysis_help() -> None:
-    """
-    Help for analysis.
-    """
-    print("Call `output.summary` for a DF of summary metrics.")
-    print("Call `output.plot_runs(<metric_id>)` to plot the input metric for all runs.")
-    print("Call `output.metric_map` to get a list of metrics and their ids.")
-    print("Call `output.plot_summary()` to plot histograms of summary metrics.")
-    print("Call `output.data[i].plot_prices()` to plot the prices used for run `i`.")
 
 
 if __name__ == "__main__":
@@ -89,24 +76,24 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    scenario = args.scenario
-    num_iter = args.num_iter
+    _scenario = args.scenario
+    _num_iter = args.num_iter
 
     if args.multiprocess:
-        ncpu = cpu_count()
+        _ncpu = cpu_count()
     else:
-        ncpu = 1
+        _ncpu = 1
 
     if args.analysis:
-        output = with_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
+        _output = with_analysis(_scenario, MODELLED_MARKETS, _num_iter, _ncpu)
     else:
-        output = without_analysis(scenario, MODELLED_MARKETS, num_iter, ncpu)
+        _output = without_analysis(_scenario, MODELLED_MARKETS, _num_iter, _ncpu)
 
-    logger.info("Done. Call `analysis_help()` for more info in interactive mode.")
+    logger.info("Done.")
 
-    dir_ = os.path.join(RESULTS_DIR, scenario)
+    dir_ = os.path.join(RESULTS_DIR, _scenario)
     os.makedirs(dir_, exist_ok=True)
     i = len(os.listdir(dir_)) + 1
-    fn = os.path.join(dir_, f"results_{num_iter}_iters_{i}.pkl")
+    fn = os.path.join(dir_, f"results_{_num_iter}_iters_{i}.pkl")
     with open(fn, "wb") as f:
-        pickle.dump(output, f)
+        pickle.dump(_output, f)

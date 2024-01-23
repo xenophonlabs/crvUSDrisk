@@ -20,7 +20,6 @@ the last 60 days.
 """
 import os
 import argparse
-from datetime import datetime, timedelta
 from src.prices.utils import gen_price_config
 from src.configs import ADDRESSES, get_scenario_config
 from src.logging import get_logger

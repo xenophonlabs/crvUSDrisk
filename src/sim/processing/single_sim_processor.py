@@ -125,7 +125,6 @@ class SingleSimProcessor:
             for band, val in llamma.bands_fees_y.items():
                 if val > 0:
                     active_bands[controller.address].add(band)
-        print(active_bands)
         active_debt: Dict[str, float] = defaultdict(int)
         for controller in self.scenario.controllers:
             for band in active_bands[controller.address]:

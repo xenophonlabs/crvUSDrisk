@@ -22,8 +22,8 @@ scenarios = [
     "adverse crvusd liquidity",
     "severe crvusd liquidity",
     "very severe crvusd liquidity",
-    # "adverse flash crash",
-    # "severe flash crash",
+    "adverse flash crash",
+    "severe flash crash",
     "adverse depeg",
     "severe depeg",
     "severe vol and adverse drift",
@@ -33,10 +33,10 @@ scenarios = [
     "severe vol and adverse crvusd liquidity",
     "severe vol and severe crvusd liquidity",
     "severe vol and very severe crvUSD liquidity",
-    # "adverse flash crash and adverse growth",
-    # "adverse flash crash and severe growth",
-    # "adverse flash crash and adverse crvusd liquidity",
-    # "adverse flash crash and severe crvusd liquidity",
+    "adverse flash crash and adverse growth",
+    "adverse flash crash and severe growth",
+    "adverse flash crash and adverse crvusd liquidity",
+    "adverse flash crash and severe crvusd liquidity",
 ]
 
 if __name__ == "__main__":
