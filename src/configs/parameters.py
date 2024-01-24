@@ -19,10 +19,12 @@ if TYPE_CHECKING:
 
 DEBT_CEILING = "debt_ceiling"
 CHAINLINK_LIMIT = "chainlink_limit"
+FEE = "fee"
 
 MODELED_PARAMETERS = [
     DEBT_CEILING,
     CHAINLINK_LIMIT,
+    FEE,
 ]
 
 ### ============ Debt Ceilings ============ ###
@@ -45,15 +47,6 @@ different increases.
 DEBT_CEILING_SAMPLES = [1, 2, 5, 10]
 DEBT_CEILING_SWEEP = [{DEBT_CEILING: sample} for sample in DEBT_CEILING_SAMPLES]
 
-### ============ Chainlink Limits ============ ###
-
-CHAINLINK_LIMIT_SAMPLES = [int(l * 1e18) for l in [0.015, 0.05, 0.1, 0.15]]
-CHAINLINK_LIMIT_SWEEP = [
-    {CHAINLINK_LIMIT: sample} for sample in CHAINLINK_LIMIT_SAMPLES
-]
-
-### ============ Functions ============ ###
-
 
 def set_debt_ceilings(scenario: Scenario, target: float) -> None:
     """
@@ -65,6 +58,14 @@ def set_debt_ceilings(scenario: Scenario, target: float) -> None:
         controller.FACTORY.set_debt_ceiling(controller.address, new_debt_ceiling)
 
 
+### ============ Chainlink Limits ============ ###
+
+CHAINLINK_LIMIT_SAMPLES = [int(l * 1e18) for l in [0.015, 0.05, 0.1, 0.15]]
+CHAINLINK_LIMIT_SWEEP = [
+    {CHAINLINK_LIMIT: sample} for sample in CHAINLINK_LIMIT_SAMPLES
+]
+
+
 def set_chainlink_limits(scenario: Scenario, target: float) -> None:
     """
     Sets the chainlink limit for each oracle with the target
@@ -74,3 +75,36 @@ def set_chainlink_limits(scenario: Scenario, target: float) -> None:
         oracle = cast(Oracle, llamma.price_oracle_contract)
         decimals = llamma.COLLATERAL_TOKEN.decimals
         oracle.set_chainlink(oracle.price(), decimals, target)  # tiny bounds
+
+
+### ============ LLAMMA Fees ============ ###
+
+FEE_SAMPLES = [int(l * 1e18) for l in [0.005, 0.006, 0.007, 0.008, 0.009, 0.01]]
+FEE_SWEEP = [{FEE: sample} for sample in FEE_SAMPLES]
+
+
+def set_fees(scenario: Scenario, target: float) -> None:
+    """
+    Sets the chainlink limit for each oracle with the target
+    bounds.
+    """
+    for llamma in scenario.llammas:
+        llamma.set_fee(target)
+
+
+### ============ Parameter Sweep ============ ###
+
+
+def set_parameters(scenario: Scenario, parameters: dict[str, float]) -> None:
+    """
+    Sets the parameters in the input scenario.
+    """
+    for parameter, value in parameters.items():
+        if parameter == DEBT_CEILING:
+            set_debt_ceilings(scenario, value)
+        elif parameter == CHAINLINK_LIMIT:
+            set_chainlink_limits(scenario, value)
+        elif parameter == FEE:
+            set_fees(scenario, value)
+        else:
+            raise ValueError(f"Invalid parameter {parameter}.")

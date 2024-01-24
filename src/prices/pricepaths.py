@@ -66,7 +66,6 @@ class PricePaths:
     def __init__(self, num_steps: int, config: dict, jump_params: dict):
         """
         Generate price paths from config file.
-        TODO integrate with curvesim PriceSampler?
         """
         self.config = config
         freq = config["freq"]

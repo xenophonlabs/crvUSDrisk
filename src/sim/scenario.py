@@ -37,12 +37,7 @@ from ..configs.tokens import (
     COINGECKO_IDS_INV,
     WETH_DTO,
 )
-from ..configs.parameters import (
-    DEBT_CEILING,
-    set_debt_ceilings,
-    CHAINLINK_LIMIT,
-    set_chainlink_limits,
-)
+from ..configs.parameters import set_parameters
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -408,14 +403,7 @@ class Scenario:
         """
         Apply parameter changes.
         """
-        for key, target in params.items():
-            if key == DEBT_CEILING:
-                self.target_debt_multiplier = target
-                set_debt_ceilings(self, target)
-            elif key == CHAINLINK_LIMIT:
-                set_chainlink_limits(self, target)
-            else:
-                raise ValueError(f"Invalid parameter type: {key}.")
+        set_parameters(self, params)
 
     ### ========== Scenario Execution ========== ###
 

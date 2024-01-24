@@ -6,14 +6,9 @@ from ..sweep import sweep
 
 # pylint: disable=duplicate-code
 scenarios = [
-    "baseline",
-    "adverse vol",
-    "severe vol",
     "adverse flash crash",
     "severe flash crash",
-    "severe vol and adverse crvusd liquidity",
-    "severe vol and severe crvusd liquidity",
-    "severe vol and very severe crvUSD liquidity",
+    "adverse depeg",
 ]
 
 if __name__ == "__main__":
