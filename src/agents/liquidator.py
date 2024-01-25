@@ -188,6 +188,13 @@ class Liquidator(Agent):
             # basis token -> crvusd
             j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
+
+            if to_repay >= crvusd_pool.balances[j]:
+                logger.debug(
+                    "Not enough crvusd in pool %s for liquidation.", crvusd_pool.name
+                )
+                continue
+
             amt_in = crvusd_pool.get_dx(i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
