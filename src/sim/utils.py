@@ -127,6 +127,8 @@ def find_active_band(llamma: SimLLAMMAPool) -> None:
         if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
             llamma.active_band = n
             break
+    assert llamma.bands_x[llamma.active_band] == 0
+    assert llamma.bands_y[llamma.active_band] > 0
     llamma.min_band = min_band
 
 

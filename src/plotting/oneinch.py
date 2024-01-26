@@ -63,7 +63,7 @@ def plot_regression(
         s=S,
         label="1inch Quotes",
     )
-    ax.plot(x / 10**in_token.decimals, y, label="Prediction", c="indianred", lw=1)
+    ax.plot(x / 10**in_token.decimals, y, label="Prediction", c="indianred", lw=2)
     ax.set_xscale(scale)
     ax.legend()
     ax.set_xlabel(f"Amount in ({in_token.symbol})")

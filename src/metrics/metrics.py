@@ -345,9 +345,14 @@ class PriceMetric(Metric):
         cfg = {"Worst Oracle Error Pct": ["max"]}
 
         for llamma in self.scenario.llammas:
-            cfg[f"{entity_str(llamma, 'llamma')} Price"] = ["mean"]
             cfg[f"{entity_str(llamma, 'llamma')} Oracle Price"] = ["mean"]
             cfg[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = ["max"]
+
+        for tpool in self.scenario.tricryptos:
+            coins = tpool.coin_names
+            col = f"{entity_str(tpool, 'tricrypto')} Oracle Price"
+            cfg[" ".join([col, coins[1]])] = ["mean"]
+            cfg[" ".join([col, coins[2]])] = ["mean"]
 
         return cfg
 
@@ -363,9 +368,15 @@ class PriceMetric(Metric):
             ]
             oracle_error_pct = abs(market_price - oracle_price) / market_price * 100
             errors.append(oracle_error_pct)
-            val[f"{entity_str(llamma, 'llamma')} Price"] = llamma.get_p() / 1e18
             val[f"{entity_str(llamma, 'llamma')} Oracle Price"] = oracle_price
             val[f"{entity_str(llamma, 'llamma')} Oracle Error Pct"] = oracle_error_pct
+
+        for tpool in self.scenario.tricryptos:
+            coins = tpool.coin_names
+            col = f"{entity_str(tpool, 'tricrypto')} Oracle Price"
+            oracle_prices = tpool.price_oracle()
+            val[" ".join([col, coins[1]])] = oracle_prices[0] / 1e18
+            val[" ".join([col, coins[2]])] = oracle_prices[1] / 1e18
 
         val["Worst Oracle Error Pct"] = max(errors)
 

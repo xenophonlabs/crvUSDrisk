@@ -7,6 +7,8 @@ We shock four possible parameters:
 - Total debt in the system
 - Debt : crvUSD liquidity ratio
 """
+from typing import List
+import pandas as pd
 from .tokens import WETH, WSTETH, SFRXETH, WBTC, TBTC, USDC
 
 # Tags
@@ -21,6 +23,27 @@ DEBT = "debt"
 MU = "mu"
 VOL = "vol"
 JUMP = "jump"
+
+ORDERING = [NEUTRAL, ADVERSE, SEVERE, VERY_SEVERE]
+
+
+def order_tags(
+    df: pd.DataFrame,
+    col: str,
+    other_cols: List[str] | None = None,
+    other_cols_first: bool = True,
+) -> None:
+    """
+    Order dataframe based on tags.
+    Inplace.
+    """
+    df["sort"] = df[col].map(ORDERING.index)
+    cols = ["sort"]
+    if other_cols is not None:
+        cols = other_cols + cols if other_cols_first else cols + other_cols
+    df.sort_values(cols, inplace=True)
+    df.drop("sort", axis=1, inplace=True)
+
 
 ### ============ Mu ============ ###
 

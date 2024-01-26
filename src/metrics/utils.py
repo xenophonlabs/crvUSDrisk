@@ -28,6 +28,8 @@ def entity_str(entity: Any, type_: str) -> str:
         name = name.replace("/", "_")
     elif type_ == "pk":
         name = entity.POOL.name.replace("Curve.fi Factory Plain Pool: ", "")
+    elif type_ == "tricrypto":
+        name = entity.name.replace("Tricrypto", "")
     else:
         raise ValueError("Invalid type_.")
 
