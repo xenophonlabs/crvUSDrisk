@@ -11,7 +11,6 @@ The model also comes with some technical limitations. Limitations differ from as
 <ol>
 <li><b>Collateral GBMs.</b> Collateral prices behave as Geometric Brownian Motion processes.</li>
 <li><b>Stablecoin OUs.</b> Stablecoin prices behave as Ornstein-Uhlenbeck processes.</li>
-<li><b>Lookback Window.</b> Price parameters are trained on 60 days of Coingecko price data.</li>
 <li><b>Exogenous Prices.</b> Prices are exogenous to the system. Although trades incur slippage at any given timestep, they do not permanently affect the price trajectory of the simulation.</li>
 <li><b>Endogenous crvUSD Prices.</b> crvUSD liquidity and price discovery is entirely contained in the simulated LLAMMA, StableSwap, and TriCrypto pools. The simulated Oracles and Stable Aggregator point to these pools, and any simulated trades will affect these prices.</li>
 </ol>
@@ -20,7 +19,6 @@ The model also comes with some technical limitations. Limitations differ from as
 
 <ol>
 <li><b>Isotonic External Liquidity.</b> Trades against external markets (i.e. selling collateral on Uniswap) are modeled using an <a href="https://scikit-learn.org/stable/modules/generated/sklearn.isotonic.IsotonicRegression.html">Isotonic Regressor</a> using historical 1Inch swap quotes from <a href="https://github.com/xenophonlabs/oneinch-quotes">this</a> API.</li>
-<li><b>Lookback Window.</b> Quotes are fetched over a 30 day period specified in the scenario configuration.</li>
 <li><b>DEX Liquidity.</b> All external liquidity is contained in DEXes indexed by 1Inch.</li>
 <li><b>Endogenous crvUSD Liquidity.</b> All crvUSD liquidity in endogenous to the system and contained in the simulated StableSwap, Tricrypto, and LLAMMA pools.</li>
 </ol>
@@ -54,6 +52,5 @@ We are working on fixing the below limitations.
 <li><b>Staked oracles.</b> Staked collateral pools (e.g. stETH/ETH) are not modelled explicitly. It is assumed that these pools are centered at the simulated price (e.g. stETH/ETH simulated price) and do not pose a meaningful risk vector. Notice that the wstETH and sfrxETH LLAMMAs use these staked pools in their oracles.</li>
 <li><b>Frozen oracles.</b> Oracle prices do not change within a cyclic arbitrage, meaning that the first trade will not meaningfully move oracle prices before the second trade is executed. This drastically simplifies and accelerates computation, although is not completely accurate.</li>
 <li><b>Missing crvUSD Liquidity.</b> The model provides a conservative estimate for crvUSD liquidity, it does not exhaustively simulate all pools. It currently includes: all LLAMMAs, all Pegged StableSwap pools, TricryptoLLAMA.</li>
-<li><b>Jumps.</b> The model does not currently model price jumps.</li>
 <li><b>Gas.</b> The model does not currently model gas costs.</li>
 </ol>

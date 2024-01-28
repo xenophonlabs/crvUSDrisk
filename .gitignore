@@ -3,6 +3,7 @@
 data/*
 logs/*
 results/*
+results_250_iters/*
 figs/results/*
 *dev.ipynb
 
