@@ -16,6 +16,7 @@ FN_PRED = f"{PATH}/predictions/" + "{}_{}.png"
 logger = get_logger(__name__)
 
 
+# pylint: disable=too-many-arguments
 def plot(
     quotes: pd.DataFrame,
     market: ExternalMarket,
@@ -36,7 +37,7 @@ def plot(
 
 def main() -> None:
     """Generate price impact plots for each token pair."""
-    scenario = Scenario("baseline_micro", ["wsteth"])
+    scenario = Scenario("baseline", ["wsteth"])
     scenario.update_market_prices(scenario.pricepaths[0])
 
     quotes = scenario.generate_markets()  # regenerate to fetch quotes
@@ -48,7 +49,7 @@ def main() -> None:
         market = scenario.markets[pair]
         token1, token2 = pair
 
-        logger.info(f"Plotting ({token1.symbol, token2.symbol}). ({i}/{n})")
+        logger.info("Plotting (%s, %s). (%d/%d)", token1.symbol, token2.symbol, i, n)
         plot(
             quotes,
             market,
@@ -61,7 +62,7 @@ def main() -> None:
 
         i += 1
 
-        logger.info(f"Plotting ({token2.symbol, token1.symbol}). ({i}/{n})")
+        logger.info("Plotting (%s, %s). (%d/%d)", token2.symbol, token1.symbol, i, n)
         plot(
             quotes,
             market,

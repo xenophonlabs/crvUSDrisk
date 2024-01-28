@@ -2,7 +2,24 @@
 Provides utility functions for the simulation.
 """
 from typing import List
-from crvusdsim.pool import SimMarketInstance
+from crvusdsim.pool import SimMarketInstance, SimController, SimLLAMMAPool
+from ..configs import ALIASES_LLAMMA, MODELLED_MARKETS
+
+
+def parse_markets(market_names: List[str]) -> List[str]:
+    """
+    Parse list of market names.
+    """
+    aliases = []
+    for alias in market_names:
+        alias = alias.lower()
+        if alias[:2] == "0x":
+            alias = ALIASES_LLAMMA[alias]
+        assert alias in MODELLED_MARKETS, ValueError(
+            f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
+        )
+        aliases.append(alias)
+    return aliases
 
 
 def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
@@ -30,7 +47,7 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
         stableswap_seen[spool.address] = spool
 
     for sim_market in sim_markets[1:]:
-        debt_ceiling = sim_market.stablecoin.balanceOf[sim_market.controller.address]
+        debt_ceiling = sim_market.factory.debt_ceiling[sim_market.controller.address]
 
         # Top-level objects
         sim_market.stablecoin = master_stablecoin
@@ -79,6 +96,9 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
             sim_market.collateral_token,
             debt_ceiling,
         )
+        master_stablecoin.burnFrom(
+            sim_market.controller.address, sim_market.controller.total_debt()
+        )
 
     validate_binds(sim_markets)
 
@@ -96,3 +116,58 @@ def validate_binds(sim_markets: List[SimMarketInstance]) -> None:
                 assert sim_market.__dict__[k] is master
             else:
                 assert sim_market.__dict__[k] is not master
+
+
+def find_active_band(llamma: SimLLAMMAPool) -> None:
+    """Find the active band for a LLAMMA."""
+    min_band = llamma.min_band
+    for n in range(llamma.min_band, llamma.max_band):
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
+            min_band += 1
+        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
+            llamma.active_band = n
+            break
+    assert llamma.bands_x[llamma.active_band] == 0
+    assert llamma.bands_y[llamma.active_band] > 0
+    llamma.min_band = min_band
+
+
+def clear_controller(controller: SimController) -> None:
+    """Clear all controller states."""
+    users = list(controller.loan.keys())
+    for user in users:
+        debt = controller._debt(user)[0]  # pylint: disable=protected-access
+        if debt > 0:
+            controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
+            controller.repay(debt, user)
+        del controller.loan[user]
+
+    for band in range(controller.AMM.min_band, controller.AMM.max_band):
+        # Might be some dust left due to discrepancy between user
+        # snapshot and band snapshot
+        controller.AMM.bands_x[band] = 0
+        controller.AMM.bands_y[band] = 0
+
+    assert controller.n_loans == 0
+    assert len(controller.loan) == 0
+    assert controller.total_debt() == 0
+
+
+def reset_controller_price(controller: SimController) -> None:
+    """
+    Reset controller price.
+    """
+    llamma = controller.AMM
+
+    min_band = llamma.min_band - 3  # Offset by a little bit
+    active_band = min_band + 1
+
+    llamma.active_band = active_band
+    llamma.min_band = min_band
+
+    p = llamma.p_oracle_up(active_band)
+    llamma.price_oracle_contract.last_price = p
+
+    ts = controller._block_timestamp  # pylint: disable=protected-access
+    controller.prepare_for_trades(ts + 60 * 60)
+    llamma.prepare_for_trades(ts + 60 * 60)

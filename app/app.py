@@ -102,15 +102,11 @@ initial_modal = dbc.Modal(
                                     id="select-scenario",
                                     options=[
                                         {
-                                            "label": "Baseline Macro",
-                                            "value": "baseline_macro",
-                                        },
-                                        {
-                                            "label": "Baseline Micro",
-                                            "value": "baseline_micro",
+                                            "label": "Baseline",
+                                            "value": "baseline",
                                         },
                                     ],
-                                    value="baseline_macro",
+                                    value="baseline",
                                 ),
                                 html.Br(),
                                 dbc.Label("Select Markets", html_for="select-markets"),
@@ -284,7 +280,7 @@ def _generate_content(output: MonteCarloResults):
     var_body = html.Div(
         [
             html.H4(
-                f"VaR: {output.summary['Bad Debt Max'].quantile(QUANTILE):,.0f} crvUSD"
+                f"VaR: {output.summary['Bad Debt Pct Max'].quantile(QUANTILE):,.2f} %"
             )
         ]
     )
@@ -292,7 +288,7 @@ def _generate_content(output: MonteCarloResults):
     lar_body = html.Div(
         [
             html.H4(
-                f"LaR: {output.summary['Debt Liquidated Max'].quantile(QUANTILE):,.0f} crvUSD"
+                f"LaR: {output.summary['Debt Liquidated Pct Max'].quantile(QUANTILE):,.2f} %"
             )
         ]
     )
@@ -300,42 +296,42 @@ def _generate_content(output: MonteCarloResults):
     for controller in template.controllers:
         _controller = entity_str(controller, "controller")
 
-        controller_bad_debt = output.summary[f"Bad Debt On {_controller} Max"].quantile(
-            QUANTILE
-        )
+        controller_bad_debt = output.summary[
+            f"Bad Debt Pct On {_controller} Max"
+        ].quantile(QUANTILE)
         var_body.children.append(
-            html.H6(f"VaR on {_controller}: {controller_bad_debt:,.0f} crvUSD")
+            html.H6(f"VaR on {_controller}: {controller_bad_debt:,.2f} %")
         )
 
         collateral_liquidated = output.summary[
-            f"Debt Liquidated On {entity_str(controller, 'controller')} Max"
+            f"Debt Liquidated Pct On {entity_str(controller, 'controller')} Max"
         ].quantile(QUANTILE)
         lar_body.children.append(
-            html.H6(f"LaR on {_controller}: {collateral_liquidated:,.0f} crvUSD")
+            html.H6(f"LaR on {_controller}: {collateral_liquidated:,.2f} %")
         )
 
     var_card = create_card(
         "Value at Risk",
-        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs. This may intuitively be interpreted as: Bad debt under the input assumptions will only ever exceed VaR 1% of the time.",
+        "Value at Risk (VaR) is the p99 maximum bad debt observed over the simulated runs as a percentage of simulated debt. This may intuitively be interpreted as: Bad d under the input assumptions will only ever exceed VaR 1% of the time.",
         var_body,
     )
 
     lar_card = create_card(
         "Liquidations at Risk",
-        "Liquidations at Risk (LaR) is the p99 maximum debt liquidated over the simulated runs. This may intuitively be interpreted as: Liquidated debt under the input assumptions will only ever exceed LaR 1% of the time.",
+        "Liquidations at Risk (LaR) is the p99 maximum debt liquidated over the simulated runs as a percentage of simulated debt. This may intuitively be interpreted as: Liquidated debt under the input assumptions will only ever exceed LaR 1% of the time.",
         lar_body,
     )
 
     blar_body = html.Div(
         [
             html.H4(
-                f"BLaR: {output.summary['Borrower Loss Max'].quantile(QUANTILE):,.0f} USD"
+                f"BLaR: {output.summary['Borrower Loss Pct Max'].quantile(QUANTILE):,.2f} %"
             )
         ]
     )
     blar_card = create_card(
         "Borrower Losses at Risk",
-        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
+        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs as a percentage of simulated debt. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
         blar_body,
     )
 
@@ -423,15 +419,15 @@ def _generate_content(output: MonteCarloResults):
                                             str(metadata["markets"]),
                                         ]
                                     ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Brief description: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            str(metadata["description"]),
-                                        ]
-                                    ),
+                                    # html.Li(
+                                    #     [
+                                    #         html.Span(
+                                    #             "Brief description: ",
+                                    #             style={"font-weight": "bold"},
+                                    #         ),
+                                    #         str(metadata["description"]),
+                                    #     ]
+                                    # ),
                                 ]
                             ),
                         ),
@@ -476,7 +472,7 @@ def _generate_content(output: MonteCarloResults):
                                         dbc.Select(
                                             options=aggregate_columns,
                                             id="aggregate-metric-dropdown",
-                                            value="System Health Mean",
+                                            value="System Health Min",
                                         ),
                                         width=4,
                                     ),
@@ -780,7 +776,7 @@ def update_aggregate_graph(value):
     return fig
 
 
-N = 3  # keep every N rows for run graphs
+N = 1  # keep every N rows for run graphs
 
 
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))

@@ -28,6 +28,8 @@ def entity_str(entity: Any, type_: str) -> str:
         name = name.replace("/", "_")
     elif type_ == "pk":
         name = entity.POOL.name.replace("Curve.fi Factory Plain Pool: ", "")
+    elif type_ == "tricrypto":
+        name = entity.name.replace("Tricrypto", "")
     else:
         raise ValueError("Invalid type_.")
 
@@ -43,4 +45,9 @@ def controller_healths(controller: SimController) -> np.ndarray:
 
 def controller_debts(controller: SimController) -> np.ndarray:
     """Return array of debts of controller users."""
-    return np.array([l.initial_debt for l in controller.loan.values()])
+    return np.array(
+        [
+            controller._debt(user)[0]  # pylint: disable=protected-access
+            for user in controller.loan
+        ]
+    )

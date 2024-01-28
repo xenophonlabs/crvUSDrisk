@@ -1,4 +1,4 @@
-"""Package for all custom modules for simulations."""
+"""
+Provides the `ExternalMarket` class for modeling.
+"""
 from .market import ExternalMarket
-
-__all__ = ["ExternalMarket"]

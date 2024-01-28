@@ -1,21 +1,21 @@
 """
-Provides the base scenario template.
+Provides the `Strategy` class which stores the metrics
+and runs the scenario.
 """
-from abc import ABC, abstractmethod
 from typing import List, Type
-from ..scenario import Scenario
-from ..processing import SingleSimProcessor
-from ..results import SingleSimResults
-from ...metrics import Metric
-from ...logging import get_logger
+from .scenario import Scenario
+from .processing import SingleSimProcessor
+from .results import SingleSimResults
+from ..metrics import Metric
+from ..logging import get_logger
 
 logger = get_logger(__name__)
 
 
 # pylint: disable=too-few-public-methods
-class Strategy(ABC):
+class Strategy:
     """
-    Base strategy implements the __call__ method.
+    Strategy stores the metrics and runs the simulation.
     """
 
     def __init__(self, metrics: List[Type[Metric]]):
@@ -24,7 +24,6 @@ class Strategy(ABC):
     def __call__(
         self,
         scenario: Scenario,
-        parameters: dict,
         i: int | None = None,
     ) -> SingleSimResults:
         """
@@ -46,7 +45,3 @@ class Strategy(ABC):
         logger.info("DONE with simulation %d", i)
 
         return processor.process()
-
-    @abstractmethod
-    def apply_shocks(self, scenario_template: Scenario) -> None:
-        """Apply the scenario shocks to the template."""

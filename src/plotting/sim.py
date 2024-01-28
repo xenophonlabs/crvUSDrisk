@@ -1,4 +1,5 @@
 """Plotting functions for simulations."""
+from typing import Any
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -13,8 +14,11 @@ COINGECKO_IDS_ = {v: k for k, v in COINGECKO_IDS.items()}
 
 
 def plot_prices(
-    df: pd.DataFrame, df2: pd.DataFrame | None = None, fn: str | None = None
-) -> plt.Figure:
+    df: pd.DataFrame,
+    df2: pd.DataFrame | None = None,
+    fn: str | None = None,
+    axs: Any = None,
+) -> plt.Axes:
     """
     Plot prices in df. Assumes that each col
     in the df is a coin.
@@ -26,7 +30,8 @@ def plot_prices(
     n, m = int(n**0.5), n // int(n**0.5) + (n % int(n**0.5) > 0)
     # now n, m are the dimensions of the grid
 
-    f, axs = plt.subplots(n, m, figsize=(15, 15))
+    if axs is None:
+        _, axs = plt.subplots(n, m, figsize=(15, 15))
 
     for i in range(n):
         for j in range(m):
@@ -35,7 +40,7 @@ def plot_prices(
                 ax = axs[j]
             else:
                 ax = axs[i, j]
-            ax.plot(df.index, df[col], lw=1, c="royalblue", label="Real")
+            ax.plot(df.index, df[col], lw=1, label="Real")
             title = col
             if "0x" in title and title in ADDRESS_TO_SYMBOL:
                 title = ADDRESS_TO_SYMBOL[title]
@@ -53,7 +58,8 @@ def plot_prices(
                 )
                 ax.legend()
 
-    return save(f, fn)
+    save(axs.flatten()[0].figure, fn)
+    return axs
 
 
 def plot_jumps(
@@ -222,41 +228,34 @@ def plot_debt_to_liquidity(debts: pd.DataFrame, liquidity: pd.DataFrame) -> plt.
     Plot crvUSD debt in LLAMMA vs liquidity in StableSwap pools over
     time.
     """
+    _start = max(debts.index[0], liquidity.index[0])
+    _end = min(debts.index[-1], liquidity.index[-1])
+    _debts = debts.loc[_start:_end]
+    _liquidity = liquidity.loc[_start:_end]
+
     f, ax = plt.subplots()
 
-    ax2 = ax.twinx()
-
     ax.fill_between(
-        debts.index,
+        _debts.index,
         0,
-        debts["debt"] / 1e6,
+        _debts["debt"] / 1e6,
         label="crvUSD Debt",
         color="indianred",
         alpha=0.7,
     )
     ax.fill_between(
-        liquidity.index,
+        _liquidity.index,
         0,
-        liquidity["liquidity"] / 1e6,
+        _liquidity["liquidity"] / 1e6,
         label="crvUSD Liquidity",
         color="royalblue",
         alpha=0.7,
     )
     ax.set_ylabel("Total crvUSD (Millions)")
     ax.tick_params(axis="x", rotation=45)
+    ax.set_title("crvUSD Debt vs Liquidity in StableSwap Pools")
 
-    ratio = (debts["debt"] / liquidity["liquidity"]).dropna()
-    ax2.axhline(
-        ratio.mean(),
-        color="black",
-        linestyle="--",
-        label="Mean Debt:Liquidity Ratio",
-        lw=1,
-    )
-    ax2.set_ylabel("Debt:Liquidity Ratio")
-
-    ax.set_title("crvUSD Debt in LLAMMA vs Liquidity in StableSwap Pools")
-
-    f.legend(loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3)
+    # f.legend(loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=2)
+    ax.legend()
 
     return f

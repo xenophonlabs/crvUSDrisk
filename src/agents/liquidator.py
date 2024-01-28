@@ -1,6 +1,6 @@
 """Provides the `Liquidator` class."""
 import math
-from typing import List, Dict
+from typing import List, Dict, cast
 from dataclasses import dataclass
 from collections import defaultdict
 from crvusdsim.pool.crvusd.controller import Position
@@ -188,6 +188,13 @@ class Liquidator(Agent):
             # basis token -> crvusd
             j = get_crvusd_index(crvusd_pool)
             i = j ^ 1
+
+            if to_repay >= crvusd_pool.balances[j]:
+                logger.debug(
+                    "Not enough crvusd in pool %s for liquidation.", crvusd_pool.name
+                )
+                continue
+
             amt_in = crvusd_pool.get_dx(i, j, to_repay)
             trade1 = Swap(crvusd_pool, i, j, amt_in)
 
@@ -222,13 +229,16 @@ class Liquidator(Agent):
             self._count[controller.address] += 1
 
             external = best.trades[2]
-            liquidation = best.trades[1]
+            liquidation = cast(Liquidation, best.trades[1])
+            position = liquidation.position
+
             self.collateral_liquidated[
                 controller.address
             ] += external.amt / 10 ** external.get_decimals(external.i)
-            self.debt_repaid[
+
+            self.debt_repaid[  # Includes the liquidated user's crvusd in llamma
                 controller.address
-            ] += liquidation.amt / 10 ** liquidation.get_decimals(liquidation.i)
+            ] += position.debt / 10 ** liquidation.get_decimals(liquidation.i)
 
             self.update_borrower_losses(best, prices)
 

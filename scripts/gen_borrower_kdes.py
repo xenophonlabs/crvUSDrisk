@@ -55,10 +55,10 @@ if __name__ == "__main__":
 
     df = get_historical_user_snapshots(address, start_ts, end_ts)
 
-    dir = os.path.join(CONFIG_DIR, alias.lower())
+    _dir = os.path.join(CONFIG_DIR, alias.lower())
 
-    os.makedirs(dir, exist_ok=True)
-    fn = os.path.join(dir, f"{start_ts}_{end_ts}.pkl")
+    os.makedirs(_dir, exist_ok=True)
+    fn = os.path.join(_dir, f"{start_ts}_{end_ts}.pkl")
 
     kde = gaussian_kde(df[["debt_log", "collateral_log", "n"]].values.T)
     with open(fn, "wb") as f:
@@ -68,6 +68,9 @@ if __name__ == "__main__":
         values = df[["health", "collateral_log"]].values.T
         density = gaussian_kde(values)(values)
         health, collateral_log = values
-        title = f"Borrower States for {alias} from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+        title = (
+            f"Borrower States for {alias} from "
+            "{start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+        )
         fig = plot_borrowers_2d(health, collateral_log, density, title=title)
         plt.show()

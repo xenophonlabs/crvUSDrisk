@@ -2,17 +2,23 @@
 Provides the `Scenario` class for running simulations.
 """
 
-from typing import List, Tuple, Set, cast, Dict
+from typing import List, Tuple, Set, cast, Dict, Any
 from itertools import combinations
 from datetime import datetime
+from collections import defaultdict
 import pandas as pd
 from crvusdsim.pool import get, SimMarketInstance  # type: ignore
 from crvusdsim.pool.crvusd.price_oracle.crypto_with_stable_price import Oracle
-from crvusdsim.pool.sim_interface import SimController, SimLLAMMAPool
 from curvesim.pool.sim_interface import SimCurveCryptoPool
 from scipy.stats import gaussian_kde
 import numpy as np
-from .utils import rebind_markets
+from .utils import (
+    rebind_markets,
+    clear_controller,
+    reset_controller_price,
+    find_active_band,
+    parse_markets,
+)
 from ..prices import PriceSample, PricePaths
 from ..configs import (
     TOKEN_DTOs,
@@ -22,9 +28,16 @@ from ..configs import (
     get_liquidity_config,
     CRVUSD_DTO,
     ALIASES_LLAMMA,
-    MODELLED_MARKETS,
 )
-from ..configs.tokens import WETH, WSTETH, SFRXETH
+from ..configs.tokens import (
+    WETH,
+    WSTETH,
+    SFRXETH,
+    STABLE_CG_IDS,
+    COINGECKO_IDS_INV,
+    WETH_DTO,
+)
+from ..configs.parameters import set_parameters
 from ..modules import ExternalMarket
 from ..agents import Arbitrageur, Liquidator, Keeper, Borrower, LiquidityProvider
 from ..data_transfer_objects import TokenDTO
@@ -44,32 +57,35 @@ class Scenario:
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, scenario: str, market_names: List[str]):
-        for alias in market_names.copy():
-            if alias[:2] == "0x":
-                alias = ALIASES_LLAMMA[alias]
-            assert alias.lower() in MODELLED_MARKETS, ValueError(
-                f"Only {MODELLED_MARKETS} markets are supported, not {alias}."
-            )
-        self.market_names = market_names
+    def __init__(
+        self,
+        scenario: str,
+        market_names: List[str],
+    ):
+        self.market_names = parse_markets(market_names)
         self.config = config = get_scenario_config(scenario)
         self.name: str = config["name"]
-        self.description: str = config["description"]
         self.num_steps: int = config["N"]
         self.freq: str = config["freq"]
+        self.subgraph_end_ts = config["subgraph_end_ts"]
 
         self.price_config = get_price_config(
             self.freq, self.config["prices"]["start"], self.config["prices"]["end"]
         )
+
+        # Shocks | Must be set by scenario shocks!
+        self.jump_params: dict = {}
+        self.target_debt: Dict[str, float] = {}
+        self.target_debt_multiplier = 1.0
+        self.target_liquidity_ratio: float = 0.0
+
+        self.apply_shocks()
 
         self.generate_sim_market()  # must be first
         self.generate_pricepaths()
         self.generate_markets()
         self.generate_agents()
 
-        # FIXME this costs a lot of memory to store
-        # but prevents us from having to read it from disk
-        # which would cause thread locks.
         self.kde: Dict[str, gaussian_kde] = {}
         for controller in self.controllers:
             pool = controller.AMM
@@ -82,6 +98,35 @@ class Scenario:
         self.liquidity_config = get_liquidity_config(
             config["liquidity"]["start"], config["liquidity"]["end"]
         )
+
+        self.curr_price = self.pricepaths[0]
+
+    @property
+    def arbed_pools(self) -> list:
+        """
+        Return the pools that are arbed.
+        By default the arbitrageur will arbitrage all
+        crvUSD pools against External Markets.
+
+        This includes LLAMMAs and StableSwap pools.
+        """
+        return self.stableswap_pools + self.llammas + list(self.markets.values())
+
+    @property
+    def total_debt(self) -> int:
+        """
+        Get total debt in all controllers.
+        """
+        return sum((controller.total_debt() for controller in self.controllers))
+
+    @property
+    def total_crvusd_liquidity(self) -> int:
+        """Total crvUSD liquidity in StableSwap Pools."""
+        return sum(
+            (spool.balances[get_crvusd_index(spool)] for spool in self.stableswap_pools)
+        )
+
+    ### ========== Scenario Setup ========== ###
 
     def generate_markets(self) -> pd.DataFrame:
         """Generate the external markets for the scenario."""
@@ -115,18 +160,9 @@ class Scenario:
         """
         Generate the pricepaths for the scenario.
         """
-        self.pricepaths: PricePaths = PricePaths(self.num_steps, self.price_config)
-
-    @property
-    def arbed_pools(self) -> list:
-        """
-        Return the pools that are arbed.
-        By default the arbitrageur will arbitrage all
-        crvUSD pools against External Markets.
-
-        This includes LLAMMAs and StableSwap pools.
-        """
-        return self.stableswap_pools + self.llammas + list(self.markets.values())
+        self.pricepaths: PricePaths = PricePaths(
+            self.num_steps, self.price_config, self.jump_params
+        )
 
     def generate_agents(self) -> None:
         """Generate the agents for the scenario."""
@@ -139,7 +175,7 @@ class Scenario:
 
         # Set arbitrage cycles
         self.graph = PoolGraph(self.arbed_pools)
-        self.arb_cycle_length = self.config["arb_cycle_length"]
+        self.arb_cycle_length = 3
         self.cycles = self.graph.find_cycles(n=self.arb_cycle_length)
 
         self.borrowers: Dict[str, Borrower] = {}
@@ -149,13 +185,18 @@ class Scenario:
         """
         Generate the crvusd modules to simulate, including
         LLAMMAs, Controllers, StableSwap pools, etc.
+
+        Applies the input parameter changes.
         """
         sim_markets: List[SimMarketInstance] = []
         for market_name in self.market_names:
             logger.info("Fetching %s market from subgraph", market_name)
 
             sim_market = get(
-                market_name, bands_data="controller", use_simple_oracle=False
+                market_name,
+                bands_data="controller",
+                use_simple_oracle=False,
+                end_ts=self.subgraph_end_ts,
             )
 
             metadata = sim_market.pool.metadata
@@ -211,6 +252,161 @@ class Scenario:
             for sorted_pair in [sorted(pair)]
         ]
 
+    def resample_debt(self) -> None:
+        """
+        Setup borrowers for the scenario.
+        - Shift AMM price up slightly
+        - Clear debt positions
+        - Resample new debt positions from KDE until we hit target debt
+        - (AMM price shifts back down in `prepare_for_run`)
+        """
+        assert self.target_debt, RuntimeError("Target debt not set.")
+        for controller in self.controllers:
+            llamma = controller.AMM
+            llamma.price_oracle_contract.freeze()
+            reset_controller_price(controller)
+            clear_controller(controller)
+            ceiling = self.factory.debt_ceiling[controller.address]
+            target_debt = int(
+                ceiling * self.target_debt[ALIASES_LLAMMA[llamma.address]]
+            )
+            multiplier = self.target_debt_multiplier
+            while controller.total_debt() < target_debt:
+                borrower = Borrower()
+                success = borrower.create_loan(
+                    controller, self.kde[llamma.address], multiplier=multiplier
+                )
+                if not success:
+                    break
+                self.borrowers[borrower.address] = borrower
+            leftover = controller.total_debt() - target_debt
+            if success and leftover > 0:
+                controller.repay(leftover, borrower.address)
+            llamma.price_oracle_contract.unfreeze()
+            find_active_band(llamma)
+            del self.kde[llamma.address]  # free up memory
+            logger.debug(
+                "Resampled total debt %d in %s.",
+                controller.total_debt(),
+                llamma.name,
+            )
+
+    def resample_liquidity(self) -> None:
+        """
+        Resample the liquidity in stableswap pools as a
+        function of the current total debt.
+
+        Ensure we hit the target liquidity ratio.
+        """
+        assert self.target_liquidity_ratio, RuntimeError(
+            "Target liquidity ratio not set."
+        )
+
+        cfg = self.liquidity_config
+        total_debt = self.total_debt
+
+        deposit_amounts = []
+        total_crvusd_liquidity = 0
+        for spool in self.stableswap_pools:
+            # Sample liquidity for spool from multivariate normal
+            mean = np.array(cfg[spool.address]["mean_vector"])
+            cov = np.array(cfg[spool.address]["covariance_matrix"])
+            while True:
+                _amounts = np.random.multivariate_normal(mean, cov)
+                amounts = np.array(
+                    [int(b * 1e36 / r) for b, r in zip(_amounts, spool.rates)]
+                )
+                if all(amount > 0 for amount in amounts):
+                    deposit_amounts.append(amounts)
+                    total_crvusd_liquidity += amounts[get_crvusd_index(spool)]
+                    break
+
+        scale_factor = total_debt / (
+            self.target_liquidity_ratio * total_crvusd_liquidity
+        )
+
+        for spool, amounts in zip(self.stableswap_pools, deposit_amounts):
+            spool.remove_liquidity(spool.totalSupply, [0, 0])
+            assert spool.totalSupply == 0
+            assert spool.balances == [0, 0]
+            # Resample
+            lp = LiquidityProvider()
+            lp.add_liquidity(
+                spool,
+                amounts * scale_factor,
+            )
+            self.lps[lp.address] = lp
+
+        logger.debug(
+            "Resampled total crvUSD liquidity %d with ratio %f",
+            self.total_crvusd_liquidity,
+            self.total_debt / self.total_crvusd_liquidity,
+        )
+
+    ### ========== Scenario Shocks ========== ###
+
+    def apply_shocks(self) -> None:
+        """Apply the scenario shocks."""
+        for shock in self.config["shocks"]:
+            if shock["type"] == "mu":
+                self._shock_mu(shock)
+            elif shock["type"] == "debt":
+                self._shock_debt(shock)
+            elif shock["type"] == "liquidity":
+                self._shock_debt_liquidity_ratio(shock)
+            elif shock["type"] == "vol":
+                self._shock_vol(shock)
+            elif shock["type"] == "jump":
+                self._shock_jumps(shock)
+            else:
+                raise ValueError(f"Unknown shock type {shock['type']}.")
+
+    def _shock_mu(self, shock: dict) -> None:
+        """
+        Shocks the drift for collateral price GBMs.
+        """
+        for k, v in self.price_config["params"].items():
+            if k not in STABLE_CG_IDS:
+                token = TOKEN_DTOs[COINGECKO_IDS_INV[k]]
+                v["mu"] = shock["target"][token.symbol]
+
+    def _shock_debt_liquidity_ratio(self, shock: dict) -> None:
+        """
+        Shocks the ratio of Debt : crvUSD Liquidity.
+        """
+        self.target_liquidity_ratio = shock["target"]
+
+    def _shock_vol(self, shock: dict) -> None:
+        """
+        Shocks the volatility for collateral price GBMs.
+        """
+        for k, v in self.price_config["params"].items():
+            if k not in STABLE_CG_IDS:
+                token = TOKEN_DTOs[COINGECKO_IDS_INV[k]]
+                v["sigma"] = shock["target"][token.symbol]
+
+    def _shock_debt(self, shock: dict) -> None:
+        """
+        Shocks the total amount of debt in the system.
+        """
+        self.target_debt = shock["target"]
+
+    def _shock_jumps(self, shock: dict) -> None:
+        """
+        Unpack the jump config.
+        """
+        self.jump_params = shock["target"]
+
+    ### ========== Parameter Sweeps ========== ###
+
+    def apply_parameters(self, params: Dict[str, Any]) -> None:
+        """
+        Apply parameter changes.
+        """
+        set_parameters(self, params)
+
+    ### ========== Scenario Execution ========== ###
+
     def update_market_prices(self, sample: PriceSample) -> None:
         """Update market prices with a new sample."""
         for pair in self.pairs:
@@ -225,7 +421,7 @@ class Scenario:
         2. Liquidate users that were loaded underwater.
         """
         if resample:
-            self.setup_borrowers()  # randomly sample positions
+            self.resample_debt()  # randomly sample positions
             self.resample_liquidity()  # resample crvUSD liquidity
 
         sample = self.pricepaths[0]
@@ -272,6 +468,11 @@ class Scenario:
 
             controller.after_trades(do_liquidate=True)  # liquidations
 
+        for llamma in self.llammas:
+            llamma.reset_admin_fees()
+            llamma.bands_fees_x = defaultdict(int)
+            llamma.bands_fees_y = defaultdict(int)
+
     def _increment_timestamp(self, ts: int) -> None:
         """Increment the timestamp for all modules."""
         self.aggregator._increment_timestamp(ts)  # pylint: disable=protected-access
@@ -313,24 +514,32 @@ class Scenario:
                 )
             )
 
-    def update_staked_prices(self, sample: PriceSample) -> None:
-        """Update staked prices with a new sample."""
-        # Need to know which assets (staked and base)
+    def update_oracle_prices(self, sample: PriceSample) -> None:
+        """
+        The crvusdsim oracles require us to update the
+        staked prices for staked tokens (e.g. wstETH).
+
+        When sweeping chainlink limits, we also must update
+        the chainlink aggregator oracle prices.
+        """
         for llamma in self.llammas:
             oracle = cast(Oracle, llamma.price_oracle_contract)
+            collat = llamma.COLLATERAL_TOKEN
             if hasattr(oracle, "staked_oracle"):
-                derivative = llamma.COLLATERAL_TOKEN.address
-                base = WETH
-                assert derivative in [WSTETH, SFRXETH]
-                p_staked = int(sample.prices[derivative][base] * 10**18)
+                assert collat.address in [WSTETH, SFRXETH]
+                p_staked = int(sample.prices[collat.address][WETH] * 10**18)
                 oracle.staked_oracle.update(p_staked)
+                collat = WETH_DTO  # use WETH for chainlink aggregator
+            if oracle.chainlink_aggregator is not None:
+                p = int(sample.prices_usd[collat.address] * 10**collat.decimals)
+                oracle.set_chainlink_price(p)
 
     def prepare_for_trades(self, sample: PriceSample) -> None:
         """Prepare all modules for a new time step."""
         ts = sample.timestamp
         self.update_market_prices(sample)
         self.update_tricrypto_prices(sample)
-        self.update_staked_prices(sample)
+        self.update_oracle_prices(sample)
 
         for llamma in self.llammas:
             llamma.prepare_for_trades(ts)  # this increments oracle timestamp
@@ -351,133 +560,11 @@ class Scenario:
 
         sample.prices_usd[CRVUSD_DTO.address] = self.aggregator.price() / 1e18
 
-    def after_trades(self) -> None:
-        """Perform post processing for all modules at the end of a time step."""
+        self.curr_price = sample
 
     def perform_actions(self, prices: PriceSample) -> None:
         """Perform all agent actions for a time step."""
+        assert prices is self.curr_price  # Check we have prepared for trades
+        self.keeper.update(self.peg_keepers)
         self.arbitrageur.arbitrage(self.cycles, prices)
         self.liquidator.perform_liquidations(self.controllers, prices)
-        self.keeper.update(self.peg_keepers)
-        # TODO LP
-
-    def setup_borrowers(self) -> None:
-        """
-        Setup borrowers for the scenario.
-        - Shift AMM price up slightly
-        - Clear debt positions
-        - Resample new debt positions from KDE
-        - (AMM price shifts back down in `prepare_for_run`)
-        """
-        for controller in self.controllers:
-            llamma = controller.AMM
-            llamma.price_oracle_contract.freeze()
-            reset_controller_price(controller)
-            clear_controller(controller)
-            num_loans = self.config["borrowers"]["num_loans"][
-                ALIASES_LLAMMA[llamma.address]
-            ]
-            for _ in range(num_loans):
-                borrower = Borrower()
-                success = borrower.create_loan(controller, self.kde[llamma.address])
-                if not success:
-                    break
-                self.borrowers[borrower.address] = borrower
-            llamma.price_oracle_contract.unfreeze()
-            find_active_band(llamma)
-            del self.kde[llamma.address]  # free up memory
-            logger.debug(
-                "Resampled %d loans with total debt %d in %s.",
-                num_loans,
-                controller.total_debt(),
-                llamma.name,
-            )
-
-    def total_debt(self) -> int:
-        """
-        Get total debt in all controllers.
-        """
-        return sum((controller.total_debt() for controller in self.controllers))
-
-    def resample_liquidity(self) -> None:
-        """
-        Resample the liquidity in stableswap pools as a
-        function of the current total debt.
-        """
-        cfg = self.liquidity_config
-        total_debt = self.total_debt() / 1e18
-        mean_liquidity = sum(
-            (
-                cfg[spool.address]["mean_vector"][get_crvusd_index(spool)]
-                for spool in self.stableswap_pools
-            )
-        )
-        scale_factor = total_debt / (mean_liquidity * cfg["target_ratio"])
-
-        for spool in self.stableswap_pools:
-            spool.remove_liquidity(spool.totalSupply, [0, 0])
-            assert spool.totalSupply == 0
-            assert spool.balances == [0, 0]
-
-            # Resample
-            lp = LiquidityProvider()
-            lp.add_liquidity(
-                spool,
-                np.array(cfg[spool.address]["mean_vector"]),
-                np.array(cfg[spool.address]["covariance_matrix"]),
-                scale_factor,
-            )
-            self.lps[lp.address] = lp
-
-    def total_crvusd_liquidity(self) -> int:
-        """Total crvUSD liquidity in StableSwap Pools."""
-        return sum(
-            (spool.balances[get_crvusd_index(spool)] for spool in self.stableswap_pools)
-        )
-
-
-def find_active_band(llamma: SimLLAMMAPool) -> None:
-    """Find the active band for a LLAMMA."""
-    min_band = llamma.min_band
-    for n in range(llamma.min_band, llamma.max_band):
-        if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
-            min_band += 1
-        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
-            llamma.active_band = n
-            break
-    llamma.min_band = min_band
-
-
-def clear_controller(controller: SimController) -> None:
-    """Clear all controller states."""
-    users = list(controller.loan.keys())
-    for user in users:
-        debt = controller._debt(user)[0]  # pylint: disable=protected-access
-        if debt > 0:
-            controller.STABLECOIN._mint(user, debt)  # pylint: disable=protected-access
-        controller.repay(debt, user)
-        del controller.loan[user]
-
-    assert controller.n_loans == 0
-    assert len(controller.loan) == 0
-    assert controller.total_debt() == 0
-
-
-def reset_controller_price(controller: SimController) -> None:
-    """
-    Reset controller price.
-    """
-    llamma = controller.AMM
-
-    min_band = llamma.min_band - 3  # Offset by a little bit
-    active_band = min_band + 1
-
-    llamma.active_band = active_band
-    llamma.min_band = min_band
-
-    p = llamma.p_oracle_up(active_band)
-    llamma.price_oracle_contract.last_price = p
-
-    ts = controller._block_timestamp  # pylint: disable=protected-access
-    controller.prepare_for_trades(ts + 60 * 60)
-    llamma.prepare_for_trades(ts + 60 * 60)
