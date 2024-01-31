@@ -101,7 +101,6 @@ class Swap(Trade):
             if isinstance(pool, ExternalMarket):
                 amt_out = result
             elif isinstance(pool, (SimLLAMMAPool, SimCurveStableSwapPool)):
-                # TODO for LLAMMA, need to adjust `amt_in` by `in_amount_done`.
                 in_amount_done, amt_out, _ = result
                 if in_amount_done != amt_in:
                     logger.warning(

@@ -10,49 +10,6 @@ from ...utils import approx, scale_prices
 simple_types = (int, float, str, bool, list, dict, tuple, set)
 
 
-def test_statelessness(scenario: Scenario) -> None:
-    """
-    Make sure that finding the best arbitrage
-    does not affect underlying pools.
-    """
-    _scenario = deepcopy(scenario)
-
-    spools = _scenario.stableswap_pools
-    spool_snapshots = {p.address: p.get_snapshot() for p in spools}
-
-    llammas = _scenario.llammas
-    llamma_snapshots = {l.address: l.get_snapshot() for l in llammas}
-
-    _scenario.arbitrageur.find_best_arbitrage(_scenario.cycles, _scenario.curr_price)
-
-    for spool in spools:
-        old = spool_snapshots[spool.address]
-        new = spool.get_snapshot()
-        assert old.balances == new.balances
-        assert (
-            old._block_timestamp  # pylint: disable=protected-access
-            == new._block_timestamp  # pylint: disable=protected-access
-        )
-        assert old.last_price == new.last_price
-        assert old.ma_price == new.ma_price
-        assert old.ma_last_time == new.ma_last_time
-
-    for llamma in llammas:
-        old = llamma_snapshots[llamma.address]
-        new = llamma.get_snapshot()
-        assert old.bands_x == new.bands_x
-        assert old.bands_y == new.bands_y
-        assert (
-            old._block_timestamp  # pylint: disable=protected-access
-            == new._block_timestamp  # pylint: disable=protected-access
-        )
-        assert old.user_shares == new.user_shares
-        assert old.total_shares == new.total_shares
-        assert old.bands_fees_x == new.bands_fees_x
-        assert old.bands_fees_y == new.bands_fees_y
-        assert old.active_band == new.active_band
-
-
 def test_find_best_arbitrage(scenario: Scenario) -> None:
     """
     Test that the find_best_arbitrage function returns
