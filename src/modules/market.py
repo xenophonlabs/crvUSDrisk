@@ -171,7 +171,7 @@ class ExternalMarket:
         x = np.clip(
             np.array(size).reshape(-1, 1).astype(float), model.X_min_, model.X_max_
         )
-        return float(model.f_(x))  # NOTE this is way faster than `predict`
+        return float(model.f_(x)[0][0])  # NOTE this is way faster than `predict`
 
     def price_impact_many(self, i: int, j: int, size: np.ndarray) -> np.ndarray:
         """

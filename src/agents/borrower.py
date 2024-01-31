@@ -35,6 +35,9 @@ class Borrower(Agent):
     def __init__(self) -> None:
         super().__init__()
         self.address = "0x" + secrets.token_hex(20)
+        self.collateral = 0
+        self.debt = 0
+        self.n = 0
 
     def create_loan(
         self, controller: SimController, kde: gaussian_kde, multiplier: float = 1
@@ -84,5 +87,9 @@ class Borrower(Agent):
                 controller.create_loan(self.address, collateral, debt, n)
             else:
                 raise e
+
+        self.debt = debt
+        self.collateral = collateral
+        self.n = n
 
         return True

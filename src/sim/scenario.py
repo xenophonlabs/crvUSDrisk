@@ -15,7 +15,7 @@ import numpy as np
 from .utils import (
     rebind_markets,
     clear_controller,
-    reset_controller_price,
+    raise_controller_price,
     find_active_band,
     parse_markets,
 )
@@ -181,12 +181,9 @@ class Scenario:
         self.borrowers: Dict[str, Borrower] = {}
         self.lps: Dict[str, LiquidityProvider] = {}
 
-    def generate_sim_market(self) -> None:
+    def fetch_markets(self) -> List[SimMarketInstance]:
         """
-        Generate the crvusd modules to simulate, including
-        LLAMMAs, Controllers, StableSwap pools, etc.
-
-        Applies the input parameter changes.
+        Fetch crvUSD markets from subgraph.
         """
         sim_markets: List[SimMarketInstance] = []
         for market_name in self.market_names:
@@ -219,6 +216,17 @@ class Scenario:
             del sim_market.pool.metadata["userStates"]
 
             sim_markets.append(sim_market)
+
+        return sim_markets
+
+    def generate_sim_market(self) -> None:
+        """
+        Generate the crvusd modules to simulate, including
+        LLAMMAs, Controllers, StableSwap pools, etc.
+
+        Applies the input parameter changes.
+        """
+        sim_markets = self.fetch_markets()
 
         # Rebind all markets to use the same shared resources
         rebind_markets(sim_markets)
@@ -264,7 +272,7 @@ class Scenario:
         for controller in self.controllers:
             llamma = controller.AMM
             llamma.price_oracle_contract.freeze()
-            reset_controller_price(controller)
+            raise_controller_price(controller)
             clear_controller(controller)
             ceiling = self.factory.debt_ceiling[controller.address]
             target_debt = int(

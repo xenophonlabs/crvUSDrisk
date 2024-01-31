@@ -87,7 +87,6 @@ class Liquidator(Agent):
                     coins = [c.address for c in pool.coins]
                     if basis_token.address in coins:
                         crvusd_pool = pool
-                        # TODO assuming only one pool for each basis token
                         break
 
                 # Get collateral/basis_token pool

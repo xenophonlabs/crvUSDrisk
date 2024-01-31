@@ -36,7 +36,6 @@ def get_crvusd_index(pool: SimPoolType) -> int:
 def get_quotes(start: int, end: int, tokens: Set[TokenDTO]) -> pd.DataFrame:
     """
     Return list of 1inch quotes from API.
-    TODO add support for filtering for tokens.
     """
     tokens_raw = ",".join([t.address for t in tokens])
     params: Dict[str, int | str] = {
@@ -145,9 +144,6 @@ def get_historical_stableswap_stats(
     """
     Get the historical balance and total LP token supply
     for input stableswap pools.
-
-    TODO should this really be a list or dict?
-    TODO might need to add event loop!
     """
     dfs = defaultdict(list)
     ts = start
