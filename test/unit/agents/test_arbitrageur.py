@@ -5,7 +5,7 @@ test/unit/trades/
 """
 from copy import deepcopy
 from src.sim import Scenario
-from ...utils import approx
+from ...utils import approx, scale_prices
 
 simple_types = (int, float, str, bool, list, dict, tuple, set)
 
@@ -29,7 +29,10 @@ def test_statelessness(scenario: Scenario) -> None:
         old = spool_snapshots[spool.address]
         new = spool.get_snapshot()
         assert old.balances == new.balances
-        assert old._block_timestamp == new._block_timestamp
+        assert (
+            old._block_timestamp  # pylint: disable=protected-access
+            == new._block_timestamp  # pylint: disable=protected-access
+        )
         assert old.last_price == new.last_price
         assert old.ma_price == new.ma_price
         assert old.ma_last_time == new.ma_last_time
@@ -39,7 +42,10 @@ def test_statelessness(scenario: Scenario) -> None:
         new = llamma.get_snapshot()
         assert old.bands_x == new.bands_x
         assert old.bands_y == new.bands_y
-        assert old._block_timestamp == new._block_timestamp
+        assert (
+            old._block_timestamp  # pylint: disable=protected-access
+            == new._block_timestamp  # pylint: disable=protected-access
+        )
         assert old.user_shares == new.user_shares
         assert old.total_shares == new.total_shares
         assert old.bands_fees_x == new.bands_fees_x
@@ -86,12 +92,8 @@ def test_arbitrage(scenario: Scenario) -> None:
 
     prev_collat_price = llamma.get_p()
 
-    # Raise the collateral price
-    collateral = controller.COLLATERAL_TOKEN.address
-    sample = _scenario.curr_price
-    sample.prices_usd[collateral] *= 2
-    sample.update(sample.prices_usd)
-    _scenario.update_market_prices(sample)
+    # Double the collateral price
+    scale_prices(_scenario, controller.COLLATERAL_TOKEN.address, 2.0)
 
     # Check that the arbitrages were executed
     arbitrageur.arbitrage(_scenario.cycles, _scenario.curr_price)

@@ -17,12 +17,13 @@ from ...utils import approx
 
 @pytest.fixture(scope="module")
 def liquidation_tests_passed() -> dict:
+    """Track successes over hypothesis tests."""
     return {"passed": False}
 
 
 @given(i=st.integers(min_value=0, max_value=len(MODELLED_MARKETS) - 1))
 @settings(deadline=None)
-def test_one_liquidation(
+def test_one_liquidation(  # pylint: disable=too-many-locals, redefined-outer-name
     scenario: Scenario, liquidation_tests_passed: dict, i: int
 ) -> None:
     """
@@ -73,7 +74,9 @@ def test_one_liquidation(
     liquidation_tests_passed["passed"] = True
 
 
-def test_at_least_one_liquidation_test_passed(liquidation_tests_passed: dict) -> None:
+def test_at_least_one_liquidation_test_passed(
+    liquidation_tests_passed: dict,  # pylint: disable=redefined-outer-name
+) -> None:
     """
     Ensure that the liquidation test passed on at
     least one controller. Sometimes, they don't all

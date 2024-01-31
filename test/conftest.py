@@ -5,16 +5,15 @@ All network requests are intercepted and mocked. The mocks
 expect there to be necessary data in the data/test/ directory.
 """
 from typing import List, Set
-import pytest
 import os
 import json
 from unittest.mock import patch
+import pytest
 import pandas as pd
 from crvusdsim.pool import SimMarketInstance, get_sim_market
 from src.configs import LLAMMA_ALIASES, MODELLED_MARKETS
 from src.data_transfer_objects import TokenDTO
 from src.sim import Scenario
-from src.sim.utils import find_active_band
 
 MOCKED_PRICES = {
     "paxos-standard": 0.999346,
@@ -63,7 +62,7 @@ def mocked_get_sim_market(
     market_name: str,
     bands_data: str = "controller",
     use_simple_oracle: bool = False,
-    end_ts: int | None = None,
+    end_ts: int | None = None,  # pylint: disable=unused-argument
 ) -> SimMarketInstance:
     """
     Returns a SimMarketInstance object using stored pool metadata.
@@ -72,7 +71,7 @@ def mocked_get_sim_market(
         market_name = LLAMMA_ALIASES[market_name]
 
     fn = os.path.join(POOL_METADATA_DIR, f"pool_metadata_{market_name}.json")
-    with open(fn, "r") as f:
+    with open(fn, "r", encoding="utf-8") as f:
         pool_metadata = json.load(f)
 
     bands_x = {
@@ -93,14 +92,14 @@ def mocked_get_sim_market(
 
 
 def mocked_get_quotes(
-    start: int,
-    end: int,
-    coins: Set[TokenDTO],
+    start: int,  # pylint: disable=unused-argument
+    end: int,  # pylint: disable=unused-argument
+    coins: Set[TokenDTO],  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     """
     Returns a dataframe of quotes for the given coins.
     """
-    fn = os.path.join(QUOTES_DIR, f"quotes.csv")
+    fn = os.path.join(QUOTES_DIR, "quotes.csv")
     return pd.read_csv(fn, index_col=[0, 1])
 
 
@@ -119,6 +118,6 @@ def scenario() -> Scenario:
         patch("src.sim.scenario.get", side_effect=mocked_get_sim_market),
         patch("src.sim.scenario.get_quotes", side_effect=mocked_get_quotes),
     ):
-        scenario = Scenario("baseline", MODELLED_MARKETS)
-        scenario.prepare_for_run(resample=False)
-        return scenario
+        _scenario = Scenario("baseline", MODELLED_MARKETS)
+        _scenario.prepare_for_run(resample=False)
+        return _scenario

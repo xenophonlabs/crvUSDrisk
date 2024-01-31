@@ -2,9 +2,9 @@
 Test that the utility functions for resampling
 the Controllers and LLAMMAS work as expected.
 """
+from copy import deepcopy
 from hypothesis import given
 import hypothesis.strategies as st
-from copy import deepcopy
 from src.configs import MODELLED_MARKETS
 from src.sim import Scenario
 from src.sim.utils import raise_controller_price, clear_controller, find_active_band

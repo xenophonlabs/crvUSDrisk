@@ -5,11 +5,11 @@ Note
 ----
 The logic for this test is in `demote_pegkeep.ipynb`.
 """
-from src.agents import Keeper
 from src.sim import Scenario
 from ...utils import increment_timestamps
 
 
+# pylint: disable=too-many-locals
 def test_update(scenario: Scenario) -> None:
     """
     Test that raising PK pool prices allows the

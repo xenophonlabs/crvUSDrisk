@@ -10,7 +10,8 @@ immutable_types = (int, float, str, tuple, frozenset)
 container_types = (dict, list, tuple, set)
 
 
-def have_shared_resources(obj1: Any, obj2: Any, visited: set = set()) -> bool:
+# pylint: disable=too-many-branches, too-many-return-statements
+def have_shared_resources(obj1: Any, obj2: Any, visited: set | None = None) -> bool:
     """
     Recursive DFS for checking that two objects do not
     have any (mutable, not callable) shared resources.
@@ -19,6 +20,8 @@ def have_shared_resources(obj1: Any, obj2: Any, visited: set = set()) -> bool:
     any shared resources will dramatically increase lock overhead
     and slow down simulations.
     """
+    visited = visited or set()
+
     if id(obj1) in visited or id(obj2) in visited:
         return False
 
@@ -35,7 +38,7 @@ def have_shared_resources(obj1: Any, obj2: Any, visited: set = set()) -> bool:
     if isinstance(obj1, container_types):
         iter1 = obj1.items() if isinstance(obj1, dict) else enumerate(obj1)
         iter2 = obj2.items() if isinstance(obj2, dict) else enumerate(obj2)
-        for (i1, item1), (i2, item2) in zip(iter1, iter2):
+        for (_, item1), (_, item2) in zip(iter1, iter2):
             if item1 is None and item2 is None:
                 return False
 
