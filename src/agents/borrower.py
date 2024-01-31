@@ -52,6 +52,10 @@ class Borrower(Agent):
         This makes our debt ceiling simulations more conservative.
         3. Larger debt ceilings allow for larger loans, meaning they
         are more likely to occur than what has been seen previously.
+
+        FIXME the multiplier might be making positions less risky:
+        it is not obvious that doubling debt and collateral keeps health
+        constant. This needs to be investigated.
         """
         debt_log, collateral_log, n = kde.resample(1).T[0]
         debt, collateral, n = clean(

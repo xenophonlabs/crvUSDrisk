@@ -78,7 +78,7 @@ def plot_regression(
 
     if xlim:
         ax.set_xlim(0, xlim)
-        ax.set_ylim(0, df[df["in_amount"] < xlim]["price_impact"].max() * 100)
+        ax.set_ylim(0, df[df["in_amount"] < xlim * 10**in_token.decimals]["price_impact"].max() * 100)
 
     return save(f, fn)
 
