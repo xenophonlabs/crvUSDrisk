@@ -86,7 +86,7 @@ protobuf==4.25.1
 psutil==5.9.6
 ptyprocess==0.7.0
 pure-eval==0.2.2
-pycryptodome==3.19.0
+pycryptodome==3.19.1
 Pygments==2.17.2
 pylint==3.0.3
 Pympler==1.0.1
