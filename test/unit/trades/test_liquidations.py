@@ -44,7 +44,10 @@ def test_liquidation(scenario: Scenario) -> None:
         assert position.user not in controller.loan
         assert approx(controller.total_debt(), total_debt - debt)
         assert approx(sum(controller.AMM.bands_x.values()), bands_x - x)
-        assert approx(sum(controller.AMM.bands_y.values()), bands_y - y)
+        assert approx(
+            sum(controller.AMM.bands_y.values()),
+            bands_y - y * controller.COLLATERAL_PRECISION,
+        )
         assert approx(amt_out, y)
 
         break

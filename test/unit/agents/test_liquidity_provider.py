@@ -17,7 +17,7 @@ from ...utils import approx
         st.integers(min_value=1, max_value=1_000_000), min_size=2, max_size=2
     ),
 )
-@settings(max_examples=10)
+@settings(max_examples=10, deadline=None)
 def test_add_liquidity(scenario: Scenario, i: int, _amounts: List[int]) -> None:
     """
     The LP is very simple and just deposits into

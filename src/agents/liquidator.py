@@ -177,9 +177,6 @@ class Liquidator(Agent):
 
         collateral = controller.COLLATERAL_TOKEN.address
 
-        assert (
-            controller.address in self.paths
-        ), f"Liquidator paths {self.paths} not set for controller {controller.address}."
         for path in self.paths[controller.address]:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool
