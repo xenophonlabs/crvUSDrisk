@@ -60,7 +60,7 @@ def set_debt_ceilings(scenario: Scenario, target: float) -> None:
 
 ### ============ Chainlink Limits ============ ###
 
-CHAINLINK_LIMIT_SAMPLES = [int(l * 1e18) for l in [0.015, 0.05, 0.1, 0.15]]
+CHAINLINK_LIMIT_SAMPLES = [int(l * 1e18) for l in [0.015, 0.03, 0.05, 0.1, 0.15]]
 CHAINLINK_LIMIT_SWEEP = [
     {CHAINLINK_LIMIT: sample} for sample in CHAINLINK_LIMIT_SAMPLES
 ]

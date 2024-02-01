@@ -7,24 +7,29 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from ..modules import ExternalMarket
 from .utils import save
+from ..data_transfer_objects import TokenDTO
 
 S = 5
 
 
 def plot_quotes(
-    df: pd.DataFrame, in_token: str, out_token: str, fn: str | None = None
+    df: pd.DataFrame, in_token: TokenDTO, out_token: TokenDTO, fn: str | None = None
 ) -> plt.Figure:
     """Plot 1inch quotes for a given token pair."""
     f, ax = plt.subplots(figsize=(10, 5))
 
     scatter = ax.scatter(
-        df["in_amount"], df["price"], s=S, c=df["timestamp"], cmap="viridis"
+        df["in_amount"] / 10**in_token.decimals,
+        df["price"],
+        s=S,
+        c=df["timestamp"],
+        cmap="viridis",
     )
 
     ax.set_xscale("log")
-    ax.set_title(f"Prices for Swapping {in_token} into {out_token}")
+    ax.set_title(f"Prices for Swapping {in_token.symbol} into {out_token.symbol}")
     ax.set_ylabel("Exchange Rate (out/in)")
-    ax.set_xlabel(f"Trade Size ({in_token})")
+    ax.set_xlabel(f"Trade Size ({in_token.symbol})")
 
     cbar = plt.colorbar(scatter, ax=ax)
     cbar.ax.set_yticklabels(
@@ -78,7 +83,11 @@ def plot_regression(
 
     if xlim:
         ax.set_xlim(0, xlim)
-        ax.set_ylim(0, df[df["in_amount"] < xlim]["price_impact"].max() * 100)
+        ax.set_ylim(
+            0,
+            df[df["in_amount"] < xlim * 10**in_token.decimals]["price_impact"].max()
+            * 100,
+        )
 
     return save(f, fn)
 

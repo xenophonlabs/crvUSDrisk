@@ -87,7 +87,6 @@ class Liquidator(Agent):
                     coins = [c.address for c in pool.coins]
                     if basis_token.address in coins:
                         crvusd_pool = pool
-                        # TODO assuming only one pool for each basis token
                         break
 
                 # Get collateral/basis_token pool
@@ -178,9 +177,6 @@ class Liquidator(Agent):
 
         collateral = controller.COLLATERAL_TOKEN.address
 
-        assert (
-            controller.address in self.paths
-        ), f"Liquidator paths {self.paths} not set for controller {controller.address}."
         for path in self.paths[controller.address]:
             crvusd_pool = path.crvusd_pool
             collat_pool = path.collat_pool

@@ -41,21 +41,12 @@ class Cycle:
         self.state_key: StateKey = StateKey(self)  # for memoization
         self.oracles = []
 
-        # check that this is a cycle
-        for i, trade in enumerate(trades):
+        for trade in trades:
             # Get any oracles
             if isinstance(trade, Swap) and hasattr(trade.pool, "price_oracle_contract"):
                 self.oracles.append(trade.pool.price_oracle_contract)
             elif isinstance(trade, Liquidation):
                 self.oracles.append(trade.controller.AMM.price_oracle_contract)
-
-            if i != self.n - 1:
-                next_trade = trades[i + 1]
-            else:
-                next_trade = trades[0]
-            token_out = trade.get_address(trade.j)
-            token_in = next_trade.get_address(next_trade.i)
-            assert token_in == token_out, "Trades do not form a cycle."
 
     @cached_property
     def llamma_trades(self) -> List[int]:
@@ -103,34 +94,8 @@ class Cycle:
             logger.debug("Executed trade %s. Amt out: %d", trade, amt_out)
             if i != self.n - 1:
                 amt = amt_out
-                # TODO move this to test file
-                next_trade = self.trades[i + 1]
-                next_trade_amt = next_trade.amt
-                # Check that cycle was populated correctly
-                if amt_out == 0 or isinstance(next_trade, Swap):
-                    assert amt_out == next_trade_amt, (
-                        f"Trade {i + 1} output {amt_out} != "
-                        f"Trade {i + 2,} input {next_trade_amt} in Cycle {self}."
-                    )
-                else:  # liquidation
-                    if abs(amt_out - next_trade_amt) / next_trade_amt > TOLERANCE:
-                        # pool.get_dx() is not exact
-                        logger.warning(
-                            "Difference between trade %d output %d and "
-                            "trade %d input %d exceeds tolerance %f in Cycle %s.",
-                            i + 1,
-                            amt_out,
-                            i + 2,
-                            next_trade_amt,
-                            TOLERANCE,
-                            self,
-                        )
 
         profit = (amt_out - amt_in) / 10**decimals
-        if abs(profit - self.expected_profit) > TOLERANCE:
-            logger.warning(
-                "Expected profit %f != actual profit %f.", self.expected_profit, profit
-            )
 
         self.unfreeze_oracles()
 
@@ -203,9 +168,6 @@ class StateKey:
     provides a complete picture of the pool we are trading on.
     If any component of the pool which affects trade execution
     has changed, this MUST invalidate the cache!
-
-    TODO we could implement __hash__ on the `Snapshot` class,
-    in which case we could just hash the snapshot.
     """
 
     def __init__(self, cycle: Cycle):

@@ -120,9 +120,12 @@ SCENARIO_SHOCKS: Dict[str, list] = {
     # Depeg Composites
     # "Adverse depeg and adverse growth": [SHOCK_DEPEG_ADVERSE, SHOCK_DEBT_ADVERSE],
     # "Adverse depeg and severe growth": [SHOCK_DEPEG_ADVERSE, SHOCK_DEBT_SEVERE],
+    "test": [],
 }
 
 SCENARIOS = {
     name.lower(): make_scenario(shocks, name)
     for name, shocks in SCENARIO_SHOCKS.items()
 }
+
+SCENARIOS["test"]["N"] = 2

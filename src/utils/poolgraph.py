@@ -35,7 +35,6 @@ def get_shared_idxs(p1: SimPoolType, p2: SimPoolType) -> Tuple[int, int]:
     """Get the index of the shared coin in each pool."""
     shared = shared_address(p1, p2).pop()
 
-    # FIXME inefficient to recreate c1 and c2
     c1 = [c.lower() for c in p1.coin_addresses]
     c2 = [c.lower() for c in p2.coin_addresses]
 

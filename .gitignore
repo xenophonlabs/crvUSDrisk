@@ -1,9 +1,7 @@
 # Custom
 *.prof
-data/*
 logs/*
 results/*
-results_250_iters/*
 figs/results/*
 *dev.ipynb
 
@@ -168,4 +166,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-data/
+# data/

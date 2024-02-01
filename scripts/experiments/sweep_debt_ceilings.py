@@ -12,8 +12,8 @@ from ..sweep import sweep
 # pylint: disable=duplicate-code
 scenarios = [
     "baseline",
+    "adverse vol",
     "severe vol",
-    "adverse flash crash",
 ]
 
 if __name__ == "__main__":

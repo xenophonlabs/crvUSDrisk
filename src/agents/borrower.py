@@ -35,6 +35,9 @@ class Borrower(Agent):
     def __init__(self) -> None:
         super().__init__()
         self.address = "0x" + secrets.token_hex(20)
+        self.collateral = 0
+        self.debt = 0
+        self.n = 0
 
     def create_loan(
         self, controller: SimController, kde: gaussian_kde, multiplier: float = 1
@@ -52,6 +55,10 @@ class Borrower(Agent):
         This makes our debt ceiling simulations more conservative.
         3. Larger debt ceilings allow for larger loans, meaning they
         are more likely to occur than what has been seen previously.
+
+        FIXME the multiplier might be making positions less risky:
+        it is not obvious that doubling debt and collateral keeps health
+        constant. This needs to be investigated.
         """
         debt_log, collateral_log, n = kde.resample(1).T[0]
         debt, collateral, n = clean(
@@ -80,5 +87,9 @@ class Borrower(Agent):
                 controller.create_loan(self.address, collateral, debt, n)
             else:
                 raise e
+
+        self.debt = debt
+        self.collateral = collateral
+        self.n = n
 
         return True

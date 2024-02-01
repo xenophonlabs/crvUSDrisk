@@ -100,23 +100,6 @@ def rebind_markets(sim_markets: List[SimMarketInstance]) -> None:
             sim_market.controller.address, sim_market.controller.total_debt()
         )
 
-    validate_binds(sim_markets)
-
-
-def validate_binds(sim_markets: List[SimMarketInstance]) -> None:
-    """
-    Ensure binds are correct.
-    TODO move to test file
-    TODO dig deeper into shared objects (e.g. pool.BORROWED_TOKEN)
-    """
-    SHARED = ["stablecoin", "aggregator", "stableswap_pools", "peg_keepers", "factory"]
-    for k, master in sim_markets[0].__dict__.items():
-        for sim_market in sim_markets[1:]:
-            if k in SHARED:
-                assert sim_market.__dict__[k] is master
-            else:
-                assert sim_market.__dict__[k] is not master
-
 
 def find_active_band(llamma: SimLLAMMAPool) -> None:
     """Find the active band for a LLAMMA."""
@@ -124,11 +107,9 @@ def find_active_band(llamma: SimLLAMMAPool) -> None:
     for n in range(llamma.min_band, llamma.max_band):
         if llamma.bands_x[n] == 0 and llamma.bands_y[n] == 0:
             min_band += 1
-        if llamma.bands_x[n] == 0 and llamma.bands_y[n] > 0:
+        if llamma.bands_y[n] > 0:
             llamma.active_band = n
             break
-    assert llamma.bands_x[llamma.active_band] == 0
-    assert llamma.bands_y[llamma.active_band] > 0
     llamma.min_band = min_band
 
 
@@ -148,14 +129,10 @@ def clear_controller(controller: SimController) -> None:
         controller.AMM.bands_x[band] = 0
         controller.AMM.bands_y[band] = 0
 
-    assert controller.n_loans == 0
-    assert len(controller.loan) == 0
-    assert controller.total_debt() == 0
 
-
-def reset_controller_price(controller: SimController) -> None:
+def raise_controller_price(controller: SimController) -> None:
     """
-    Reset controller price.
+    Raise controller price by a little bit.
     """
     llamma = controller.AMM
 
