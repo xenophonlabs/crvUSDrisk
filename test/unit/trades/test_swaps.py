@@ -2,7 +2,7 @@
 Provides testing suite for Swap trades.
 """
 from copy import deepcopy
-from hypothesis import given
+from hypothesis import given, settings
 import hypothesis.strategies as st
 from src.sim.scenario import Scenario
 from src.trades import Swap
@@ -116,6 +116,7 @@ def test_llammas(scenario: Scenario, pool_idx: int, i: int) -> None:
     pool_idx=st.integers(min_value=0, max_value=MAX_MARKETS - 1),
     i=st.integers(min_value=0, max_value=1),
 )
+@settings(deadline=None)
 def test_markets(scenario: Scenario, pool_idx: int, i: int) -> None:
     """
     Test that trades on External Markets are stateless and

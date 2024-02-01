@@ -3,6 +3,11 @@ Provides the testing configuration.
 
 All network requests are intercepted and mocked. The mocks
 expect there to be necessary data in the data/test/ directory.
+
+TODO a lot of tests are "flaky" because they rely on stochastic
+debt resamplings or stochastic price updates. It would be *way* 
+better to provide static data for these tests to make the tests
+deterministic.
 """
 from typing import List, Set
 import os

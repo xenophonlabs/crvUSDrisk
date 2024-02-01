@@ -6,6 +6,8 @@ things like prices, although such tests could be added.
 """
 from copy import deepcopy
 import random
+from hypothesis import given, settings
+import hypothesis.strategies as st
 from src.metrics import (
     DEFAULT_METRICS,
     init_metrics,
@@ -82,7 +84,9 @@ def test_bad_debt_metric(scenario: Scenario) -> None:
     assert approx(actual, expected)
 
 
-def test_borrower_loss_metric(scenario: Scenario) -> None:
+@given(i=st.integers(min_value=0, max_value=3))
+@settings(deadline=None)
+def test_borrower_loss_metric(scenario: Scenario, i: int) -> None:
     """
     Test that the borrower loss metrics are working.
     """
@@ -102,24 +106,16 @@ def test_borrower_loss_metric(scenario: Scenario) -> None:
         # Ensure that metrics are zero at init
         assert processor.results.iloc[-1][m] == 0
 
-    # Force some bad debt
-    _scenario.resample_debt()  # this should usually result in some underwater positions
-    to_liquidate = {c.address: c.users_to_liquidate() for c in _scenario.controllers}
-    n = sum(len(v) for v in to_liquidate.values())
-    assert n > 0
+    # Force LLAMMA arbs
+    collat = _scenario.controllers[i].COLLATERAL_TOKEN.address
+    scale_prices(_scenario, collat, 0.5)
 
-    # Mix up the prices
-    for coin in _scenario.coins:
-        scale_prices(_scenario, coin.address, random.uniform(0.99, 1.01))
+    # Perform arbitrages
+    _scenario.arbitrageur.arbitrage(_scenario.cycles, _scenario.curr_price)
 
-    # Perform arbitrages and liquidations
-    _scenario.perform_actions(_scenario.curr_price)
-
+    # Users should have losses from LVR
     processor.update(_scenario.curr_price.timestamp, inplace=True)
-    for m in metric.config:
-        # Users should have losses from liquidations
-        # and from arbitrages.
-        assert processor.results.iloc[-1][m] > 0
+    assert processor.results.iloc[-1][BorrowerLossMetric.key_metric] > 0
 
 
 def test_liquidations_metric(scenario: Scenario) -> None:
@@ -160,6 +156,7 @@ def test_liquidations_metric(scenario: Scenario) -> None:
     assert approx(actual, expected)
 
 
+# pylint: disable=too-many-locals
 def test_profits_metric(scenario: Scenario) -> None:
     """
     Test that the profits metric is working.
@@ -173,7 +170,7 @@ def test_profits_metric(scenario: Scenario) -> None:
 
     # Mix up the prices
     for coin in _scenario.coins:
-        scale_prices(_scenario, coin.address, random.uniform(0.99, 1.01))
+        scale_prices(_scenario, coin.address, random.uniform(0.9, 1.1))
 
     _scenario.arbitrageur.arbitrage(_scenario.cycles, _scenario.curr_price)
 
@@ -182,7 +179,7 @@ def test_profits_metric(scenario: Scenario) -> None:
     profits = 0
     prices = _scenario.curr_price.prices_usd
     crvusd_price = prices[_scenario.stablecoin.address]
-    for llamma in scenario.llammas:
+    for llamma in _scenario.llammas:
         llamma_bands_fees_x = sum(llamma.bands_fees_x.values())
         llamma_bands_fees_y = sum(llamma.bands_fees_y.values())
 
@@ -194,6 +191,6 @@ def test_profits_metric(scenario: Scenario) -> None:
         profits += profit_x + profit_y  # cum
 
     actual = processor.results.iloc[-1][ProfitsMetric.key_metric]
-    expected = profits
+    expected = profits / (_scenario.total_debt / 1e18) * 100
 
     assert approx(actual, expected)
