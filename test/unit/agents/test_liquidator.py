@@ -118,20 +118,21 @@ def test_paths(scenario: Scenario) -> None:
     """
     Test that the liquidator paths are set up correctly.
     """
-    controllers = {c.address: c for c in scenario.controllers}
+    _scenario = deepcopy(scenario)
+    controllers = {c.address: c for c in _scenario.controllers}
     liquidator = Liquidator()
     liquidator.set_paths(
-        scenario.controllers, scenario.stableswap_pools, scenario.markets
+        _scenario.controllers, _scenario.stableswap_pools, _scenario.markets
     )
-    crvusd = scenario.stablecoin.address
+    crvusd = _scenario.stablecoin.address
     assert len(liquidator.paths) == len(controllers)
     for controller_address, paths in liquidator.paths.items():
         assert len(paths) == len(liquidator.basis_tokens)
         controller = controllers[controller_address]
         collat: str = controller.COLLATERAL_TOKEN.address
         for path in paths:
-            assert path.crvusd_pool in scenario.stableswap_pools
-            assert path.collat_pool in scenario.markets.values()
+            assert path.crvusd_pool in _scenario.stableswap_pools
+            assert path.collat_pool in _scenario.markets.values()
 
             assert collat in path.collat_pool.coin_addresses
             assert crvusd in path.crvusd_pool.coin_addresses
