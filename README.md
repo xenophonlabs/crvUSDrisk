@@ -31,21 +31,16 @@ You may also run your own simulations as instructed in [Usage](#usage).
 
 # Setup
 
-We use a simple python `venv` for package management. Due to a minor dependency conflict between the [curvesim](https://github.com/curveresearch/curvesim/tree/main) and [crvusdsim](https://github.com/0xreviews/crvusdsim) versions we are using, please follow the below steps for setup:
+We use a simple python `venv` for package management.
 
 ```
 python3 -m venv venv
 source venv/bin/activate
 python3 -m pip install --upgrade pip
-grep -v 'crvusdsim' requirements.txt > temp_requirements.txt
-python3 -m pip install -r temp_requirements.txt
-python3 -m pip install git+https://github.com/Tcintra/crvusdsim@main --no-deps
-rm temp_requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-Only Python3.11 is guaranteed support.
-
-*We are working on replacing these dependencies with stable releases.*
+Only Python3.11 is guaranteed support. Notice that the requirements point to a fork of `crvusdsim`. *We are working on replacing this dependency with stable release.*
 
 # Usage
 
