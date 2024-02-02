@@ -19,7 +19,8 @@ from src.modules import ExternalMarket
 logger = get_logger(__name__)
 
 RESULTS_DIR = os.path.join(os.getcwd(), "results")
-
+if "Storage" in os.listdir(RESULTS_DIR):  # railway volumes
+    RESULTS_DIR = os.path.join(RESULTS_DIR, "Storage")
 
 def load_markdown_file(filename: str) -> str:
     with open(filename, "r", encoding="utf-8") as file:
