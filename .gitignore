@@ -1,7 +1,7 @@
 # Custom
 *.prof
 logs/*
-results/*
+# results/*
 figs/results/*
 *dev.ipynb
 
