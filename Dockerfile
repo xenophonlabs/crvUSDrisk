@@ -25,6 +25,6 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./app/ /code/app/
 COPY ./src/ /code/src/
-COPY ./results/ /code/results/
+# COPY ./results/ /code/results/
 
 CMD ["python", "./app/main.py"]

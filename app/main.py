@@ -153,6 +153,8 @@ def update_parameter_dropdown(experiment, is_open):
         labels = [f"{p.replace('_', '.')}%" for p in params]
     elif experiment == "generic":
         labels = ["Default Parameters"]
+    else:
+        labels = params
 
     options = [{"label": label, "value": param} for label, param in zip(labels, params)]
 
