@@ -82,8 +82,12 @@ def load_results(experiment: str, parameter: str, scenario: str) -> MonteCarloRe
     Load the file contents into a pkl.
     """
     fn = os.path.join(RESULTS_DIR, experiment, parameter, scenario)
-    with open(fn, "rb") as f:
-        output = pickle.load(f)
+    try:
+        with open(fn, "rb") as f:
+            output = pickle.load(f)
+    except Exception as e:
+        logger.error(f"Error loading {fn}: {e}")
+        raise e
     return output
 
 
