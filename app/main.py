@@ -754,7 +754,7 @@ def update_aggregate_graph(value):
     return fig
 
 
-N = 3  # keep every N rows for run graphs
+N = 3  # keep every N rows for run prices
 
 
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))
@@ -765,7 +765,7 @@ def update_run_graph(value):
     fig = go.Figure()
 
     for run in output.data:
-        dff = run.df[value].iloc[::N]
+        dff = run.df[value]
         fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines"))
 
     fig.update_layout(
