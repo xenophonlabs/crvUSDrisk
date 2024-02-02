@@ -4,7 +4,7 @@ WORKDIR /code
 
 # Set your GitHub repo URL here
 ARG GIT_REPO_URL=https://github.com/xenophonlabs/crvUSDrisk.git
-ARG GIT_BRANCH=dev  # Adjust the branch name as necessary
+ARG GIT_BRANCH=main  # Adjust the branch name as necessary
 
 # Install system dependencies required for gmpy2 compilation
 RUN apt-get update && apt-get install -y \
