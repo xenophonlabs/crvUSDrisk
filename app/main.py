@@ -1,11 +1,10 @@
 """
 Provides a plotly Dash app to visualize simulation results.
-
-Optionally run the simulation before creating the app.
 """
 from datetime import datetime
 import pickle
 import json
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +17,6 @@ from dash import (
     Input,
     State,
     no_update,
-    callback_context,
 )
 from dash import dash_table
 import plotly.express as px
@@ -27,24 +25,25 @@ from plotly.subplots import make_subplots
 import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import load_figure_template
 from src.sim.results import MonteCarloResults
-from src.logging import get_logger
 from src.plotting.utils import make_square
 from src.configs import ADDRESS_TO_SYMBOL, LLAMMA_ALIASES, TOKEN_DTOs
 from src.utils import get_quotes
 from src.metrics.utils import entity_str
-from .utils import (
+from app.utils import (
     load_markdown_file,
     clean_metadata,
     load_results,
-    run_sim,
     plot_quotes,
     plot_regression,
     create_card,
+    list_experiments,
+    list_param_sweeps,
+    list_scenarios,
 )
 
-plt.switch_backend("Agg")
+PORT = os.getenv("PORT", "8050")
 
-logger = get_logger(__name__)
+plt.switch_backend("Agg")
 
 DECIMALS = 5  # number of decimal places to round to
 
@@ -75,76 +74,52 @@ load_figure_template("flatly")
 
 initial_modal = dbc.Modal(
     [
-        dbc.ModalHeader(html.H2("crvUSD Risk Simulator")),
+        dbc.ModalHeader(html.H2("crvUSD Risk Dashboard")),
         dbc.ModalBody(
             [
                 html.P(
-                    "crvUSD Risk is an Agent Based Model (ABM) that tests the resiliency of the crvUSD system under various market conditions."
+                    "crvUSD Risk is an Agent Based Model (ABM) "
+                    "that tests the resiliency of the crvUSD system "
+                    "under various market conditions."
                 ),
-                html.P("Please choose to run a simulation or load previous results."),
-                dcc.Upload(
-                    id="upload-results",
-                    children=dbc.Button(
-                        "Load Results", id="load-results-button", className="mr-1"
-                    ),
-                    style={"textAlign": "center"},
+                html.P(
+                    "Please choose a scenario to view results for. "
+                    "Experiments define the parameter sets being tested."
+                    "The generic experiment uses the default parameters."
+                ),
+                dbc.Label(
+                    "Select experiment",
+                    html_for="select-experiment",
+                ),
+                dbc.Select(
+                    id="select-experiment",
+                    options=[
+                        {"label": exp.title(), "value": exp}
+                        for exp in list_experiments()
+                    ],
+                    value="generic",
+                ),
+                html.Br(),
+                dbc.Label(
+                    "Select parameters",
+                    html_for="select-parameter",
+                ),
+                dbc.Select(id="select-parameter", disabled=True),
+                html.Br(),
+                dbc.Label(
+                    "Select scenario",
+                    html_for="select-scenario",
+                ),
+                dbc.Select(id="select-scenario", disabled=True),
+                html.Br(),
+                dbc.Button(
+                    "Load Results",
+                    id="load-results-button",
+                    className="mr-1",
+                    disabled=True,
+                    n_clicks=None,
                 ),
                 html.Hr(),
-                html.Div(
-                    [
-                        html.H5("Run Simulation", style={"textAlign": "center"}),
-                        dbc.Form(
-                            [
-                                dbc.Label(
-                                    "Select Scenario", html_for="select-scenario"
-                                ),
-                                dcc.Dropdown(
-                                    id="select-scenario",
-                                    options=[
-                                        {
-                                            "label": "Baseline",
-                                            "value": "baseline",
-                                        },
-                                    ],
-                                    value="baseline",
-                                ),
-                                html.Br(),
-                                dbc.Label("Select Markets", html_for="select-markets"),
-                                dcc.Dropdown(
-                                    [
-                                        {"label": alias, "value": alias}
-                                        for alias in LLAMMA_ALIASES.keys()
-                                    ],
-                                    "wsteth",
-                                    # multi=True,  # TODO
-                                    id="select-markets",
-                                ),
-                                html.Br(),
-                                dbc.Label("Number of Iterations", html_for="num-iter"),
-                                dbc.Input(
-                                    id="num-iter",
-                                    type="number",
-                                    min=1,
-                                    max=10000,
-                                    step=1,
-                                    value=10,
-                                ),
-                                # Parameter changes (disabled for now)
-                                # Responsive price config (disabled for now)
-                                # Responsive liquidity config (disabled for now)
-                                html.Br(),
-                                html.Div(
-                                    dbc.Button(
-                                        "Run Simulation",
-                                        id="run-sim-button",
-                                        className="mr-1",
-                                    ),
-                                    style={"textAlign": "center"},
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
                 html.Br(),
                 dbc.Spinner(
                     html.Div(
@@ -167,9 +142,61 @@ initial_modal = dbc.Modal(
 app.layout = html.Div(
     [
         initial_modal,
-        html.Div(id="main-content"),
+        html.Div(id="main-content", style={"padding-top": "1%"}),
     ]
 )
+
+
+@callback(
+    [
+        Output("select-parameter", "options"),
+        Output("select-parameter", "disabled"),
+    ],
+    Input("select-experiment", "value"),
+    State("initial-modal", "is_open"),
+)
+def update_parameter_dropdown(experiment, is_open):
+    if not is_open or experiment is None:
+        return no_update, no_update
+
+    params = list_param_sweeps(experiment)
+    # Do some label formatting
+    if experiment == "debt_ceilings":
+        labels = [p + "x" for p in params]
+    elif experiment in ["fees", "chainlink_limits"]:
+        labels = [f"{p.replace('_', '.')}%" for p in params]
+    elif experiment == "generic":
+        labels = ["Default Parameters"]
+    else:
+        labels = params
+
+    options = [{"label": label, "value": param} for label, param in zip(labels, params)]
+
+    return options, False
+
+
+@callback(
+    [
+        Output("select-scenario", "options"),
+        Output("select-scenario", "disabled"),
+        Output("load-results-button", "disabled"),
+    ],
+    [
+        Input("select-experiment", "value"),
+        Input("select-parameter", "value"),
+    ],
+    State("initial-modal", "is_open"),
+)
+def update_scenario_dropdown(experiment, param, is_open):
+    if not is_open or param is None or experiment is None:
+        return no_update, no_update, no_update
+
+    params = list_scenarios(experiment, param)
+    labels = [p.replace(".pkl", "").replace("_", " ").title() for p in params]
+
+    options = [{"label": label, "value": param} for label, param in zip(labels, params)]
+
+    return options, False, False
 
 
 @callback(
@@ -179,42 +206,31 @@ app.layout = html.Div(
         Output("loading-simulation", "children"),
     ],
     [
-        Input("upload-results", "contents"),
-        Input("run-sim-button", "n_clicks"),
+        Input("load-results-button", "n_clicks"),
     ],
     [
         State("initial-modal", "is_open"),
+        State("select-experiment", "value"),
+        State("select-parameter", "value"),
         State("select-scenario", "value"),
-        State("select-markets", "value"),
-        State("num-iter", "value"),
     ],
 )
 def generate_content(
-    upload_contents,
-    sim_clicks,
+    nclicks,
     is_open,
+    experiment,
+    parameter,
     scenario,
-    markets,
-    num_iter,
 ):
     """
-    Generate main html content either from the
-    loaded results or the simulation results.
+    Generate main html content from the
+    loaded results.
     """
-    ctx = callback_context
-
-    if not ctx.triggered:
+    if nclicks is None:
         return is_open, no_update, no_update
     else:
-        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
         global output
-        if trigger_id == "upload-results":
-            output = load_results(upload_contents)
-        elif trigger_id == "run-sim-button":
-            output = run_sim(scenario, markets, num_iter)
-        else:
-            return is_open, no_update, no_update
+        output = load_results(experiment, parameter, scenario)
 
     return False, _generate_content(output), no_update
 
@@ -331,7 +347,7 @@ def _generate_content(output: MonteCarloResults):
     )
     blar_card = create_card(
         "Borrower Losses at Risk",
-        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs as a percentage of simulated debt. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
+        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs as a percentage of simulated debt. This includes both LVR and net liquidation losses (i.e. collateral - debt liquidated). This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
         blar_body,
     )
 
@@ -368,86 +384,48 @@ def _generate_content(output: MonteCarloResults):
 
     metric_cards = dbc.CardGroup([var_card, lar_card, blar_card, depeg_card])
 
+    overview_cards = dbc.CardGroup(
+        [
+            create_card(
+                "Scenario Name",
+                metadata["scenario"].title(),
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Number of Iterations",
+                len(output.data),
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Simulation Horizon",
+                f"{metadata['num_steps']} steps of {metadata['freq']}",
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Markets", str(metadata["markets"]), "", color="primary", border=False
+            ),
+        ]
+    )
+
     layout = html.Div(
         [
             html.H1(
-                "crvUSD Risk Simulation Results",
+                "crvUSD Risk Dashboard",
+                style={"textAlign": "center"},
+            ),
+            html.P(
+                "Not financial advice. All assumptions and limitations documented in the INFO tab.",
                 style={"textAlign": "center"},
             ),
             html.Div(
                 dbc.Alert(
-                    [
-                        html.H3("Overview", style={"textAlign": "center"}),
-                        html.Div(
-                            html.Ul(
-                                [
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Scenario Name: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            metadata["scenario"],
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Number of Iterations: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            len(output.data),
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                f"Simulation Horizon: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            metadata["num_steps"],
-                                            " steps of ",
-                                            metadata["freq"],
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Markets: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            str(metadata["markets"]),
-                                        ]
-                                    ),
-                                    # html.Li(
-                                    #     [
-                                    #         html.Span(
-                                    #             "Brief description: ",
-                                    #             style={"font-weight": "bold"},
-                                    #         ),
-                                    #         str(metadata["description"]),
-                                    #     ]
-                                    # ),
-                                ]
-                            ),
-                        ),
-                        html.H5("Disclaimers", style={"textAlign": "center"}),
-                        html.P(
-                            "Not financial advice. All assumptions and limitations documented in the INFO tab.",
-                            style={"textAlign": "center"},
-                        ),
-                        html.Div(
-                            [
-                                dbc.Button(
-                                    "Download Output",
-                                    id="download-button",
-                                    color="secondary",
-                                ),
-                                dcc.Download(id="download-output"),
-                            ],
-                            style={"textAlign": "center"},
-                        ),
-                    ],
+                    overview_cards,
                     color="primary",
                 ),
                 **DIV_KWARGS,
@@ -551,7 +529,7 @@ def _generate_content(output: MonteCarloResults):
                                         dbc.Select(
                                             options=per_run_columns,
                                             id="run-metric-dropdown",
-                                            value="System Health",
+                                            value="Debt Liquidated Pct",
                                         ),
                                         width=4,
                                     ),
@@ -736,7 +714,7 @@ def _generate_content(output: MonteCarloResults):
                                     style={"textAlign": "center"},
                                 ),
                                 dcc.Markdown(
-                                    load_markdown_file("assumptions.md"),
+                                    load_markdown_file("./app/assumptions.md"),
                                     dangerously_allow_html=True,
                                 ),
                             ],
@@ -776,7 +754,7 @@ def update_aggregate_graph(value):
     return fig
 
 
-N = 1  # keep every N rows for run graphs
+N = 3  # keep every N rows for run prices
 
 
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))
@@ -787,7 +765,7 @@ def update_run_graph(value):
     fig = go.Figure()
 
     for run in output.data:
-        dff = run.df[value].iloc[::N]
+        dff = run.df[value]
         fig.add_trace(go.Scatter(x=dff.index, y=dff, mode="lines"))
 
     fig.update_layout(
@@ -818,9 +796,6 @@ def update_run_data_table(value: int):
     ],
 )
 def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
-    # if not n_clicks:
-    #     return no_update
-    # else:
     start = output.metadata["template"].quotes_start
     end = output.metadata["template"].quotes_end
     in_asset_dto = TOKEN_DTOs[in_asset]
@@ -921,4 +896,4 @@ def update_metadata_container(value):
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(port=PORT, host="0.0.0.0")
