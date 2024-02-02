@@ -1,9 +1,9 @@
 """Provides utility functions for the application."""
 from typing import List
+import os
 import base64
 import pickle
 from datetime import datetime
-from multiprocessing import cpu_count
 import numpy as np
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
@@ -11,13 +11,14 @@ from dash import html
 from dash.development.base_component import Component
 import pandas as pd
 from src.data_transfer_objects import TokenDTO
-from src.sim import simulate
 from src.sim.results import MonteCarloResults
 from src.logging import get_logger
 from src.modules import ExternalMarket
 
 
 logger = get_logger(__name__)
+
+RESULTS_DIR = os.path.join(os.getcwd(), "results")
 
 
 def load_markdown_file(filename: str) -> str:
@@ -40,23 +41,49 @@ def clean_metadata(metadata: dict) -> dict:
     return metadata
 
 
-def load_results(contents: str) -> MonteCarloResults:
-    """
-    Load the file contents using pickle and return the output object.
-    """
-    output = pickle.loads(base64.b64decode(contents.split(",")[1]))
-    return output
+### Load data
 
 
-def run_sim(scenario: str, markets: List[str], num_iter: int) -> MonteCarloResults:
+def list_experiments() -> List[str]:
     """
-    Run the simulation with the input parameters and return the output object
+    List the experiments available in the results directory.
     """
-    start = datetime.now()
-    output = simulate(scenario, markets, num_iter=num_iter, ncpu=cpu_count())[0]
-    end = datetime.now()
-    diff = end - start
-    logger.info("Done. Total runtime: %s", diff)
+    return [
+        d
+        for d in os.listdir(RESULTS_DIR)
+        if os.path.isdir(os.path.join(RESULTS_DIR, d))
+    ]
+
+
+def list_param_sweeps(experiment) -> List[str]:
+    """
+    List the parameter sweeps in this directory.
+    """
+    experiment_dir = os.path.join(RESULTS_DIR, experiment)
+    return [
+        d
+        for d in os.listdir(experiment_dir)
+        if os.path.isdir(os.path.join(experiment_dir, d))
+    ]
+
+
+def list_scenarios(experiment, parameter) -> List[str]:
+    """
+    List the scenario.pkl files in this directory.
+    """
+    param_dir = os.path.join(RESULTS_DIR, experiment, parameter)
+    return [
+        d for d in os.listdir(param_dir) if os.path.isfile(os.path.join(param_dir, d))
+    ]
+
+
+def load_results(experiment: str, parameter: str, scenario: str) -> MonteCarloResults:
+    """
+    Load the file contents into a pkl.
+    """
+    fn = os.path.join(RESULTS_DIR, experiment, parameter, scenario)
+    with open(fn, "rb") as f:
+        output = pickle.load(f)
     return output
 
 

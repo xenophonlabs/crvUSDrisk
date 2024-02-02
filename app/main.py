@@ -1,7 +1,5 @@
 """
 Provides a plotly Dash app to visualize simulation results.
-
-Optionally run the simulation before creating the app.
 """
 from datetime import datetime
 import pickle
@@ -27,24 +25,23 @@ from plotly.subplots import make_subplots
 import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import load_figure_template
 from src.sim.results import MonteCarloResults
-from src.logging import get_logger
 from src.plotting.utils import make_square
 from src.configs import ADDRESS_TO_SYMBOL, LLAMMA_ALIASES, TOKEN_DTOs
 from src.utils import get_quotes
 from src.metrics.utils import entity_str
-from .utils import (
+from app.utils import (
     load_markdown_file,
     clean_metadata,
     load_results,
-    run_sim,
     plot_quotes,
     plot_regression,
     create_card,
+    list_experiments,
+    list_param_sweeps,
+    list_scenarios,
 )
 
 plt.switch_backend("Agg")
-
-logger = get_logger(__name__)
 
 DECIMALS = 5  # number of decimal places to round to
 
@@ -79,72 +76,34 @@ initial_modal = dbc.Modal(
         dbc.ModalBody(
             [
                 html.P(
-                    "crvUSD Risk is an Agent Based Model (ABM) that tests the resiliency of the crvUSD system under various market conditions."
+                    "crvUSD Risk is an Agent Based Model (ABM) "
+                    "that tests the resiliency of the crvUSD system "
+                    "under various market conditions."
                 ),
-                html.P("Please choose to run a simulation or load previous results."),
-                dcc.Upload(
-                    id="upload-results",
-                    children=dbc.Button(
-                        "Load Results", id="load-results-button", className="mr-1"
-                    ),
-                    style={"textAlign": "center"},
+                html.P(
+                    "Please choose a scenario to view results for. "
+                    "First select an experiment, then a parameter sweep, "
+                    "and finally a scenario. The generic experiment contains "
+                    'the default parameters, whereas the "fee" experiment '
+                    "contains runs with different swap fees."
                 ),
-                html.Hr(),
-                html.Div(
-                    [
-                        html.H5("Run Simulation", style={"textAlign": "center"}),
-                        dbc.Form(
-                            [
-                                dbc.Label(
-                                    "Select Scenario", html_for="select-scenario"
-                                ),
-                                dcc.Dropdown(
-                                    id="select-scenario",
-                                    options=[
-                                        {
-                                            "label": "Baseline",
-                                            "value": "baseline",
-                                        },
-                                    ],
-                                    value="baseline",
-                                ),
-                                html.Br(),
-                                dbc.Label("Select Markets", html_for="select-markets"),
-                                dcc.Dropdown(
-                                    [
-                                        {"label": alias, "value": alias}
-                                        for alias in LLAMMA_ALIASES.keys()
-                                    ],
-                                    "wsteth",
-                                    # multi=True,  # TODO
-                                    id="select-markets",
-                                ),
-                                html.Br(),
-                                dbc.Label("Number of Iterations", html_for="num-iter"),
-                                dbc.Input(
-                                    id="num-iter",
-                                    type="number",
-                                    min=1,
-                                    max=10000,
-                                    step=1,
-                                    value=10,
-                                ),
-                                # Parameter changes (disabled for now)
-                                # Responsive price config (disabled for now)
-                                # Responsive liquidity config (disabled for now)
-                                html.Br(),
-                                html.Div(
-                                    dbc.Button(
-                                        "Run Simulation",
-                                        id="run-sim-button",
-                                        className="mr-1",
-                                    ),
-                                    style={"textAlign": "center"},
-                                ),
-                            ],
-                        ),
+                dbc.Select(
+                    id="select-experiment",
+                    options=[
+                        {"label": exp.title(), "value": exp}
+                        for exp in list_experiments()
                     ],
                 ),
+                dbc.Select(id="select-parameter", disabled=True),
+                dbc.Select(id="select-scenario", disabled=True),
+                dbc.Button(
+                    "Load Results",
+                    id="load-results-button",
+                    className="mr-1",
+                    disabled=True,
+                    n_clicks=None,
+                ),
+                html.Hr(),
                 html.Br(),
                 dbc.Spinner(
                     html.Div(
@@ -174,47 +133,86 @@ app.layout = html.Div(
 
 @callback(
     [
+        Output("select-parameter", "options"),
+        Output("select-parameter", "disabled"),
+    ],
+    Input("select-experiment", "value"),
+    State("initial-modal", "is_open"),
+)
+def update_parameter_dropdown(experiment, is_open):
+    if not is_open or experiment is None:
+        return no_update, no_update
+
+    params = list_param_sweeps(experiment)
+    # Do some label formatting
+    if experiment == "debt_ceilings":
+        labels = [p + "x" for p in params]
+    elif experiment in ["fees", "chainlink_limits"]:
+        labels = [f"{p.replace('_', '.')}%" for p in params]
+    elif experiment == "generic":
+        labels = ["Default Parameters"]
+
+    options = [{"label": label, "value": param} for label, param in zip(labels, params)]
+
+    return options, False
+
+
+@callback(
+    [
+        Output("select-scenario", "options"),
+        Output("select-scenario", "disabled"),
+        Output("load-results-button", "disabled"),
+    ],
+    [
+        Input("select-experiment", "value"),
+        Input("select-parameter", "value"),
+    ],
+    State("initial-modal", "is_open"),
+)
+def update_scenario_dropdown(experiment, param, is_open):
+    if not is_open or param is None or experiment is None:
+        return no_update, no_update, no_update
+
+    params = list_scenarios(experiment, param)
+    labels = [p.replace(".pkl", "").replace("_", " ").title() for p in params]
+
+    options = [{"label": label, "value": param} for label, param in zip(labels, params)]
+
+    return options, False, False
+
+
+@callback(
+    [
         Output("initial-modal", "is_open"),
         Output("main-content", "children"),
         Output("loading-simulation", "children"),
     ],
     [
-        Input("upload-results", "contents"),
-        Input("run-sim-button", "n_clicks"),
+        Input("load-results-button", "n_clicks"),
     ],
     [
         State("initial-modal", "is_open"),
+        State("select-experiment", "value"),
+        State("select-parameter", "value"),
         State("select-scenario", "value"),
-        State("select-markets", "value"),
-        State("num-iter", "value"),
     ],
 )
 def generate_content(
-    upload_contents,
-    sim_clicks,
+    nclicks,
     is_open,
+    experiment,
+    parameter,
     scenario,
-    markets,
-    num_iter,
 ):
     """
-    Generate main html content either from the
-    loaded results or the simulation results.
+    Generate main html content from the
+    loaded results.
     """
-    ctx = callback_context
-
-    if not ctx.triggered:
+    if nclicks is None:
         return is_open, no_update, no_update
     else:
-        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
         global output
-        if trigger_id == "upload-results":
-            output = load_results(upload_contents)
-        elif trigger_id == "run-sim-button":
-            output = run_sim(scenario, markets, num_iter)
-        else:
-            return is_open, no_update, no_update
+        output = load_results(experiment, parameter, scenario)
 
     return False, _generate_content(output), no_update
 
@@ -736,7 +734,7 @@ def _generate_content(output: MonteCarloResults):
                                     style={"textAlign": "center"},
                                 ),
                                 dcc.Markdown(
-                                    load_markdown_file("assumptions.md"),
+                                    load_markdown_file("./app/assumptions.md"),
                                     dangerously_allow_html=True,
                                 ),
                             ],
@@ -818,9 +816,6 @@ def update_run_data_table(value: int):
     ],
 )
 def fetch_liquidity_curves(n_clicks, in_asset, out_asset):
-    # if not n_clicks:
-    #     return no_update
-    # else:
     start = output.metadata["template"].quotes_start
     end = output.metadata["template"].quotes_end
     in_asset_dto = TOKEN_DTOs[in_asset]
@@ -921,4 +916,4 @@ def update_metadata_container(value):
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(port="8050", host="0.0.0.0")
