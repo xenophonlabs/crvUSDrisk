@@ -4,6 +4,7 @@ Provides a plotly Dash app to visualize simulation results.
 from datetime import datetime
 import pickle
 import json
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +17,6 @@ from dash import (
     Input,
     State,
     no_update,
-    callback_context,
 )
 from dash import dash_table
 import plotly.express as px
@@ -40,6 +40,8 @@ from app.utils import (
     list_param_sweeps,
     list_scenarios,
 )
+
+PORT = os.getenv("PORT", "8050")
 
 plt.switch_backend("Agg")
 
@@ -916,4 +918,4 @@ def update_metadata_container(value):
 
 
 if __name__ == "__main__":
-    app.run(port="8050", host="0.0.0.0")
+    app.run(port=PORT, host="0.0.0.0")
