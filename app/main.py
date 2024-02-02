@@ -74,7 +74,7 @@ load_figure_template("flatly")
 
 initial_modal = dbc.Modal(
     [
-        dbc.ModalHeader(html.H2("crvUSD Risk Simulator")),
+        dbc.ModalHeader(html.H2("crvUSD Risk Dashboard")),
         dbc.ModalBody(
             [
                 html.P(
@@ -84,10 +84,12 @@ initial_modal = dbc.Modal(
                 ),
                 html.P(
                     "Please choose a scenario to view results for. "
-                    "First select an experiment, then a parameter sweep, "
-                    "and finally a scenario. The generic experiment contains "
-                    'the default parameters, whereas the "fee" experiment '
-                    "contains runs with different swap fees."
+                    "Experiments define the parameter sets being tested."
+                    "The generic experiment uses the default parameters."
+                ),
+                dbc.Label(
+                    "Select experiment",
+                    html_for="select-experiment",
                 ),
                 dbc.Select(
                     id="select-experiment",
@@ -95,9 +97,21 @@ initial_modal = dbc.Modal(
                         {"label": exp.title(), "value": exp}
                         for exp in list_experiments()
                     ],
+                    value="generic",
+                ),
+                html.Br(),
+                dbc.Label(
+                    "Select parameters",
+                    html_for="select-parameter",
                 ),
                 dbc.Select(id="select-parameter", disabled=True),
+                html.Br(),
+                dbc.Label(
+                    "Select scenario",
+                    html_for="select-scenario",
+                ),
                 dbc.Select(id="select-scenario", disabled=True),
+                html.Br(),
                 dbc.Button(
                     "Load Results",
                     id="load-results-button",
@@ -128,7 +142,7 @@ initial_modal = dbc.Modal(
 app.layout = html.Div(
     [
         initial_modal,
-        html.Div(id="main-content"),
+        html.Div(id="main-content", style={"padding-top": "1%"}),
     ]
 )
 
@@ -333,7 +347,7 @@ def _generate_content(output: MonteCarloResults):
     )
     blar_card = create_card(
         "Borrower Losses at Risk",
-        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs as a percentage of simulated debt. This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
+        "Borrower Losses at Risk (BLaR) is the p99 maximum borrower losses observed over the simulated runs as a percentage of simulated debt. This includes both LVR and net liquidation losses (i.e. collateral - debt liquidated). This may intuitively be interpreted as: Borrower losses under the input assumptions will only ever exceed BLaR 1% of the time.",
         blar_body,
     )
 
@@ -370,86 +384,48 @@ def _generate_content(output: MonteCarloResults):
 
     metric_cards = dbc.CardGroup([var_card, lar_card, blar_card, depeg_card])
 
+    overview_cards = dbc.CardGroup(
+        [
+            create_card(
+                "Scenario Name",
+                metadata["scenario"].title(),
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Number of Iterations",
+                len(output.data),
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Simulation Horizon",
+                f"{metadata['num_steps']} steps of {metadata['freq']}",
+                "",
+                color="primary",
+                border=False,
+            ),
+            create_card(
+                "Markets", str(metadata["markets"]), "", color="primary", border=False
+            ),
+        ]
+    )
+
     layout = html.Div(
         [
             html.H1(
-                "crvUSD Risk Simulation Results",
+                "crvUSD Risk Dashboard",
+                style={"textAlign": "center"},
+            ),
+            html.P(
+                "Not financial advice. All assumptions and limitations documented in the INFO tab.",
                 style={"textAlign": "center"},
             ),
             html.Div(
                 dbc.Alert(
-                    [
-                        html.H3("Overview", style={"textAlign": "center"}),
-                        html.Div(
-                            html.Ul(
-                                [
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Scenario Name: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            metadata["scenario"],
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Number of Iterations: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            len(output.data),
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                f"Simulation Horizon: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            metadata["num_steps"],
-                                            " steps of ",
-                                            metadata["freq"],
-                                        ]
-                                    ),
-                                    html.Li(
-                                        [
-                                            html.Span(
-                                                "Markets: ",
-                                                style={"font-weight": "bold"},
-                                            ),
-                                            str(metadata["markets"]),
-                                        ]
-                                    ),
-                                    # html.Li(
-                                    #     [
-                                    #         html.Span(
-                                    #             "Brief description: ",
-                                    #             style={"font-weight": "bold"},
-                                    #         ),
-                                    #         str(metadata["description"]),
-                                    #     ]
-                                    # ),
-                                ]
-                            ),
-                        ),
-                        html.H5("Disclaimers", style={"textAlign": "center"}),
-                        html.P(
-                            "Not financial advice. All assumptions and limitations documented in the INFO tab.",
-                            style={"textAlign": "center"},
-                        ),
-                        html.Div(
-                            [
-                                dbc.Button(
-                                    "Download Output",
-                                    id="download-button",
-                                    color="secondary",
-                                ),
-                                dcc.Download(id="download-output"),
-                            ],
-                            style={"textAlign": "center"},
-                        ),
-                    ],
+                    overview_cards,
                     color="primary",
                 ),
                 **DIV_KWARGS,
@@ -553,7 +529,7 @@ def _generate_content(output: MonteCarloResults):
                                         dbc.Select(
                                             options=per_run_columns,
                                             id="run-metric-dropdown",
-                                            value="System Health",
+                                            value="Debt Liquidated Pct",
                                         ),
                                         width=4,
                                     ),
@@ -778,7 +754,7 @@ def update_aggregate_graph(value):
     return fig
 
 
-N = 1  # keep every N rows for run graphs
+N = 3  # keep every N rows for run graphs
 
 
 @callback(Output("run-graph", "figure"), Input("run-metric-dropdown", "value"))

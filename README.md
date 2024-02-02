@@ -13,11 +13,11 @@ crvUSDRisk is a tool for Curve’s researchers and developers to test the resili
 The codebase is organized into four components:
 
 1. `src` contains all the logic for the underlying risk model.
-2. `app` contains all the logic for deploying our Plotly Dashboard for viewing results. Find the dashboard [here](https://crvusdrisk.up.railway.app/).
+2. `app` contains all the logic for deploying our Plotly Dashboard for viewing results. Find the dashboard [here](https://crvusdrisk-dashboard.up.railway.app/).
 3. `scripts` contains all the logic for running the model.
 4. `notebooks` contains some demos for different aspects of the model.
 
-Our analysis of initial model results can be found in this report: **TODO**.
+Our analysis of initial model results can be found in this report: https://xenophonlabs.com/papers/A_Quantitative_Risk_Model_for_crvUSD.pdf.
 
 ### Table of Contents
 
@@ -71,9 +71,8 @@ The prices, liquidities, and other necessary scenario/parameter configurations a
 
 Results for the model runs detailed in our report can be analyzed in this Plotly Dashapp: [crvusdrisk.up.railway.app](crvusdrisk.up.railway.app). The dashboard is the best way to easily analyze individual model runs.
 
-
 # Analysis
 
-Our analysis of initial model results can be found in this report: **TODO**.
+Our analysis of initial model results can be found in this report: https://xenophonlabs.com/papers/A_Quantitative_Risk_Model_for_crvUSD.pdf.
 
 We used the `analysis.ipynb` notebook in `notebooks` to compare results across many scenarios.

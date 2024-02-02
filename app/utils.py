@@ -183,11 +183,18 @@ def plot_regression(
     return fig
 
 
-def create_card(name: str, description: str, body: List[Component]) -> dbc.Card:
+def create_card(
+    name: str,
+    description: str,
+    body: List[Component],
+    color: str = "light",
+    border: bool = True,
+) -> dbc.Card:
     """
     Create the main metric cards.
     """
-    return dbc.Card(
+    classes = "border-0" if not border else ""
+    card = dbc.Card(
         dbc.CardBody(
             [
                 html.H4(
@@ -198,5 +205,9 @@ def create_card(name: str, description: str, body: List[Component]) -> dbc.Card:
                 body,
             ],
         ),
+        color=color,
+        inverse=not border,
+        class_name=classes,
         style={"textAlign": "center"},
     )
+    return card
