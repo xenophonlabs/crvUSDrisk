@@ -1,7 +1,6 @@
 """Provides utility functions for the application."""
 from typing import List
 import os
-import base64
 import pickle
 from datetime import datetime
 import numpy as np
@@ -19,8 +18,7 @@ from src.modules import ExternalMarket
 logger = get_logger(__name__)
 
 RESULTS_DIR = os.path.join(os.getcwd(), "results")
-if "Storage" in os.listdir(RESULTS_DIR):  # railway volumes
-    RESULTS_DIR = os.path.join(RESULTS_DIR, "Storage")
+
 
 def load_markdown_file(filename: str) -> str:
     with open(filename, "r", encoding="utf-8") as file:
@@ -38,7 +36,6 @@ def clean_metadata(metadata: dict) -> dict:
         del metadata_["llamma_params"]["bands_y"]
         for spool in metadata_["stableswap_pools_params"]:
             del spool["coins"]
-        #     spool["coins"] = [c.symbol for c in spool["coins"]]
     return metadata
 
 
