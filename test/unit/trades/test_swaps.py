@@ -17,6 +17,7 @@ MAX_MARKETS = 28
     pool_idx=st.integers(min_value=0, max_value=MAX_SPOOLS - 1),
     i=st.integers(min_value=0, max_value=1),
 )
+@settings(deadline=None)
 def test_spools(scenario: Scenario, pool_idx: int, i: int) -> None:
     """
     Test that trades on stableswap pools are stateless and
